@@ -97,5 +97,20 @@ def test_who_to_ask_reason_is_constrained() -> None:
         WhoToAsk(login="priya", reason="manager", active=True)
 
 
+def test_citation_source_type_is_constrained() -> None:
+    with pytest.raises(ValidationError):
+        Citation(**{**CITATION.model_dump(), "source_type": "pull_request"})
+
+
+def test_decision_rejects_an_unknown_field() -> None:
+    with pytest.raises(ValidationError):
+        Decision(**a_decision(notes="not a decision field"))
+
+
+def test_candidate_rejects_a_path_field() -> None:
+    with pytest.raises(ValidationError):
+        Candidate(id="file:netclient/retry.py", type="File", label="retry.py", path="netclient/retry.py")
+
+
 def test_error_response_shape() -> None:
     assert ErrorResponse(detail="repository not found").detail == "repository not found"

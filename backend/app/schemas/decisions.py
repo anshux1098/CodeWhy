@@ -21,7 +21,7 @@ class Citation(BaseModel):
     kind: CitationKind
     quote: str
     source_url: str
-    source_type: str
+    source_type: SourceType
     author: str
     timestamp: str
 
