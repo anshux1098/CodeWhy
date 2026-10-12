@@ -19,7 +19,8 @@ REQUIRED_METHODS = {
 @pytest.mark.parametrize(("method", "parameters"), sorted(REQUIRED_METHODS.items()))
 def test_protocol_declares_the_seam_methods(method: str, parameters: list[str]) -> None:
     assert hasattr(DataSource, method)
-    assert list(inspect.signature(getattr(DataSource, method)).parameters) == parameters
+    declared = list(inspect.signature(getattr(DataSource, method)).parameters)[1:]
+    assert declared == parameters
 
 
 def test_fixture_is_the_default_implementation() -> None:
