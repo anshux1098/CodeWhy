@@ -1,4 +1,4 @@
-﻿# CodeWhy
+# CodeWhy
 
 Answers "why is this code like this?" for a repository, by reconstructing engineering
 decisions from commit, pull request, issue and design-doc history.
@@ -226,3 +226,7 @@ supersession rules, evidence-based confidence scoring. `stores/`, `graph/`, `pro
 `prompts/` are placeholders. `low_score` has a validator rule but no fixture response, because
 scoring arrives in a later phase. Supersession states in the fixtures are hand-written to match
 the section 6 rules; no code computes them yet.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
