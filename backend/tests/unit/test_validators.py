@@ -37,6 +37,9 @@ ENTITY = Entity(
     path="netclient/config.py",
     decision_count=3,
 )
+CANDIDATE_RETRY = Candidate(id="file:netclient/retry.py", type="File", label="retry.py")
+CANDIDATE_BACKOFF = Candidate(id="key:RETRY_BACKOFF_MS", type="ConfigKey", label="RETRY_BACKOFF_MS")
+TWO_CANDIDATES = [CANDIDATE_RETRY, CANDIDATE_BACKOFF]
 RETRY_FILE = Entity(
     id="file:netclient/retry.py",
     type="File",
@@ -126,7 +129,7 @@ def test_r1_null_reason_code_accepted_on_full() -> None:
 
 @pytest.mark.parametrize("code", ["entity_not_found", "ambiguous_entity", "out_of_scope"])
 def test_r2_entity_must_be_null(code: str) -> None:
-    candidates = [Candidate(id="file:netclient/retry.py", type="File", label="retry.py")] if code == "ambiguous_entity" else []
+    candidates = TWO_CANDIDATES if code == "ambiguous_entity" else []
     answer = None if code == "ambiguous_entity" else "Refused."
     with pytest.raises(ValidationError) as excinfo:
         build(
@@ -154,13 +157,45 @@ def test_r2_ambiguous_requires_candidates() -> None:
     assert "R2_CANDIDATES_EMPTY" in str(excinfo.value)
 
 
+def test_r2_ambiguous_requires_at_least_two_candidates() -> None:
+    with pytest.raises(ValidationError) as excinfo:
+        build(
+            outcome="refusal",
+            reason_code="ambiguous_entity",
+            entity=None,
+            candidates=[CANDIDATE_RETRY],
+            answer=None,
+            confidence=None,
+            decisions=[],
+            citations=[],
+            evidence_gaps=["Say which one you mean."],
+        )
+    assert "R2_CANDIDATES_NOT_AMBIGUOUS" in str(excinfo.value)
+
+
+def test_r2_ambiguous_rejects_duplicate_candidate_ids() -> None:
+    with pytest.raises(ValidationError) as excinfo:
+        build(
+            outcome="refusal",
+            reason_code="ambiguous_entity",
+            entity=None,
+            candidates=[CANDIDATE_RETRY, CANDIDATE_RETRY],
+            answer=None,
+            confidence=None,
+            decisions=[],
+            citations=[],
+            evidence_gaps=["Say which one you mean."],
+        )
+    assert "R2_CANDIDATES_DUPLICATE" in str(excinfo.value)
+
+
 def test_r2_ambiguous_requires_null_answer() -> None:
     with pytest.raises(ValidationError) as excinfo:
         build(
             outcome="refusal",
             reason_code="ambiguous_entity",
             entity=None,
-            candidates=[Candidate(id="file:netclient/retry.py", type="File", label="retry.py")],
+            candidates=TWO_CANDIDATES,
             answer="I am not sure which one you mean.",
             confidence=None,
             evidence_gaps=["Say which one you mean."],
@@ -173,10 +208,7 @@ def test_r2_ambiguous_shape_accepted() -> None:
         outcome="refusal",
         reason_code="ambiguous_entity",
         entity=None,
-        candidates=[
-            Candidate(id="file:netclient/retry.py", type="File", label="retry.py"),
-            Candidate(id="key:RETRY_BACKOFF_MS", type="ConfigKey", label="RETRY_BACKOFF_MS"),
-        ],
+        candidates=TWO_CANDIDATES,
         answer=None,
         confidence=None,
         decisions=[],
@@ -265,11 +297,67 @@ def test_r4_partial_with_no_verified_quote_may_not_be_high() -> None:
 
 @pytest.mark.parametrize("code", ["entity_not_found", "ambiguous_entity", "out_of_scope"])
 def test_r4_prescoring_refusals_must_have_null_confidence(code: str) -> None:
-    candidates = [Candidate(id="file:netclient/retry.py", type="File", label="retry.py")] if code == "ambiguous_entity" else []
+    candidates = TWO_CANDIDATES if code == "ambiguous_entity" else []
     answer = None if code == "ambiguous_entity" else "Refused."
     with pytest.raises(ValidationError) as excinfo:
         build(outcome="refusal", reason_code=code, entity=None, candidates=candidates, answer=answer)
     assert "R4_PRESCORING_CONFIDENCE" in str(excinfo.value)
+
+
+@pytest.mark.parametrize("code", ["no_decision_path", "low_score"])
+def test_r4_scored_refusal_may_not_carry_a_high_label(code: str) -> None:
+    with pytest.raises(ValidationError) as excinfo:
+        build(
+            outcome="refusal",
+            reason_code=code,
+            answer="I cannot answer that.",
+            confidence={"score": 0.9, "signals": HIGH_SIGNALS},
+            decisions=[],
+            citations=[],
+        )
+    assert "R4_REFUSAL_LABEL" in str(excinfo.value)
+
+
+@pytest.mark.parametrize("code", ["no_decision_path", "low_score"])
+def test_r4_scored_refusal_may_carry_a_medium_label(code: str) -> None:
+    refusal = build(
+        outcome="refusal",
+        reason_code=code,
+        answer="I cannot answer that.",
+        confidence={"score": 0.6, "signals": MEDIUM_SIGNALS},
+        decisions=[],
+        citations=[],
+        evidence_gaps=["Nothing found."],
+    )
+    assert refusal.confidence.label == "MEDIUM"
+
+
+@pytest.mark.parametrize(
+    ("outcome", "confidence"),
+    [
+        ("full", {"score": 0.83, "signals": HIGH_SIGNALS}),
+        ("partial", {"score": 0.6, "signals": MEDIUM_SIGNALS}),
+    ],
+)
+def test_r4_full_and_partial_require_a_non_empty_answer(outcome: str, confidence: dict) -> None:
+    with pytest.raises(ValidationError) as excinfo:
+        build(outcome=outcome, answer="   ", confidence=confidence)
+    assert "R4_ANSWER_REQUIRED" in str(excinfo.value)
+
+
+def test_r4_full_requires_a_non_null_answer() -> None:
+    with pytest.raises(ValidationError) as excinfo:
+        build(answer=None)
+    assert "R4_ANSWER_REQUIRED" in str(excinfo.value)
+
+
+def test_r4_full_and_partial_may_carry_a_short_answer() -> None:
+    partial = build(
+        outcome="partial",
+        answer="Because.",
+        confidence={"score": 0.6, "signals": MEDIUM_SIGNALS},
+    )
+    assert partial.answer == "Because."
 
 
 @pytest.mark.parametrize("code", ["no_decision_path", "low_score"])

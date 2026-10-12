@@ -7,6 +7,7 @@ from app.schemas.confidence import ConfidenceScore
 from app.schemas.decisions import Citation, Decision, WhoToAsk
 from app.schemas.entities import Candidate, Entity
 from app.services.response_rules import (
+    check_answer_required,
     check_citations,
     check_confidence,
     check_entity_and_candidates,
@@ -44,5 +45,6 @@ class AskResponse(BaseModel):
         check_entity_and_candidates(self)
         check_citations(self)
         check_confidence(self)
+        check_answer_required(self)
         check_refusal_text(self)
         return self

@@ -22,6 +22,10 @@ PRESCORING_REFUSALS: Final[frozenset[ReasonCode]] = frozenset(
     {ReasonCode.ENTITY_NOT_FOUND, ReasonCode.AMBIGUOUS_ENTITY, ReasonCode.OUT_OF_SCOPE}
 )
 NULL_ENTITY_CODES: Final[frozenset[ReasonCode]] = PRESCORING_REFUSALS
+SCORED_REFUSAL_CODES: Final[frozenset[ReasonCode]] = frozenset(
+    {ReasonCode.NO_DECISION_PATH, ReasonCode.LOW_SCORE}
+)
+AMBIGUOUS_CANDIDATE_MINIMUM: Final[int] = 2
 
 
 def check_reason_code_outcome(response: "AskResponse") -> None:
@@ -52,6 +56,17 @@ def check_entity_and_candidates(response: "AskResponse") -> None:
             raise ValueError(
                 "R2_CANDIDATES_EMPTY: reason_code 'ambiguous_entity' requires a "
                 "non-empty candidates list"
+            )
+        if len(response.candidates) < AMBIGUOUS_CANDIDATE_MINIMUM:
+            raise ValueError(
+                f"R2_CANDIDATES_NOT_AMBIGUOUS: reason_code 'ambiguous_entity' requires at least "
+                f"{AMBIGUOUS_CANDIDATE_MINIMUM} candidates to choose between, got "
+                f"{len(response.candidates)}"
+            )
+        candidate_ids = [candidate.id for candidate in response.candidates]
+        if len(set(candidate_ids)) != len(candidate_ids):
+            raise ValueError(
+                f"R2_CANDIDATES_DUPLICATE: candidates must have distinct ids, got {candidate_ids}"
             )
         if response.answer is not None:
             raise ValueError(
@@ -99,6 +114,11 @@ def check_confidence(response: "AskResponse") -> None:
     confidence = response.confidence
     if confidence is None:
         return
+    if code in SCORED_REFUSAL_CODES and confidence.label is ConfidenceLabel.HIGH:
+        raise ValueError(
+            f"R4_REFUSAL_LABEL: reason_code {code.value!r} requires label MEDIUM or LOW, "
+            f"got {confidence.label.value!r}"
+        )
     if response.outcome is Outcome.FULL and confidence.label is not ConfidenceLabel.HIGH:
         raise ValueError(
             f"R4_FULL_REQUIRES_HIGH: outcome 'full' requires label HIGH, "
@@ -118,6 +138,14 @@ def check_confidence(response: "AskResponse") -> None:
         raise ValueError(
             f"R4_CONTRADICTION_CAP: signals.contradiction is 1, so the score must be "
             f"{CONTRADICTION_SCORE_CAP} or lower, got {confidence.score}"
+        )
+
+
+def check_answer_required(response: "AskResponse") -> None:
+    if response.outcome in {Outcome.FULL, Outcome.PARTIAL} and not (response.answer or "").strip():
+        raise ValueError(
+            f"R4_ANSWER_REQUIRED: outcome {response.outcome.value!r} requires a non-empty "
+            f"answer, got {response.answer!r}"
         )
 
 
