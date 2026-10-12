@@ -6,7 +6,7 @@
     "pull_requests": 5
   },
   "fixture": true,
-  "id": "acme/netclient",
+  "id": "acme-netclient",
   "name": "netclient",
   "url": "https://github.invalid/acme/netclient"
 }

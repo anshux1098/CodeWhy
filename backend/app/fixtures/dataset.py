@@ -4,7 +4,7 @@ from app.schemas.decisions import Citation, Decision, SourceRef, WhoToAsk
 from app.schemas.entities import Entity
 from app.schemas.repository import RepositoryCounts, RepositoryResponse
 
-REPOSITORY_ID = "acme/netclient"
+REPOSITORY_ID = "acme-netclient"
 REPOSITORY_NAME = "netclient"
 REPOSITORY_URL = "https://github.invalid/acme/netclient"
 REPOSITORY = RepositoryResponse(

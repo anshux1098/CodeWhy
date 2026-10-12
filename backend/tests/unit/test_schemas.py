@@ -83,7 +83,7 @@ def test_candidate_has_no_path() -> None:
 
 def test_repository_response_counts() -> None:
     response = RepositoryResponse(
-        id="acme/netclient",
+        id="acme-netclient",
         name="netclient",
         url="https://github.invalid/acme/netclient",
         counts=RepositoryCounts(decisions=5, entities=6, pull_requests=5, commits=9),

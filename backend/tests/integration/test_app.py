@@ -232,21 +232,17 @@ def test_entities_endpoint_rejects_a_blank_query(client) -> None:
     assert client.get(f"{API}/repositories/{REPOSITORY_ID}/entities", params={"q": ""}).status_code == 422
 
 
-def test_the_catch_all_repository_route_is_declared_last() -> None:
+def test_repository_routes_use_a_slug_converter(client) -> None:
     from app.api.routes_repositories import router as repositories_router
 
-    repository_paths = [
-        f"{API}{route.path_format}"
-        for route in repositories_router.routes
-        if route.path_format.startswith("/repositories")
-    ]
-    catch_alls = [
-        index
-        for index, path in enumerate(repository_paths)
-        if path == f"{API}/repositories/{{repository_id}}"
-    ]
-    assert len(catch_alls) == 1
-    assert catch_alls[0] == len(repository_paths) - 1
+    for route in repositories_router.routes:
+        assert "{repository_id}" in route.path_format
+        assert ":path" not in route.path_format
+
+
+def test_a_repository_id_containing_a_slash_is_not_accepted(client) -> None:
+    response = client.get(f"{API}/repositories/acme/netclient")
+    assert response.status_code == 404
 
 
 def test_ask_rejects_an_empty_question(client) -> None:

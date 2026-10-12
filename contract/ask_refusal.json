@@ -24,7 +24,7 @@
     "type": "ConfigKey"
   },
   "evidence_gaps": [
-    "No pull request, issue or design doc in acme/netclient governs _PAD_BYTES.",
+    "No pull request, issue or design doc in acme-netclient governs _PAD_BYTES.",
     "A commit message, review comment or design doc mentioning this constant would settle the question."
   ],
   "fixture": true,

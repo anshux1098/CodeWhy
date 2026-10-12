@@ -217,7 +217,7 @@ class FixtureDataSource:
             entity=None,
             confidence=None,
             evidence_gaps=[
-                f"No entity in acme/netclient matches the name used in the question about {question!r}.",
+                f"No entity in acme-netclient matches the name used in the question about {question!r}.",
                 "The name may belong to a different repository, or the entity may have been deleted.",
             ],
             fixture=True,
@@ -249,7 +249,7 @@ class FixtureDataSource:
             entity=entity,
             confidence={"score": 0.09, "signals": NO_PATH_SIGNALS},
             evidence_gaps=[
-                f"No pull request, issue or design doc in acme/netclient governs {entity.label}.",
+                f"No pull request, issue or design doc in acme-netclient governs {entity.label}.",
                 "A commit message, review comment or design doc mentioning this constant would settle the question.",
             ],
             fixture=True,

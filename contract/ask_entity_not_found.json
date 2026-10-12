@@ -7,7 +7,7 @@
   "decisions": [],
   "entity": null,
   "evidence_gaps": [
-    "No entity in acme/netclient matches the name used in the question about 'Why is TIMEOUT_MS 500?'.",
+    "No entity in acme-netclient matches the name used in the question about 'Why is TIMEOUT_MS 500?'.",
     "The name may belong to a different repository, or the entity may have been deleted."
   ],
   "fixture": true,

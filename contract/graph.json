@@ -2,7 +2,7 @@
   "edges": [
     {
       "rule": null,
-      "source": "acme/netclient",
+      "source": "acme-netclient",
       "target": "module:netclient",
       "type": "CONTAINS"
     },
@@ -172,7 +172,7 @@
   "fixture": true,
   "nodes": [
     {
-      "id": "acme/netclient",
+      "id": "acme-netclient",
       "label": "netclient",
       "props": {
         "url": "https://github.invalid/acme/netclient"

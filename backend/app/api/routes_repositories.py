@@ -16,7 +16,17 @@ NOT_FOUND_RESPONSE: dict = {404: {"model": ErrorResponse}}
 
 
 @router.get(
-    "/repositories/{repository_id:path}/entities",
+    "/repositories/{repository_id}",
+    response_model=RepositoryResponse,
+    responses=NOT_FOUND_RESPONSE,
+    summary="Repository identity and counts",
+)
+def get_repository(repository_id: str, source: DataSource = Depends(get_source)) -> RepositoryResponse:
+    return source.get_repository(repository_id)
+
+
+@router.get(
+    "/repositories/{repository_id}/entities",
     response_model=EntityListResponse,
     responses=NOT_FOUND_RESPONSE,
     summary="Search files, modules and config keys",
@@ -30,7 +40,7 @@ def search_entities(
 
 
 @router.post(
-    "/repositories/{repository_id:path}/ask",
+    "/repositories/{repository_id}/ask",
     response_model=AskResponse,
     responses=NOT_FOUND_RESPONSE,
     summary="Answer a why question, or refuse with a reason code",
@@ -44,7 +54,7 @@ def ask(
 
 
 @router.get(
-    "/repositories/{repository_id:path}/graph",
+    "/repositories/{repository_id}/graph",
     response_model=GraphResponse,
     responses=NOT_FOUND_RESPONSE,
     summary="Bounded subgraph, optionally rooted at one entity",
@@ -55,13 +65,3 @@ def get_graph(
     source: DataSource = Depends(get_source),
 ) -> GraphResponse:
     return source.get_graph(repository_id, entity_id)
-
-
-@router.get(
-    "/repositories/{repository_id:path}",
-    response_model=RepositoryResponse,
-    responses=NOT_FOUND_RESPONSE,
-    summary="Repository identity and counts",
-)
-def get_repository(repository_id: str, source: DataSource = Depends(get_source)) -> RepositoryResponse:
-    return source.get_repository(repository_id)

@@ -1,4 +1,4 @@
-# CodeWhy
+﻿# CodeWhy
 
 Answers "why is this code like this?" for a repository, by reconstructing engineering
 decisions from commit, pull request, issue and design-doc history.
@@ -8,7 +8,7 @@ frontend can be built in parallel. No ingestion, extraction, graph, LLM, embeddi
 resolution, refusal gate or supersession logic exists yet, and every response says so with
 `"fixture": true`.
 
-The fixture repository `acme/netclient` does not exist. Its people (`priya`, `marco`, `lena`,
+The fixture repository `acme-netclient` does not exist. Its people (`priya`, `marco`, `lena`,
 `tom`), pull request numbers and quotes are fictional.
 
 ## Requirements
@@ -138,11 +138,11 @@ PowerShell:
 ```powershell
 $base = "http://127.0.0.1:8000/api/v1"
 Invoke-RestMethod "$base/health"
-Invoke-RestMethod "$base/repositories/acme/netclient"
-Invoke-RestMethod "$base/repositories/acme/netclient/entities?q=retry"
+Invoke-RestMethod "$base/repositories/acme-netclient"
+Invoke-RestMethod "$base/repositories/acme-netclient/entities?q=retry"
 Invoke-RestMethod "$base/decisions/dec_77"
-Invoke-RestMethod "$base/repositories/acme/netclient/graph"
-Invoke-RestMethod "$base/repositories/acme/netclient/ask" -Method Post -Body (@{question = "Why is MAX_RETRIES 3?"} | ConvertTo-Json) -ContentType "application/json"
+Invoke-RestMethod "$base/repositories/acme-netclient/graph"
+Invoke-RestMethod "$base/repositories/acme-netclient/ask" -Method Post -Body (@{question = "Why is MAX_RETRIES 3?"} | ConvertTo-Json) -ContentType "application/json"
 ```
 
 bash:
@@ -150,11 +150,11 @@ bash:
 ```bash
 base=http://127.0.0.1:8000/api/v1
 curl "$base/health"
-curl "$base/repositories/acme/netclient"
-curl "$base/repositories/acme/netclient/entities?q=retry"
+curl "$base/repositories/acme-netclient"
+curl "$base/repositories/acme-netclient/entities?q=retry"
 curl "$base/decisions/dec_77"
-curl "$base/repositories/acme/netclient/graph"
-curl -X POST "$base/repositories/acme/netclient/ask" -H 'content-type: application/json' -d '{"question": "Why is MAX_RETRIES 3?"}'
+curl "$base/repositories/acme-netclient/graph"
+curl -X POST "$base/repositories/acme-netclient/ask" -H 'content-type: application/json' -d '{"question": "Why is MAX_RETRIES 3?"}'
 ```
 
 ## Fixture questions and what they return
