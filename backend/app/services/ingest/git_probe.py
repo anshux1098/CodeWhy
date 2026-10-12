@@ -13,6 +13,8 @@ RECORD_START = "\x02"
 RECORD_END = "\x03"
 FIELD_SEP = "\x1f"
 HISTORY_FORMAT = f"{RECORD_START}%H{FIELD_SEP}%aI{FIELD_SEP}%s{FIELD_SEP}%b{RECORD_END}"
+FILE_HISTORY_FORMAT = f"{RECORD_START}%H{FIELD_SEP}%aI{FIELD_SEP}%s{FIELD_SEP}%ae{FIELD_SEP}%b{RECORD_END}"
+LONG_MESSAGE_CHARS = 150
 SKIP_DIRECTORIES = frozenset({"test", "tests", "docs", "doc", "examples", "example", "benchmarks", "scripts", "build", "dist", "vendor", "__pycache__"})
 SKIP_FILENAMES = frozenset({"setup.py", "conftest.py"})
 REVERT_SUBJECT_PREFIX = "Revert "
@@ -75,6 +77,7 @@ class Commit:
     subject: str
     body: str
     files: tuple[str, ...] = ()
+    author_email: str = ""
 
 
 @dataclass(frozen=True)
@@ -85,6 +88,7 @@ class Revert:
     target_sha: Optional[str]
     target_subject: Optional[str]
     touches_python: bool
+    files: tuple[str, ...] = ()
 
     @property
     def short_sha(self) -> str:
@@ -255,6 +259,48 @@ def parse_history(raw: str) -> list[Commit]:
     return commits
 
 
+def parse_file_history(raw: str) -> list[Commit]:
+    commits: list[Commit] = []
+    for chunk in raw.split(RECORD_START):
+        if not chunk.strip():
+            continue
+        header, _, remainder = chunk.partition(RECORD_END)
+        fields = header.split(FIELD_SEP, 4)
+        if len(fields) < 5:
+            continue
+        sha, authored_at, subject, author_email, body = fields
+        files = tuple(line.strip() for line in remainder.splitlines() if line.strip())
+        commits.append(
+            Commit(
+                sha=sha,
+                authored_at=authored_at,
+                subject=subject,
+                body=body,
+                files=files,
+                author_email=author_email,
+            )
+        )
+    return commits
+
+
+def read_file_history(
+    path: Path,
+    relative_path: str,
+    branch: str,
+    *,
+    runner: CommandRunner = default_runner,
+) -> list[Commit]:
+    result = runner(
+        ["git", "log", "--follow", f"--format={FILE_HISTORY_FORMAT}", "--name-only", branch, "--", relative_path],
+        path,
+    )
+    if result.returncode != 0:
+        raise GitProbeError(
+            f"git log --follow failed for {relative_path}: {(result.stderr or '').strip()[:200]}"
+        )
+    return parse_file_history(result.stdout or "")
+
+
 def is_revert(commit: Commit) -> bool:
     if commit.subject.strip().startswith(REVERT_SUBJECT_PREFIX):
         return True
@@ -287,6 +333,7 @@ def detect_reverts(commits: Iterable[Commit]) -> list[Revert]:
                 target_sha=target_sha,
                 target_subject=target.subject if target else None,
                 touches_python=any(name.endswith(".py") for name in commit.files),
+                files=commit.files,
             )
         )
     return reverts
@@ -381,6 +428,112 @@ def collect_constants(package_dir: Path, root: Path) -> list[Constant]:
     return constants
 
 
+def revert_map(commits: Iterable[Commit]) -> dict[str, Revert]:
+    known = {commit.sha: commit for commit in commits}
+    mapping: dict[str, Revert] = {}
+    for commit in commits:
+        if not is_revert(commit):
+            continue
+        target = revert_target_sha(commit)
+        if not target:
+            continue
+        reverted = known.get(target)
+        mapping[target] = Revert(
+            sha=commit.sha,
+            authored_at=commit.authored_at,
+            subject=commit.subject,
+            target_sha=target,
+            target_subject=reverted.subject if reverted else None,
+            touches_python=any(name.endswith(".py") for name in commit.files),
+            files=commit.files,
+        )
+    return mapping
+
+
+@dataclass(frozen=True)
+class FileHistory:
+    path: str
+    commits: int = 0
+    pr_linked: int = 0
+    reverted: int = 0
+    reverts_touching: int = 0
+    authors: int = 0
+    long_messages: int = 0
+    first_commit_at: Optional[str] = None
+    last_commit_at: Optional[str] = None
+    reverted_commits: tuple[Commit, ...] = ()
+
+    @property
+    def revert_pressure(self) -> int:
+        return self.reverted + self.reverts_touching
+
+
+def summarise_file(
+    relative_path: str,
+    commits: Sequence[Commit],
+    *,
+    revert_targets: dict[str, Revert],
+    all_reverts: Sequence[Revert],
+) -> FileHistory:
+    pull_request_linked = sum(1 for commit in commits if has_pull_request_reference(commit.subject))
+    reverted = [commit for commit in commits if commit.sha in revert_targets]
+    reverts_touching = [revert for revert in all_reverts if relative_path in revert.files]
+    dates = [commit.authored_at for commit in commits if commit.authored_at]
+    return FileHistory(
+        path=relative_path,
+        commits=len(commits),
+        pr_linked=pull_request_linked,
+        reverted=len(reverted),
+        reverts_touching=len(reverts_touching),
+        authors=len({commit.author_email for commit in commits if commit.author_email}),
+        long_messages=sum(1 for commit in commits if len(commit.body) >= LONG_MESSAGE_CHARS),
+        first_commit_at=min(dates) if dates else None,
+        last_commit_at=max(dates) if dates else None,
+        reverted_commits=tuple(reverted),
+    )
+
+
+def class_body_constants(body: Sequence[ast.stmt]) -> list[tuple[str, str]]:
+    found: list[tuple[str, str]] = []
+    for node in body:
+        names = assigned_names(node)
+        if not names:
+            continue
+        value = literal_value(getattr(node, "value", None))
+        if value is None:
+            continue
+        for name in names:
+            if is_upper_constant(name):
+                found.append((name, value))
+    return found
+
+
+def extract_class_constants(source: str, relative_path: str) -> list[Constant]:
+    tree = ast.parse(source)
+    found: list[Constant] = []
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+        for name, value in class_body_constants(node.body):
+            found.append(Constant(name=f"{node.name}.{name}", path=relative_path, value=value))
+    return found
+
+
+def collect_class_constants(package_dir: Path, root: Path) -> list[Constant]:
+    constants: list[Constant] = []
+    for path in iter_python_files(package_dir):
+        try:
+            source = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        try:
+            relative = path.relative_to(root).as_posix()
+        except ValueError:
+            relative = path.as_posix()
+        constants.extend(extract_class_constants(source, relative))
+    return constants
+
+
 def has_pull_request_reference(subject: str) -> bool:
     text = subject or ""
     if "Merge pull request #" in text:
@@ -394,7 +547,11 @@ def constant_history(
     *,
     runner: CommandRunner = default_runner,
 ) -> ConstantHistory:
-    pattern = f"^{constant.name}\\s*(:[^=]+)?="
+    qualified = "." in constant.name
+    raw_name = constant.name.split(".")[-1]
+    pattern = (
+        f"^\\s+{raw_name}\\s*(:[^=]+)?=" if qualified else f"^{raw_name}\\s*(:[^=]+)?="
+    )
     result = runner(
         [
             "git",
