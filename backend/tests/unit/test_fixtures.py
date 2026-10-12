@@ -137,13 +137,23 @@ def test_graph_is_not_truncated_for_the_fixture_repository() -> None:
     assert 0 < len(graph.nodes) <= 80
 
 
-def test_graph_filtered_by_entity_is_a_subset_with_internal_edges() -> None:
-    full = source().get_graph(REPOSITORY_ID, None)
+def test_graph_filtered_by_entity_keeps_every_edge_internal() -> None:
     scoped = source().get_graph(REPOSITORY_ID, "key:MAX_RETRIES")
-    full_ids = {node.id for node in full.nodes}
-    scoped_ids = {node.id for node in scoped.nodes}
-    assert scoped_ids < full_ids
-    assert all(edge.source in scoped_ids and edge.target in scoped_ids for edge in scoped.edges)
+    ids = {node.id for node in scoped.nodes}
+    assert all(edge.source in ids and edge.target in ids for edge in scoped.edges)
+
+
+def test_graph_filtered_by_entity_is_a_subset_of_the_whole_graph() -> None:
+    whole = {node.id for node in source().get_graph(REPOSITORY_ID, None).nodes}
+    scoped = {node.id for node in source().get_graph(REPOSITORY_ID, "key:MAX_RETRIES").nodes}
+    assert scoped <= whole
+    assert REPOSITORY_ID in scoped
+
+
+def test_graph_traversal_depth_bounds_the_neighbourhood() -> None:
+    shallow = {node.id for node in source(max_graph_traversal_depth=1).get_graph(REPOSITORY_ID, "key:MAX_RETRIES").nodes}
+    deep = {node.id for node in source().get_graph(REPOSITORY_ID, "key:MAX_RETRIES").nodes}
+    assert shallow < deep
 
 
 def test_graph_truncation_sets_the_flag_and_drops_dangling_edges() -> None:

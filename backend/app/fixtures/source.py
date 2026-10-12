@@ -22,8 +22,8 @@ from app.schemas.graph import GraphEdge, GraphNode, GraphResponse
 from app.schemas.repository import RepositoryResponse
 from app.services.data_source import NotFoundError
 
-TOKEN_PATTERN = re.compile(r"[a-z0-9_]+")
-SEGMENT_PATTERN = re.compile(r"[a-z0-9]+")
+TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_]+")
+WORD_PATTERN = re.compile(r"[a-z0-9]+")
 MIN_SEGMENT_LENGTH = 3
 
 HIGH_SIGNALS = {
@@ -66,27 +66,27 @@ MAX_RETRIES_HISTORY = ("dec_41", "dec_77", "dec_90")
 def _segments(label: str) -> list[str]:
     return [
         segment
-        for segment in SEGMENT_PATTERN.findall(label.lower())
+        for segment in WORD_PATTERN.findall(label.lower())
         if len(segment) >= MIN_SEGMENT_LENGTH
     ]
 
 
 def matching_entities(question: str) -> list[tuple[str, int]]:
-    tokens = set(TOKEN_PATTERN.findall(question.lower()))
+    words = set(WORD_PATTERN.findall(question.lower()))
     scored: list[tuple[str, int]] = []
     for entity in ENTITIES:
-        score = sum(1 for segment in _segments(entity.label) if segment in tokens)
+        score = sum(1 for segment in _segments(entity.label) if segment in words)
         if score:
             scored.append((entity.id, score))
     best = max((score for _, score in scored), default=0)
-    return sorted((pair for pair in scored if pair[1] == best))
+    return sorted(pair for pair in scored if pair[1] == best)
 
 
 def has_entity_signal(question: str) -> bool:
-    tokens = set(TOKEN_PATTERN.findall(question.lower()))
-    if any("_" in token or token.isupper() for token in tokens):
-        return True
-    return any(entity for entity, _ in matching_entities(question))
+    for token in TOKEN_PATTERN.findall(question):
+        if "_" in token or (len(token) >= MIN_SEGMENT_LENGTH and token.isupper()):
+            return True
+    return bool(matching_entities(question))
 
 
 class FixtureDataSource:
@@ -168,12 +168,16 @@ class FixtureDataSource:
     ) -> tuple[list[GraphNode], list[GraphEdge]]:
         seed = {entity_id, REPOSITORY_ID}
         frontier = {entity_id}
-        connected = {
-            edge.target for edge in edges if edge.source in frontier and edge.target not in seed
-        } | {
-            edge.source for edge in edges if edge.target in frontier and edge.source not in seed
-        }
-        seed |= connected
+        for _ in range(self._settings.max_graph_traversal_depth):
+            connected = {
+                edge.target for edge in edges if edge.source in frontier and edge.target not in seed
+            } | {
+                edge.source for edge in edges if edge.target in frontier and edge.source not in seed
+            }
+            if not connected:
+                break
+            seed |= connected
+            frontier = connected
         kept = [node for node in nodes if node.id in seed]
         kept_ids = {node.id for node in kept}
         return kept, [edge for edge in edges if edge.source in kept_ids and edge.target in kept_ids]

@@ -203,12 +203,12 @@ GRAPH_EDGES: tuple[dict[str, object], ...] = (
 )
 
 EXAMPLE_QUESTIONS: dict[str, dict[str, object]] = {
-    "full": {"question": "Why is max retries set to 3?", "outcome": "full", "reason_code": None},
-    "superseded": {"question": "Is max retries still 6?", "outcome": "full", "reason_code": None},
+    "full": {"question": "Why is MAX_RETRIES 3?", "outcome": "full", "reason_code": None},
+    "superseded": {"question": "Is MAX_RETRIES still 6?", "outcome": "full", "reason_code": None},
     "file": {"question": "Why does config.py change so often?", "outcome": "full", "reason_code": None},
-    "rejected": {"question": "Why is retry backoff configurable?", "outcome": "partial", "reason_code": None},
-    "no_decision_path": {"question": "Why is the pad bytes block size 17?", "outcome": "refusal", "reason_code": "no_decision_path"},
-    "no_verified_quote": {"question": "Why did the netclient helper move?", "outcome": "partial", "reason_code": "no_verified_quote"},
+    "rejected": {"question": "Why is RETRY_BACKOFF_MS configurable?", "outcome": "partial", "reason_code": None},
+    "no_decision_path": {"question": "Why is _PAD_BYTES 17?", "outcome": "refusal", "reason_code": "no_decision_path"},
+    "no_verified_quote": {"question": "Why did the netclient package move that helper into its own module?", "outcome": "partial", "reason_code": "no_verified_quote"},
     "ambiguous": {"question": "Why is retry set this way?", "outcome": "refusal", "reason_code": "ambiguous_entity"},
     "entity_not_found": {"question": "Why is TIMEOUT_MS 500?", "outcome": "refusal", "reason_code": "entity_not_found"},
     "out_of_scope": {"question": "Why was the team late for the demo?", "outcome": "refusal", "reason_code": "out_of_scope"},
