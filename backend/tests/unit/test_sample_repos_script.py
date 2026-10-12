@@ -146,8 +146,9 @@ def test_report_contains_the_table_definitions_cost_and_notes() -> None:
         }
     )
     rows, notes = collect(client, ("acme/one", "acme/two"), 50)
-    report = build_report(rows, notes, "250")
+    report = build_report(rows, notes, "250", 50)
     assert "| repo | sampled |" in report
+    assert "the 50 most recently created merged pull requests" in report
     assert "acme/one" in report
     assert "acme/two" in report
     assert "## Definitions" in report
@@ -160,14 +161,14 @@ def test_report_contains_the_table_definitions_cost_and_notes() -> None:
 def test_report_says_so_when_nothing_failed() -> None:
     client = FakeClient({"acme/one": envelope("acme/one")})
     rows, notes = collect(client, ("acme/one",), 50)
-    report = build_report(rows, notes, "250")
+    report = build_report(rows, notes, "250", 50)
     assert "None. Every candidate returned a row." in report
 
 
 def test_the_sampler_never_writes_a_token_into_the_report() -> None:
     client = FakeClient({"acme/one": envelope("acme/one")})
     rows, notes = collect(client, ("acme/one",), 50)
-    report = build_report(rows, notes, "250")
+    report = build_report(rows, notes, "250", 50)
     for marker in ("ghp_", "github_pat_", "Authorization", "bearer "):
         assert marker not in report
 
