@@ -55,7 +55,7 @@ def test_cors_header_present_on_a_normal_request(client) -> None:
 
 def test_cors_is_not_wildcard(client) -> None:
     response = client.get(f"{API}/health", headers={"Origin": "https://evil.example"})
-    assert response.headers.get("access-control-allow-origin") != "*"
+    assert "access-control-allow-origin" not in response.headers
 
 
 def test_repository_endpoint(client) -> None:
@@ -115,10 +115,57 @@ def test_dependencies_endpoint_reports_every_service(client) -> None:
     assert payload["data_source"] == "fixture"
 
 
-def test_dependencies_endpoint_leaks_no_secret(client) -> None:
-    body = client.get(f"{API}/health/dependencies").text
-    for secret in ("ghp_", "sk-", "Bearer ", "password\": \""):
+def test_dependencies_endpoint_leaks_no_secret() -> None:
+    from fastapi.testclient import TestClient
+
+    from app.api.deps import get_settings
+    from app.config import Settings
+    from app.main import create_app
+
+    fake = Settings(
+        _env_file=None,
+        github_token="ghp_FAKE_TOKEN_VALUE",
+        neo4j_uri="neo4j+s://neo4juser:supersecretpassword@db.example.invalid",
+        neo4j_username="neo4juser",
+        neo4j_password="supersecretpassword",
+        llm_api_key="sk-FAKE-KEY-VALUE",
+    )
+    application = create_app()
+    application.dependency_overrides[get_settings] = lambda: fake
+    try:
+        with TestClient(application) as configured:
+            body = configured.get(f"{API}/health/dependencies").text
+    finally:
+        application.dependency_overrides.clear()
+    for secret in (
+        "ghp_FAKE_TOKEN_VALUE",
+        "supersecretpassword",
+        "sk-FAKE-KEY-VALUE",
+        "neo4juser",
+    ):
         assert secret not in body
+    assert "db.example.invalid" in body
+
+
+def test_entities_endpoint_rejects_a_blank_query(client) -> None:
+    assert client.get(f"{API}/repositories/{REPOSITORY_ID}/entities", params={"q": ""}).status_code == 422
+
+
+def test_the_catch_all_repository_route_is_declared_last() -> None:
+    from app.api.routes_repositories import router as repositories_router
+
+    repository_paths = [
+        f"{API}{route.path_format}"
+        for route in repositories_router.routes
+        if route.path_format.startswith("/repositories")
+    ]
+    catch_alls = [
+        index
+        for index, path in enumerate(repository_paths)
+        if path == f"{API}/repositories/{{repository_id}}"
+    ]
+    assert len(catch_alls) == 1
+    assert catch_alls[0] == len(repository_paths) - 1
 
 
 def test_ask_rejects_an_empty_question(client) -> None:
