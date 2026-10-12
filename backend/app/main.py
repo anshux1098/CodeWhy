@@ -6,9 +6,9 @@ from fastapi.responses import JSONResponse
 
 from app.api import routes_decisions, routes_health, routes_repositories
 from app.services.data_source import NotFoundError
+from app.services.health import APP_VERSION
 
 API_PREFIX = "/api/v1"
-APP_VERSION = "0.1.0"
 FRONTEND_ORIGIN = "http://localhost:5173"
 
 CONTRACT_NOTES = """

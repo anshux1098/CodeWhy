@@ -6,12 +6,16 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel
 
+from app.config import Settings
 from app.fixtures.dataset import REPOSITORY_ID
+from app.fixtures.source import FixtureDataSource
+from app.main import create_app
 from app.schemas.ask import AskResponse
 from app.schemas.decisions import DecisionDetail
 from app.schemas.entities import EntityListResponse
 from app.schemas.graph import GraphResponse
 from app.schemas.repository import RepositoryResponse
+from scripts.export_contract import CONTRACT_SPECS, build_payload
 
 CONTRACT_DIR = Path(__file__).resolve().parents[3] / "contract"
 
@@ -83,3 +87,38 @@ def test_each_ask_contract_file_has_its_documented_outcome(name: str, expected: 
 def test_repository_contract_file_names_the_fixture_repository() -> None:
     payload = json.loads((CONTRACT_DIR / "repository.json").read_text(encoding="utf-8"))
     assert payload["id"] == REPOSITORY_ID
+
+
+NOT_FOUND_PATHS = {
+    "/api/v1/repositories/{repository_id}",
+    "/api/v1/repositories/{repository_id}/entities",
+    "/api/v1/repositories/{repository_id}/ask",
+    "/api/v1/repositories/{repository_id}/graph",
+    "/api/v1/decisions/{decision_id}",
+}
+
+
+def test_openapi_documents_the_404_body_on_every_route_that_can_raise_not_found() -> None:
+    document = json.loads((CONTRACT_DIR / "openapi.json").read_text(encoding="utf-8"))
+    assert "ErrorResponse" in document["components"]["schemas"]
+    for path in sorted(NOT_FOUND_PATHS):
+        operations = document["paths"][path]
+        assert operations, path
+        for method, operation in operations.items():
+            responses = operation["responses"]
+            assert "404" in responses, (path, method)
+            schema = responses["404"]["content"]["application/json"]["schema"]
+            assert schema["$ref"].endswith("/ErrorResponse"), (path, method)
+
+
+def test_contract_files_match_a_fresh_generation() -> None:
+    data_source = FixtureDataSource(Settings(_env_file=None))
+    for name, (model, question) in sorted(CONTRACT_SPECS.items()):
+        payload = build_payload(name, model, question, data_source)
+        fresh = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
+        committed = (CONTRACT_DIR / name).read_bytes().replace(b"\r\n", b"\n")
+        assert committed == fresh, f"contract/{name} has drifted from the fixtures"
+    document = json.loads(json.dumps(create_app().openapi(), sort_keys=True))
+    fresh_openapi = (json.dumps(document, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    committed_openapi = (CONTRACT_DIR / "openapi.json").read_bytes().replace(b"\r\n", b"\n")
+    assert committed_openapi == fresh_openapi, "contract/openapi.json has drifted from create_app()"

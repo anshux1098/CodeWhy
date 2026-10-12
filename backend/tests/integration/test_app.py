@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
 from app.fixtures.dataset import EXAMPLE_QUESTIONS, REPOSITORY_ID
+from app.schemas.errors import ErrorResponse
 
 API = "/api/v1"
 
@@ -71,6 +74,31 @@ def test_unknown_repository_is_404(client) -> None:
     assert "detail" in response.json()
 
 
+@pytest.mark.parametrize(
+    ("method", "url", "body"),
+    [
+        ("GET", f"{API}/repositories/acme/other", None),
+        ("GET", f"{API}/repositories/acme/other/entities?q=x", None),
+        ("POST", f"{API}/repositories/acme/other/ask", {"question": "Why is MAX_RETRIES 3?"}),
+        ("GET", f"{API}/repositories/{REPOSITORY_ID}/graph", None),
+        ("GET", f"{API}/decisions/dec_missing", None),
+    ],
+    ids=["repository", "entities", "ask", "graph", "decision"],
+)
+def test_every_not_found_route_returns_the_error_response_shape(client, method, url, body) -> None:
+    if url.endswith("/graph"):
+        response = client.get(url, params={"entity_id": "key:NO_SUCH_ENTITY"})
+    elif method == "POST":
+        response = client.post(url, json=body)
+    else:
+        response = client.get(url)
+    assert response.status_code == 404
+    payload = response.json()
+    assert set(payload) == {"detail"}
+    assert ErrorResponse.model_validate(payload).detail == payload["detail"]
+    assert payload["detail"].strip()
+
+
 def test_entities_endpoint(client) -> None:
     payload = client.get(f"{API}/repositories/{REPOSITORY_ID}/entities", params={"q": "MAX"}).json()
     assert payload["entities"][0]["label"] == "MAX_RETRIES"
@@ -111,8 +139,40 @@ def test_graph_endpoint_filters_by_entity(client) -> None:
 def test_dependencies_endpoint_reports_every_service(client) -> None:
     payload = client.get(f"{API}/health/dependencies").json()
     states = {service["name"]: service["status"] for service in payload["services"]}
-    assert set(states) == {"github", "neo4j", "llm", "embeddings"}
+    assert states == {
+        "github": "not configured",
+        "neo4j": "not configured",
+        "llm": "not configured",
+        "embeddings": "configured",
+    }
     assert payload["data_source"] == "fixture"
+
+
+def test_health_version_matches_the_openapi_version(client) -> None:
+    live = client.get(f"{API}/health").json()["version"]
+    declared = client.get("/openapi.json").json()["info"]["version"]
+    assert live == declared
+
+
+def test_dependencies_endpoint_survives_a_malformed_neo4j_uri() -> None:
+    from fastapi.testclient import TestClient
+
+    from app.api.deps import get_settings
+    from app.config import Settings
+    from app.main import create_app
+
+    broken = Settings(_env_file=None, neo4j_uri="neo4j+s://db.example.invalid:7687[")
+    application = create_app()
+    application.dependency_overrides[get_settings] = lambda: broken
+    try:
+        with TestClient(application) as configured:
+            response = configured.get(f"{API}/health/dependencies")
+    finally:
+        application.dependency_overrides.clear()
+    assert response.status_code == 200
+    services = {service["name"]: service for service in response.json()["services"]}
+    assert services["neo4j"]["status"] == "configured"
+    assert services["neo4j"]["detail"] == "NEO4J_URI is not a valid URI"
 
 
 def test_dependencies_endpoint_leaks_no_secret() -> None:
@@ -134,9 +194,17 @@ def test_dependencies_endpoint_leaks_no_secret() -> None:
     application.dependency_overrides[get_settings] = lambda: fake
     try:
         with TestClient(application) as configured:
-            body = configured.get(f"{API}/health/dependencies").text
+            response = configured.get(f"{API}/health/dependencies")
     finally:
         application.dependency_overrides.clear()
+    body = response.text
+    states = {service["name"]: service["status"] for service in response.json()["services"]}
+    assert states == {
+        "github": "configured",
+        "neo4j": "configured",
+        "llm": "configured",
+        "embeddings": "configured",
+    }
     for secret in (
         "ghp_FAKE_TOKEN_VALUE",
         "supersecretpassword",
