@@ -35,6 +35,22 @@ def test_graph_response_rejects_a_dangling_edge() -> None:
     assert "R6_DANGLING_EDGE" in str(excinfo.value)
 
 
+def test_graph_response_rejects_duplicate_node_ids() -> None:
+    repeated = nodes(2) + [GraphNode(id="n0", label="a second n0", type="CodeEntity", props={})]
+    with pytest.raises(ValidationError) as excinfo:
+        GraphResponse(nodes=repeated, edges=[], fixture=True)
+    assert "R6_DUPLICATE_NODE" in str(excinfo.value)
+
+
+def test_graph_response_accepts_distinct_node_ids_that_share_a_label() -> None:
+    shared_label = [
+        GraphNode(id="n0", label="retry.py", type="CodeEntity", props={}),
+        GraphNode(id="n1", label="retry.py", type="CodeEntity", props={}),
+    ]
+    graph = GraphResponse(nodes=shared_label, edges=[], fixture=True)
+    assert [node.id for node in graph.nodes] == ["n0", "n1"]
+
+
 def test_graph_response_accepts_an_internal_edge() -> None:
     graph = GraphResponse(
         nodes=nodes(2),

@@ -1,20 +1,45 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
 from app.config import Settings
-from app.fixtures.dataset import CITATIONS, DECISIONS, ENTITIES, EXAMPLE_QUESTIONS, REPOSITORY_ID
+from app.fixtures.dataset import (
+    CITATIONS,
+    DECISIONS,
+    ENTITIES,
+    EXAMPLE_QUESTIONS,
+    GRAPH_EDGES,
+    GRAPH_NODES,
+    REPOSITORY,
+    REPOSITORY_ID,
+    WHO_TO_ASK,
+)
 from app.fixtures.source import FixtureDataSource
 from app.services.data_source import NotFoundError
 
 FICTION_MARKERS = ("acme", "priya", "marco", "lena", "tom")
 REAL_HOST_MARKERS = ("github.com", "gitlab.com", "bitbucket")
+CONTRACT_DIR = Path(__file__).resolve().parents[3] / "contract"
 
 
 def source(**overrides: object) -> FixtureDataSource:
     return FixtureDataSource(Settings(_env_file=None, **overrides))
+
+
+def dataset_blob() -> str:
+    return json.dumps(
+        [entity.model_dump() for entity in ENTITIES]
+        + [decision.model_dump() for decision in DECISIONS]
+        + [citation.model_dump() for citation in CITATIONS]
+        + [person.model_dump() for person in WHO_TO_ASK]
+        + [REPOSITORY.model_dump()]
+        + [dict(node) for node in GRAPH_NODES]
+        + [dict(edge) for edge in GRAPH_EDGES]
+        + [dict(spec) for spec in EXAMPLE_QUESTIONS.values()]
+    )
 
 
 def test_every_example_question_validates_and_is_flagged() -> None:
@@ -27,15 +52,29 @@ def test_every_example_question_validates_and_is_flagged() -> None:
 
 
 def test_no_real_repository_or_login_leaks_into_the_dataset() -> None:
-    blob = json.dumps(
-        [entity.model_dump() for entity in ENTITIES]
-        + [decision.model_dump() for decision in DECISIONS]
-        + [citation.model_dump() for citation in CITATIONS]
-    )
+    blob = dataset_blob()
     for host in REAL_HOST_MARKERS:
         assert host not in blob
     for marker in FICTION_MARKERS:
         assert marker in blob or marker in REPOSITORY_ID
+
+
+def test_every_fixture_collection_reaches_the_fiction_guard() -> None:
+    assert REPOSITORY.url.startswith("https://github.invalid/")
+    assert {person.login for person in WHO_TO_ASK} >= {"priya", "marco", "lena", "tom"}
+    assert any(node["type"] == "Decision" for node in GRAPH_NODES)
+    assert any(edge["type"] == "SUPERSEDES" for edge in GRAPH_EDGES)
+    for spec in EXAMPLE_QUESTIONS.values():
+        assert spec["question"]
+
+
+def test_no_committed_contract_file_names_a_real_host() -> None:
+    contract_files = sorted(CONTRACT_DIR.glob("*.json"))
+    assert contract_files
+    for path in contract_files:
+        body = path.read_text(encoding="utf-8")
+        for host in REAL_HOST_MARKERS:
+            assert host not in body, f"contract/{path.name} leaks {host}"
 
 
 def test_supersession_states_follow_the_section_six_rules() -> None:

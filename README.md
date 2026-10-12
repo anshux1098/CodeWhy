@@ -104,6 +104,7 @@ Without activating, in PowerShell:
 - API docs: <http://127.0.0.1:8000/docs>
 - OpenAPI: <http://127.0.0.1:8000/openapi.json>
 - CORS allows `http://localhost:5173`, which is the Vite dev server.
+  A page opened at `http://127.0.0.1:5173` is a different origin and is blocked, so serve the frontend on `localhost`.
 
 ## Export the contract
 

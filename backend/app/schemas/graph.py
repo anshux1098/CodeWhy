@@ -41,6 +41,11 @@ class GraphResponse(BaseModel):
                 "Truncate before constructing the response."
             )
         known = {node.id for node in self.nodes}
+        if len(known) != len(self.nodes):
+            raise ValueError(
+                f"R6_DUPLICATE_NODE: graph has {len(self.nodes)} nodes but only {len(known)} "
+                f"distinct ids; an edge to a shared id would resolve ambiguously"
+            )
         for edge in self.edges:
             if edge.source not in known or edge.target not in known:
                 raise ValueError(
