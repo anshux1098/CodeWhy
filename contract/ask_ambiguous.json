@@ -1,0 +1,28 @@
+{
+  "answer": null,
+  "candidates": [
+    {
+      "id": "file:netclient/retry.py",
+      "label": "retry.py",
+      "type": "File"
+    },
+    {
+      "id": "key:RETRY_BACKOFF_MS",
+      "label": "RETRY_BACKOFF_MS",
+      "type": "ConfigKey"
+    }
+  ],
+  "citations": [],
+  "code_differs_from_latest": null,
+  "confidence": null,
+  "decisions": [],
+  "entity": null,
+  "evidence_gaps": [
+    "The question matches more than one entity, so no decision path was chosen.",
+    "Repeat the question naming one file, module or config key."
+  ],
+  "fixture": true,
+  "outcome": "refusal",
+  "reason_code": "ambiguous_entity",
+  "who_to_ask": []
+}

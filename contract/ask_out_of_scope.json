@@ -1,0 +1,17 @@
+{
+  "answer": "CodeWhy answers questions about files, modules and config keys. Rephrase the question around the code.",
+  "candidates": [],
+  "citations": [],
+  "code_differs_from_latest": null,
+  "confidence": null,
+  "decisions": [],
+  "entity": null,
+  "evidence_gaps": [
+    "The question does not name a file, a module or a config key.",
+    "A question naming one code entity would let CodeWhy traverse to its decisions."
+  ],
+  "fixture": true,
+  "outcome": "refusal",
+  "reason_code": "out_of_scope",
+  "who_to_ask": []
+}

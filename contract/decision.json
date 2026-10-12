@@ -1,0 +1,38 @@
+{
+  "citations": [
+    {
+      "author": "marco",
+      "decision_id": "dec_77",
+      "id": "cit_77",
+      "kind": "SOURCE",
+      "quote": "Raising MAX_RETRIES to six removes most of the p95 on our long-tail calls without changing any other default.",
+      "source_type": "PullRequest",
+      "source_url": "https://github.invalid/acme/netclient/pull/77",
+      "timestamp": "2024-06-04T09:40:00Z"
+    }
+  ],
+  "conflicts_with": [],
+  "effective_at": "2024-06-04T10:02:00Z",
+  "ended_at": "2024-08-19T14:30:00Z",
+  "evidence_gaps": [],
+  "fixture": true,
+  "id": "dec_77",
+  "probable_superseded_by": [],
+  "rationale": "Six retries removed most of the p95 on long-tail calls.",
+  "reaffirms": [],
+  "recorded_at": "2024-06-04T09:40:00Z",
+  "rule": "2_config_key_changed",
+  "source": {
+    "number": 77,
+    "type": "PullRequest",
+    "url": "https://github.invalid/acme/netclient/pull/77"
+  },
+  "state": "SUPERSEDED",
+  "summary": "Raise MAX_RETRIES to 6 to cut tail latency",
+  "superseded_by": [
+    "dec_90"
+  ],
+  "supersedes": [
+    "dec_41"
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "answer": "Change recorded, rationale unknown. netclient was touched by PR #104, whose description states no reason.",
+  "candidates": [],
+  "citations": [],
+  "code_differs_from_latest": null,
+  "confidence": {
+    "label": "LOW",
+    "score": 0.35,
+    "signals": {
+      "agreement": 0.0,
+      "contradiction": 0.0,
+      "directness": 0.0,
+      "provenance": 0.6,
+      "relevance": 0.5,
+      "temporal_consistency": 1.0
+    }
+  },
+  "decisions": [
+    {
+      "conflicts_with": [],
+      "effective_at": "2025-01-15T17:00:00Z",
+      "ended_at": null,
+      "id": "dec_104",
+      "probable_superseded_by": [],
+      "rationale": null,
+      "reaffirms": [],
+      "recorded_at": "2025-01-15T16:45:00Z",
+      "rule": null,
+      "source": {
+        "number": 104,
+        "type": "PullRequest",
+        "url": "https://github.invalid/acme/netclient/pull/104"
+      },
+      "state": "ACTIVE",
+      "summary": "Move the retry backoff helper from config.py into netclient/retry.py",
+      "superseded_by": [],
+      "supersedes": []
+    }
+  ],
+  "entity": {
+    "decision_count": 1,
+    "id": "module:netclient",
+    "label": "netclient",
+    "path": "netclient/",
+    "type": "Module"
+  },
+  "evidence_gaps": [
+    "PR #104 has no quoted rationale that survived the quote check.",
+    "A review comment or a design doc on the move would settle the question."
+  ],
+  "fixture": true,
+  "outcome": "partial",
+  "reason_code": "no_verified_quote",
+  "who_to_ask": [
+    {
+      "active": true,
+      "login": "tom",
+      "reason": "recent_contributor"
+    }
+  ]
+}

@@ -1,0 +1,385 @@
+{
+  "edges": [
+    {
+      "rule": null,
+      "source": "acme/netclient",
+      "target": "module:netclient",
+      "type": "CONTAINS"
+    },
+    {
+      "rule": null,
+      "source": "module:netclient",
+      "target": "file:netclient/config.py",
+      "type": "CONTAINS"
+    },
+    {
+      "rule": null,
+      "source": "module:netclient",
+      "target": "file:netclient/retry.py",
+      "type": "CONTAINS"
+    },
+    {
+      "rule": null,
+      "source": "file:netclient/config.py",
+      "target": "key:MAX_RETRIES",
+      "type": "CONTAINS"
+    },
+    {
+      "rule": null,
+      "source": "file:netclient/config.py",
+      "target": "key:_PAD_BYTES",
+      "type": "CONTAINS"
+    },
+    {
+      "rule": null,
+      "source": "file:netclient/config.py",
+      "target": "key:RETRY_BACKOFF_MS",
+      "type": "CONTAINS"
+    },
+    {
+      "rule": null,
+      "source": "dec_41",
+      "target": "key:MAX_RETRIES",
+      "type": "GOVERNS"
+    },
+    {
+      "rule": null,
+      "source": "dec_77",
+      "target": "key:MAX_RETRIES",
+      "type": "GOVERNS"
+    },
+    {
+      "rule": null,
+      "source": "dec_90",
+      "target": "key:MAX_RETRIES",
+      "type": "GOVERNS"
+    },
+    {
+      "rule": null,
+      "source": "dec_55",
+      "target": "key:RETRY_BACKOFF_MS",
+      "type": "GOVERNS"
+    },
+    {
+      "rule": null,
+      "source": "dec_104",
+      "target": "file:netclient/retry.py",
+      "type": "GOVERNS"
+    },
+    {
+      "rule": "1_revert_commit",
+      "source": "dec_90",
+      "target": "dec_77",
+      "type": "SUPERSEDES"
+    },
+    {
+      "rule": "2_config_key_changed",
+      "source": "dec_77",
+      "target": "dec_41",
+      "type": "SUPERSEDES"
+    },
+    {
+      "rule": null,
+      "source": "dec_41",
+      "target": "pr:41",
+      "type": "DECIDED_IN"
+    },
+    {
+      "rule": null,
+      "source": "dec_77",
+      "target": "pr:77",
+      "type": "DECIDED_IN"
+    },
+    {
+      "rule": null,
+      "source": "dec_90",
+      "target": "pr:90",
+      "type": "DECIDED_IN"
+    },
+    {
+      "rule": null,
+      "source": "dec_55",
+      "target": "pr:55",
+      "type": "DECIDED_IN"
+    },
+    {
+      "rule": null,
+      "source": "dec_104",
+      "target": "pr:104",
+      "type": "DECIDED_IN"
+    },
+    {
+      "rule": null,
+      "source": "dec_41",
+      "target": "ev:cit_41",
+      "type": "SUPPORTED_BY"
+    },
+    {
+      "rule": null,
+      "source": "dec_77",
+      "target": "ev:cit_77",
+      "type": "SUPPORTED_BY"
+    },
+    {
+      "rule": null,
+      "source": "dec_90",
+      "target": "ev:cit_90",
+      "type": "SUPPORTED_BY"
+    },
+    {
+      "rule": null,
+      "source": "dec_55",
+      "target": "ev:cit_55",
+      "type": "SUPPORTED_BY"
+    },
+    {
+      "rule": null,
+      "source": "person:priya",
+      "target": "pr:41",
+      "type": "AUTHORED"
+    },
+    {
+      "rule": null,
+      "source": "person:marco",
+      "target": "pr:77",
+      "type": "AUTHORED"
+    },
+    {
+      "rule": null,
+      "source": "person:lena",
+      "target": "pr:90",
+      "type": "AUTHORED"
+    },
+    {
+      "rule": null,
+      "source": "person:tom",
+      "target": "pr:55",
+      "type": "AUTHORED"
+    },
+    {
+      "rule": null,
+      "source": "person:tom",
+      "target": "pr:104",
+      "type": "AUTHORED"
+    },
+    {
+      "rule": null,
+      "source": "person:lena",
+      "target": "pr:77",
+      "type": "REVIEWED"
+    }
+  ],
+  "fixture": true,
+  "nodes": [
+    {
+      "id": "acme/netclient",
+      "label": "netclient",
+      "props": {
+        "url": "https://github.invalid/acme/netclient"
+      },
+      "type": "Repository"
+    },
+    {
+      "id": "module:netclient",
+      "label": "netclient",
+      "props": {
+        "entity_type": "Module",
+        "path": "netclient/"
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:netclient/config.py",
+      "label": "config.py",
+      "props": {
+        "entity_type": "File",
+        "path": "netclient/config.py"
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:netclient/retry.py",
+      "label": "retry.py",
+      "props": {
+        "entity_type": "File",
+        "path": "netclient/retry.py"
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "key:MAX_RETRIES",
+      "label": "MAX_RETRIES",
+      "props": {
+        "entity_type": "ConfigKey",
+        "path": "netclient/config.py"
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "key:_PAD_BYTES",
+      "label": "_PAD_BYTES",
+      "props": {
+        "entity_type": "ConfigKey",
+        "path": "netclient/config.py"
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "key:RETRY_BACKOFF_MS",
+      "label": "RETRY_BACKOFF_MS",
+      "props": {
+        "entity_type": "ConfigKey",
+        "path": "netclient/config.py"
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "dec_41",
+      "label": "Cap MAX_RETRIES at 3",
+      "props": {
+        "state": "ACTIVE"
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_77",
+      "label": "Raise MAX_RETRIES to 6",
+      "props": {
+        "rule": "2_config_key_changed",
+        "state": "SUPERSEDED"
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_90",
+      "label": "Revert MAX_RETRIES to 3",
+      "props": {
+        "rule": "1_revert_commit",
+        "state": "ACTIVE"
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_55",
+      "label": "Make the retry backoff configurable",
+      "props": {
+        "state": "REJECTED"
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_104",
+      "label": "Move the retry backoff helper",
+      "props": {
+        "state": "ACTIVE"
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "pr:41",
+      "label": "Pull request 41",
+      "props": {
+        "number": 41
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:55",
+      "label": "Pull request 55",
+      "props": {
+        "merged": false,
+        "number": 55
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:77",
+      "label": "Pull request 77",
+      "props": {
+        "number": 77
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:90",
+      "label": "Pull request 90",
+      "props": {
+        "number": 90
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:104",
+      "label": "Pull request 104",
+      "props": {
+        "number": 104
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "person:priya",
+      "label": "priya",
+      "props": {
+        "login": "priya"
+      },
+      "type": "Person"
+    },
+    {
+      "id": "person:marco",
+      "label": "marco",
+      "props": {
+        "login": "marco"
+      },
+      "type": "Person"
+    },
+    {
+      "id": "person:lena",
+      "label": "lena",
+      "props": {
+        "login": "lena"
+      },
+      "type": "Person"
+    },
+    {
+      "id": "person:tom",
+      "label": "tom",
+      "props": {
+        "login": "tom"
+      },
+      "type": "Person"
+    },
+    {
+      "id": "ev:cit_41",
+      "label": "Verified quote from 41",
+      "props": {
+        "quote_verified": true
+      },
+      "type": "Evidence"
+    },
+    {
+      "id": "ev:cit_77",
+      "label": "Verified quote from 77",
+      "props": {
+        "quote_verified": true
+      },
+      "type": "Evidence"
+    },
+    {
+      "id": "ev:cit_90",
+      "label": "Verified revert quote from 90",
+      "props": {
+        "quote_verified": true
+      },
+      "type": "Evidence"
+    },
+    {
+      "id": "ev:cit_55",
+      "label": "Verified quote from 55",
+      "props": {
+        "quote_verified": true
+      },
+      "type": "Evidence"
+    }
+  ],
+  "truncated": false
+}

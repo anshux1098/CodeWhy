@@ -1,0 +1,20 @@
+{
+  "entities": [
+    {
+      "decision_count": 1,
+      "id": "file:netclient/retry.py",
+      "label": "retry.py",
+      "path": "netclient/retry.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 1,
+      "id": "key:RETRY_BACKOFF_MS",
+      "label": "RETRY_BACKOFF_MS",
+      "path": "netclient/config.py",
+      "type": "ConfigKey"
+    }
+  ],
+  "fixture": true,
+  "query": "retry"
+}

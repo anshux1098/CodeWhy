@@ -1,0 +1,34 @@
+{
+  "answer": "No recorded decision explains _PAD_BYTES. The constant exists, but nothing in the history says why.",
+  "candidates": [],
+  "citations": [],
+  "code_differs_from_latest": null,
+  "confidence": {
+    "label": "LOW",
+    "score": 0.09,
+    "signals": {
+      "agreement": 0.0,
+      "contradiction": 0.0,
+      "directness": 0.0,
+      "provenance": 0.0,
+      "relevance": 0.3,
+      "temporal_consistency": 0.3
+    }
+  },
+  "decisions": [],
+  "entity": {
+    "decision_count": 0,
+    "id": "key:_PAD_BYTES",
+    "label": "_PAD_BYTES",
+    "path": "netclient/config.py",
+    "type": "ConfigKey"
+  },
+  "evidence_gaps": [
+    "No pull request, issue or design doc in acme/netclient governs _PAD_BYTES.",
+    "A commit message, review comment or design doc mentioning this constant would settle the question."
+  ],
+  "fixture": true,
+  "outcome": "refusal",
+  "reason_code": "no_decision_path",
+  "who_to_ask": []
+}

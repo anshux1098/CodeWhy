@@ -1,0 +1,17 @@
+{
+  "answer": "No file, module or config key in this repository matches that name.",
+  "candidates": [],
+  "citations": [],
+  "code_differs_from_latest": null,
+  "confidence": null,
+  "decisions": [],
+  "entity": null,
+  "evidence_gaps": [
+    "No entity in acme/netclient matches the name used in the question about 'Why is TIMEOUT_MS 500?'.",
+    "The name may belong to a different repository, or the entity may have been deleted."
+  ],
+  "fixture": true,
+  "outcome": "refusal",
+  "reason_code": "entity_not_found",
+  "who_to_ask": []
+}

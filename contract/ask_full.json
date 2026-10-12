@@ -1,0 +1,137 @@
+{
+  "answer": "MAX_RETRIES is 3 because PR #41 capped it at three to match the mobile client, which gives up after three retries. PR #77 raised it to 6 and PR #90 reverted that.",
+  "candidates": [],
+  "citations": [
+    {
+      "author": "priya",
+      "decision_id": "dec_41",
+      "id": "cit_41",
+      "kind": "SOURCE",
+      "quote": "The mobile client gives up after three retries, so capping the library at the same number keeps behaviour identical on both sides.",
+      "source_type": "PullRequest",
+      "source_url": "https://github.invalid/acme/netclient/pull/41",
+      "timestamp": "2024-02-11T09:14:00Z"
+    },
+    {
+      "author": "lena",
+      "decision_id": "dec_90",
+      "id": "cit_90",
+      "kind": "SOURCE",
+      "quote": "Revert \"Raise MAX_RETRIES to 6\"",
+      "source_type": "PullRequest",
+      "source_url": "https://github.invalid/acme/netclient/pull/90",
+      "timestamp": "2024-08-19T14:12:00Z"
+    }
+  ],
+  "code_differs_from_latest": false,
+  "confidence": {
+    "label": "HIGH",
+    "score": 0.83,
+    "signals": {
+      "agreement": 0.4,
+      "contradiction": 0.0,
+      "directness": 1.0,
+      "provenance": 0.8,
+      "relevance": 0.9,
+      "temporal_consistency": 1.0
+    }
+  },
+  "decisions": [
+    {
+      "conflicts_with": [],
+      "effective_at": "2024-02-11T09:20:00Z",
+      "ended_at": "2024-06-04T10:02:00Z",
+      "id": "dec_41",
+      "probable_superseded_by": [],
+      "rationale": "The mobile client gives up after three retries, so a longer library loop only wastes battery.",
+      "reaffirms": [],
+      "recorded_at": "2024-02-11T09:14:00Z",
+      "rule": null,
+      "source": {
+        "number": 41,
+        "type": "PullRequest",
+        "url": "https://github.invalid/acme/netclient/pull/41"
+      },
+      "state": "ACTIVE",
+      "summary": "Cap MAX_RETRIES at 3 to match the mobile client retry budget",
+      "superseded_by": [
+        "dec_77"
+      ],
+      "supersedes": []
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": "2024-06-04T10:02:00Z",
+      "ended_at": "2024-08-19T14:30:00Z",
+      "id": "dec_77",
+      "probable_superseded_by": [],
+      "rationale": "Six retries removed most of the p95 on long-tail calls.",
+      "reaffirms": [],
+      "recorded_at": "2024-06-04T09:40:00Z",
+      "rule": "2_config_key_changed",
+      "source": {
+        "number": 77,
+        "type": "PullRequest",
+        "url": "https://github.invalid/acme/netclient/pull/77"
+      },
+      "state": "SUPERSEDED",
+      "summary": "Raise MAX_RETRIES to 6 to cut tail latency",
+      "superseded_by": [
+        "dec_90"
+      ],
+      "supersedes": [
+        "dec_41"
+      ]
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": "2024-08-19T14:30:00Z",
+      "ended_at": null,
+      "id": "dec_90",
+      "probable_superseded_by": [],
+      "rationale": "The battery regression outweighed the latency gain, so the original cap came back.",
+      "reaffirms": [],
+      "recorded_at": "2024-08-19T14:12:00Z",
+      "rule": "1_revert_commit",
+      "source": {
+        "number": 90,
+        "type": "PullRequest",
+        "url": "https://github.invalid/acme/netclient/pull/90"
+      },
+      "state": "ACTIVE",
+      "summary": "Revert MAX_RETRIES to 3 after the latency fix regressed mobile battery",
+      "superseded_by": [],
+      "supersedes": [
+        "dec_77"
+      ]
+    }
+  ],
+  "entity": {
+    "decision_count": 3,
+    "id": "key:MAX_RETRIES",
+    "label": "MAX_RETRIES",
+    "path": "netclient/config.py",
+    "type": "ConfigKey"
+  },
+  "evidence_gaps": [],
+  "fixture": true,
+  "outcome": "full",
+  "reason_code": null,
+  "who_to_ask": [
+    {
+      "active": true,
+      "login": "priya",
+      "reason": "author"
+    },
+    {
+      "active": true,
+      "login": "lena",
+      "reason": "reviewer"
+    },
+    {
+      "active": false,
+      "login": "marco",
+      "reason": "recent_contributor"
+    }
+  ]
+}
