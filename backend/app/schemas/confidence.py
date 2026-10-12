@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.common import ConfidenceLabel
@@ -14,7 +16,7 @@ class ConfidenceSignals(BaseModel):
     agreement: float = Field(ge=0.0, le=1.0)
     relevance: float = Field(ge=0.0, le=1.0)
     temporal_consistency: float = Field(ge=0.0, le=1.0)
-    contradiction: float = Field(ge=0.0, le=1.0)
+    contradiction: Literal[0.0, 1.0]
 
 
 class ConfidenceScore(BaseModel):

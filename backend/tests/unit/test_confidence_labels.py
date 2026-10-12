@@ -59,6 +59,29 @@ def test_signals_must_be_between_zero_and_one() -> None:
         ConfidenceSignals(directness=1.5)
 
 
+def test_contradiction_is_binary() -> None:
+    with pytest.raises(ValidationError):
+        ConfidenceSignals(
+            directness=1.0,
+            provenance=0.8,
+            agreement=0.4,
+            relevance=0.9,
+            temporal_consistency=1.0,
+            contradiction=0.999,
+        )
+
+
+def test_contradiction_accepts_exactly_one_and_zero() -> None:
+    assert ConfidenceSignals(
+        directness=1.0,
+        provenance=0.8,
+        agreement=0.4,
+        relevance=0.9,
+        temporal_consistency=1.0,
+        contradiction=1.0,
+    ).contradiction == 1.0
+
+
 def test_missing_signals_are_rejected() -> None:
     with pytest.raises(ValidationError):
         ConfidenceScore(score=0.9)

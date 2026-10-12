@@ -90,7 +90,7 @@ def build(**overrides: object) -> AskResponse:
 
 @pytest.mark.parametrize(
     "code",
-    ["entity_not_found", "ambiguous_entity", "out_of_scope", "no_decision_path", "low_score"],
+    ["entity_not_found", "ambiguous_entity", "out_of_scope", "no_decision_path", "low_score", "no_verified_quote"],
 )
 def test_r1_refusal_only_code_rejected_on_full(code: str) -> None:
     with pytest.raises(ValidationError) as excinfo:
