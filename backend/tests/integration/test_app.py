@@ -136,8 +136,21 @@ def test_graph_endpoint_filters_by_entity(client) -> None:
     assert all(edge["source"] in ids and edge["target"] in ids for edge in scoped["edges"])
 
 
-def test_dependencies_endpoint_reports_every_service(client) -> None:
-    payload = client.get(f"{API}/health/dependencies").json()
+def test_dependencies_endpoint_reports_every_service() -> None:
+    from fastapi.testclient import TestClient
+
+    from app.api.deps import get_settings
+    from app.config import Settings
+    from app.main import create_app
+
+    empty = Settings(_env_file=None)
+    application = create_app()
+    application.dependency_overrides[get_settings] = lambda: empty
+    try:
+        with TestClient(application) as unconfigured:
+            payload = unconfigured.get(f"{API}/health/dependencies").json()
+    finally:
+        application.dependency_overrides.clear()
     states = {service["name"]: service["status"] for service in payload["services"]}
     assert states == {
         "github": "not configured",
