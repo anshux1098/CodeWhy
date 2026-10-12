@@ -14,6 +14,7 @@ from app.services.ingest.git_probe import (
     METRIC_DEFINITIONS,
     MIN_CONSTANT_COMMITS,
     TOP_CONSTANTS,
+    TOP_REVERTS,
     CommandRunner,
     RepoProbe,
     collect_constants,
@@ -85,8 +86,15 @@ def probe_repository(
         probe.default_branch = branch
         commits = read_history(path, branch, runner=runner)
         probe.total_commits = len(commits)
-        probe.reverts = detect_reverts(commits)[:10]
-        probe.notes.append(f"{repo}: {len(probe.reverts)} reverts shown, of the full history")
+        all_reverts = detect_reverts(commits)
+        probe.revert_count = len(all_reverts)
+        probe.python_revert_count = sum(1 for revert in all_reverts if revert.touches_python)
+        probe.reverts = all_reverts[:TOP_REVERTS]
+        probe.notes.append(
+            f"{repo}: {probe.revert_count} reverts in the full history, "
+            f"{probe.python_revert_count} of them touching .py; "
+            f"showing the {len(probe.reverts)} most recent"
+        )
     except Exception as exc:
         probe.status = "failed"
         probe.notes.append(f"{repo}: history probe failed: {exc.__class__.__name__}: {str(exc)[:160]}")
@@ -117,7 +125,7 @@ def render_revert_table(probes: Sequence[RepoProbe]) -> str:
     header = "| repo | branch | total commits | reverts | reverts touching .py | status |"
     divider = "| --- | --- | --- | --- | --- | --- |"
     rows = [
-        f"| {p.repo} | {p.default_branch or 'n/a'} | {p.total_commits} | {len(p.reverts)} | "
+        f"| {p.repo} | {p.default_branch or 'n/a'} | {p.total_commits} | {p.revert_count} | "
         f"{p.reverts_touching_python} | {p.status} |"
         for p in probes
     ]
@@ -175,7 +183,8 @@ def build_report(probes: Sequence[RepoProbe]) -> str:
         "",
         render_revert_table(probes),
         "",
-        f"Showing the {len(probes[0].reverts) if probes else 0} most recent reverts per repository.",
+        f"Showing the {TOP_REVERTS} most recent reverts per repository. The reverts column above counts the "
+        "full history, not only the rows listed here.",
         "",
         "## Most recent reverts",
         "",

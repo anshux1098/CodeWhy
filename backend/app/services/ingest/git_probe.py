@@ -19,6 +19,7 @@ REVERT_SUBJECT_PREFIX = "Revert "
 REVERT_BODY_MARKER = "This reverts commit "
 VALUE_DISPLAY_LIMIT = 40
 TOP_CONSTANTS = 25
+TOP_REVERTS = 10
 MIN_CONSTANT_COMMITS = 2
 COMMAND_TIMEOUT_SECONDS = 300
 
@@ -121,6 +122,8 @@ class RepoProbe:
     repo: str
     default_branch: str = ""
     total_commits: int = 0
+    revert_count: int = 0
+    python_revert_count: int = 0
     reverts: list[Revert] = field(default_factory=list)
     constants_found: int = 0
     constant_histories: list[ConstantHistory] = field(default_factory=list)
@@ -129,7 +132,7 @@ class RepoProbe:
 
     @property
     def reverts_touching_python(self) -> int:
-        return sum(1 for revert in self.reverts if revert.touches_python)
+        return self.python_revert_count
 
 
 CommandRunner = Callable[[Sequence[str], Path], subprocess.CompletedProcess]
@@ -149,6 +152,8 @@ def default_runner(args: Sequence[str], cwd: Path) -> subprocess.CompletedProces
         env=git_environment(),
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=COMMAND_TIMEOUT_SECONDS,
         check=False,
     )

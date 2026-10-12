@@ -151,6 +151,17 @@ def test_parse_history_skips_noise_and_keeps_multiline_bodies() -> None:
     assert commits[0].files == ("pkg/a.py", "README.md")
 
 
+def test_non_ascii_commit_bodies_survive_the_real_git_runner(tmp_path: Path) -> None:
+    repo = build_repo(tmp_path / "r", {"pkg/config.py": "MAX = 1\n"})
+    commit_file(repo, "pkg/config.py", "MAX = 2\n", "Prüfung der Größe (#7)\n\nÄnderung an der Zeichenkette – ok.")
+    branch = default_branch(repo)
+    commits = read_history(repo, branch)
+    assert len(commits) == 2
+    assert "Zeichenkette" in commits[0].body
+    assert "�" not in commits[0].subject
+    assert commits[0].subject == "Prüfung der Größe (#7)"
+
+
 # Constant extraction
 
 
