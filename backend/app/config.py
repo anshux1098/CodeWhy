@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from typing import Final
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.schemas.common import GRAPH_NODE_CAP
 
 DATA_SOURCES: Final[tuple[str, ...]] = ("fixture", "graph")
 SUPPORTED_EMBEDDING_PROVIDERS: Final[frozenset[str]] = frozenset({"local"})
@@ -55,7 +57,15 @@ class Settings(BaseSettings):
     min_score: float = 0.55
 
     data_source: str = "fixture"
-    max_graph_nodes: int = 80
+    max_graph_nodes: int = Field(
+        default=80,
+        gt=0,
+        le=GRAPH_NODE_CAP,
+        description=(
+            "Lowers the /graph node cap. Never raises it: the hard cap is GRAPH_NODE_CAP in "
+            "app.schemas.common, which every GraphResponse is validated against."
+        ),
+    )
     app_env: str = "dev"
     log_level: str = "INFO"
 
@@ -87,7 +97,6 @@ class Settings(BaseSettings):
         "max_graph_traversal_depth",
         "max_chain_length",
         "max_evidence_items",
-        "max_graph_nodes",
         "embedding_dimensions",
         "max_llm_tokens_per_run",
     )

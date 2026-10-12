@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.config import Settings, SettingsError
+from app.schemas.common import GRAPH_NODE_CAP
 
 CREDENTIAL_FIELDS = [
     "github_token",
@@ -77,3 +78,10 @@ def test_unknown_data_source_is_rejected() -> None:
 def test_min_score_outside_zero_to_one_is_rejected() -> None:
     with pytest.raises(ValueError):
         Settings(_env_file=None, min_score=1.5)
+
+
+def test_max_graph_nodes_can_lower_the_cap_but_not_raise_it() -> None:
+    assert Settings(_env_file=None, max_graph_nodes=10).max_graph_nodes == 10
+    assert Settings(_env_file=None).max_graph_nodes == GRAPH_NODE_CAP
+    with pytest.raises(ValueError):
+        Settings(_env_file=None, max_graph_nodes=GRAPH_NODE_CAP + 1)

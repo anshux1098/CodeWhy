@@ -207,6 +207,10 @@ feature that needs them runs, through `Settings.require_github()`, `require_neo4
 `DATA_SOURCE` picks the data-source implementation. Phase 0 ships only `fixture`;
 `GraphDataSource` arrives in Phase 3.
 
+`MAX_GRAPH_NODES` can only **lower** the `/graph` node cap, never raise it. The hard cap is
+`GRAPH_NODE_CAP` in `backend/app/schemas/common.py`, which every `GraphResponse` is validated
+against; a value above it is rejected at startup rather than silently ignored.
+
 ## Layout
 
 ```
