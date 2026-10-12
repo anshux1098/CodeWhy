@@ -50,10 +50,8 @@ def test_every_contract_file_validates(name: str, model: type[BaseModel]) -> Non
     assert validated.model_dump(mode="json") == payload
 
 
-@pytest.mark.parametrize("name", sorted(EXPECTED_FILES))
+@pytest.mark.parametrize("name", sorted(name for name in EXPECTED_FILES if name.startswith("ask_")))
 def test_every_ask_contract_file_is_flagged_as_a_fixture(name: str) -> None:
-    if not name.startswith("ask_"):
-        pytest.skip("only ask responses carry a fixture flag")
     payload = json.loads((CONTRACT_DIR / name).read_text(encoding="utf-8"))
     assert payload["fixture"] is True
 
@@ -66,13 +64,20 @@ def test_openapi_contract_file_is_a_valid_document() -> None:
     assert "confidence is null" in document["info"]["description"]
 
 
-def test_contract_covers_every_fixture_outcome() -> None:
-    outcomes = {
-        json.loads((CONTRACT_DIR / name).read_text(encoding="utf-8"))["outcome"]
-        for name in EXPECTED_FILES
-        if name.startswith("ask_")
-    }
-    assert outcomes == {"full", "partial", "refusal"}
+EXPECTED_ASK_OUTCOMES = {
+    "ask_full.json": ("full", None),
+    "ask_partial.json": ("partial", "no_verified_quote"),
+    "ask_refusal.json": ("refusal", "no_decision_path"),
+    "ask_ambiguous.json": ("refusal", "ambiguous_entity"),
+    "ask_entity_not_found.json": ("refusal", "entity_not_found"),
+    "ask_out_of_scope.json": ("refusal", "out_of_scope"),
+}
+
+
+@pytest.mark.parametrize(("name", "expected"), sorted(EXPECTED_ASK_OUTCOMES.items()))
+def test_each_ask_contract_file_has_its_documented_outcome(name: str, expected: tuple[str, str | None]) -> None:
+    payload = json.loads((CONTRACT_DIR / name).read_text(encoding="utf-8"))
+    assert (payload["outcome"], payload["reason_code"]) == expected
 
 
 def test_repository_contract_file_names_the_fixture_repository() -> None:
