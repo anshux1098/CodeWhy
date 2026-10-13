@@ -26,61 +26,104 @@ def inspect(cache: SqliteCache, repo: Optional[str]) -> dict[str, Any]:
         row = connection.execute(sql, parameters).fetchone()
         return int(row[0]) if row else 0
 
+    def rows(sql: str, parameters: Sequence[Any] = ()) -> list[dict[str, Any]]:
+        return [dict(row) for row in connection.execute(sql, parameters)]
+
+    def list_columns(table: str, wanted: Sequence[str]) -> list[str]:
+        """Only the columns this cache file actually has, so an older file still reports."""
+        return [name for name in wanted if cache.has_column(table, name)]
+
     def scoped(predicate: str = "1 = 1") -> int:
         """Count commits matching a predicate, restricted to the repo when one was given."""
+        if not have_commits:
+            return 0
         return scalar(f"SELECT COUNT(*) FROM commits{clause}{join}{predicate}", args)
 
-    commits = scalar(f"SELECT COUNT(*) FROM commits{clause}", args)
-    commit_files = scalar(
-        f"SELECT COUNT(*) FROM commit_files WHERE sha IN (SELECT sha FROM commits{clause})", args
+    have_commits = cache.has_table("commits")
+    have_commit_files = cache.has_table("commit_files")
+    have_raw = cache.has_table("raw_objects")
+
+    def safe(has_table: bool, sql: str, parameters: Sequence[Any] = ()) -> int:
+        return scalar(sql, parameters) if has_table else 0
+
+    commits = safe(have_commits, f"SELECT COUNT(*) FROM commits{clause}", args)
+    commit_files = safe(
+        have_commit_files,
+        f"SELECT COUNT(*) FROM commit_files WHERE sha IN (SELECT sha FROM commits{clause})",
+        args,
     )
-    empty_diffs = scalar(
+    empty_diffs = safe(
+        have_commit_files,
         f"SELECT COUNT(*) FROM commit_files WHERE (diff IS NULL OR diff = '')"
         f" AND sha IN (SELECT sha FROM commits{clause})",
         args,
     )
-    truncated = scalar(
-        f"SELECT COUNT(*) FROM commit_files WHERE diff_truncated = 1"
-        f" AND sha IN (SELECT sha FROM commits{clause})",
-        args,
-    )
-    has_list = lambda column: f"({column} IS NOT NULL AND {column} != '[]')"  # noqa: E731
-    with_closing = scoped(" OR ".join([has_list("closing")]))
-    with_references = scoped(
-        " OR ".join(
-            [
-                has_list("closing"),
-                has_list("mentions"),
-                has_list("pull_requests"),
-                "(trailers IS NOT NULL AND trailers != '{}')",
-            ]
+    truncated = (
+        scalar(
+            f"SELECT COUNT(*) FROM commit_files WHERE diff_truncated = 1"
+            f" AND sha IN (SELECT sha FROM commits{clause})",
+            args,
         )
+        if have_commit_files and cache.has_column("commit_files", "diff_truncated")
+        else 0
     )
+    def has_list(column: str) -> str:
+        if not cache.has_column("commits", column):
+            return "0"
+        return f"({column} IS NOT NULL AND {column} != '[]')"
+
+    with_closing = scoped(has_list("closing"))
+    with_references = scoped(" OR ".join(
+        [has_list(column) for column in ("closing", "mentions", "pull_requests")]
+        + [
+            "(trailers IS NOT NULL AND trailers != '{}')"
+            if cache.has_column("commits", "trailers")
+            else "0"
+        ]
+    ))
 
     def kinds(kind: str) -> int:
+        if not have_raw:
+            return 0
         if repo:
             return scalar("SELECT COUNT(*) FROM raw_objects WHERE kind = ? AND repo = ?", (kind, repo))
         return scalar("SELECT COUNT(*) FROM raw_objects WHERE kind = ?", (kind,))
 
-    missing = [dict(row) for row in connection.execute(
-        "SELECT repo, kind, number, reason FROM missing" + clause + " ORDER BY kind, number", args
-    )]
-    skips = [dict(row) for row in connection.execute(
-        "SELECT repo, kind, reason, count, bound FROM skips" + clause + " ORDER BY kind, reason", args
-    )]
-    runs = [dict(row) for row in connection.execute(
+    missing = (
+        rows("SELECT repo, kind, number, reason FROM missing" + clause + " ORDER BY kind, number", args)
+        if cache.has_table("missing")
+        else []
+    )
+    skips = (
+        [
+            {**row, "bound": row.get("bound")}
+            for row in rows(
+                "SELECT repo, kind, reason, count"
+                + (", bound" if cache.has_column("skips", "bound") else "")
+                + " FROM skips" + clause + " ORDER BY kind, reason",
+                args,
+            )
+        ]
+        if cache.has_table("skips")
+        else []
+    )
+    runs = [] if not cache.has_table("ingest_runs") else [dict(row) for row in connection.execute(
         "SELECT id, repo, started_at, finished_at, status, graphql_cost FROM ingest_runs" + clause
         + " ORDER BY started_at DESC LIMIT 10",
         args,
     )]
-    files = [
-        dict(row)
-        for row in connection.execute(
-            "SELECT path, COUNT(*) AS commits FROM commit_files WHERE sha IN "
-            "(SELECT sha FROM commits" + clause + ") GROUP BY path ORDER BY commits DESC, path LIMIT 25",
-            args,
-        )
-    ]
+    files = (
+        [
+            dict(row)
+            for row in connection.execute(
+                "SELECT path, COUNT(*) AS commits FROM commit_files WHERE sha IN "
+                "(SELECT sha FROM commits" + clause + ") GROUP BY path ORDER BY commits DESC, path LIMIT 25",
+                args,
+            )
+        ]
+        if have_commit_files
+        else []
+    )
 
     return {
         "database": str(cache.path),
@@ -117,7 +160,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"no cache at {path}", file=sys.stderr)
         return 2
 
-    with SqliteCache(path) as cache:
+    with SqliteCache(path, read_only=True) as cache:
         report = inspect(cache, args.repo)
 
     if args.json:

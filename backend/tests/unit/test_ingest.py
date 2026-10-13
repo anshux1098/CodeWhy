@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -19,8 +20,7 @@ from app.services.ingest.git_collect import (
 )
 from app.services.ingest.github_objects import (
     IngestionStopped,
-    build_issue_query,
-    build_pull_request_query,
+    build_issue_or_pull_request_query,
     chunked,
     normalise_issue,
     normalise_pull_request,
@@ -206,12 +206,40 @@ def test_batches_never_exceed_twenty() -> None:
 
 
 def test_queries_use_one_alias_per_number() -> None:
-    query = build_pull_request_query([11, 12])
-    assert "pr11: pullRequest(number: 11)" in query
-    assert "pr12: pullRequest(number: 12)" in query
-    assert "issue" not in query.split("fragment")[0]
-    issue_query = build_issue_query([5])
-    assert "issue5: issue(number: 5)" in issue_query
+    query = build_issue_or_pull_request_query([11, 12])
+    assert "n11: issueOrPullRequest(number: 11)" in query
+    assert "n12: issueOrPullRequest(number: 12)" in query
+    assert "pullRequest(number:" not in query
+    assert "issue(number:" not in query
+
+
+FRAGMENT_HEADER = "fragment CodeWhyIssueOrPullRequest on IssueOrPullRequest {"
+
+
+def _fragment_sections() -> tuple[str, str, str]:
+    """Return the interface level text, the PullRequest section and the Issue section."""
+    fragment = build_issue_or_pull_request_query([1]).split(FRAGMENT_HEADER, 1)[1]
+    pull_part = fragment.split("... on PullRequest {", 1)[1].split("... on Issue {", 1)[0]
+    return fragment.split("... on ", 1)[0], pull_part, fragment.split("... on Issue {", 1)[1]
+
+
+def test_only_typename_is_selected_directly_on_the_interface() -> None:
+    """IssueOrPullRequest exposes no merged, labels or author fields, so they must be
+    selected inside inline fragments. GitHub rejects the whole query otherwise, and a
+    fake client cannot detect it."""
+    interface_level, _, _ = _fragment_sections()
+    selected = [line.strip() for line in interface_level.splitlines() if line.strip()]
+    assert selected == ["__typename"]
+
+
+def test_type_specific_fields_are_inside_their_own_inline_fragment() -> None:
+    _, pull_part, issue_part = _fragment_sections()
+    for field in ("merged", "mergedAt", "mergeCommit", "reviews", "reviewThreads", "files", "closingIssuesReferences"):
+        assert field in pull_part, field
+    for field in ("merged", "mergeCommit", "reviews", "closingIssuesReferences"):
+        assert field not in issue_part, field
+    assert "labels" in issue_part
+    assert "labels" not in pull_part
 
 
 def test_truncation_is_flagged_when_a_connection_has_more_pages() -> None:
@@ -807,10 +835,11 @@ def test_inspect_cache_reports_counts_without_writing(tmp_path: Path) -> None:
             client=client, max_prs=2, max_issues=2,
         )
 
-    with SqliteCache(path) as cache:
-        before = cache._connection.total_changes
+    digest_before = hashlib.sha256(path.read_bytes()).hexdigest()
+    with SqliteCache(path, read_only=True) as cache:
+        schema_before = cache._connection.execute("PRAGMA schema_version").fetchone()[0]
         report = inspect(cache, "acme/netclient")
-        after = cache._connection.total_changes
+        schema_after = cache._connection.execute("PRAGMA schema_version").fetchone()[0]
 
     counts = report["counts"]
     assert counts["commits"] == 2
@@ -818,7 +847,41 @@ def test_inspect_cache_reports_counts_without_writing(tmp_path: Path) -> None:
     assert counts["commit_files_with_empty_diff"] == 0
     assert counts["pull_requests"] == 1
     assert counts["issues"] == 0
-    assert after == before, "inspect must not write to the cache"
+    # total_changes does not count DDL, so the file digest is the real check.
+    assert schema_after == schema_before, "inspect must not change the schema"
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == digest_before
+
+
+def test_inspect_cache_does_not_create_or_migrate_the_file(tmp_path: Path) -> None:
+    """A read only open must not add tables, so an old cache is left exactly as found."""
+    import sqlite3
+
+    from scripts.inspect_cache import inspect
+
+    path = tmp_path / "old.sqlite3"
+    connection = sqlite3.connect(path)
+    connection.executescript(
+        "CREATE TABLE commits ("
+        "sha TEXT PRIMARY KEY, repo TEXT NOT NULL, authored_at TEXT, committed_at TEXT,"
+        "author_name TEXT, subject TEXT, message TEXT, parent_shas TEXT, pull_requests TEXT);"
+        "INSERT INTO commits (sha, repo, subject) VALUES ('abc1234', 'acme/netclient', 'Fixes: #5');"
+    )
+    connection.commit()
+    connection.close()
+    digest_before = hashlib.sha256(path.read_bytes()).hexdigest()
+
+    with SqliteCache(path, read_only=True) as cache:
+        report = inspect(cache, "acme/netclient")
+
+    tables = {
+        row[0]
+        for row in sqlite3.connect(path).execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    assert "missing" not in tables, "inspect must not add tables"
+    assert "commit_files" not in tables
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == digest_before
+    assert report["counts"]["commits"] == 1
+    assert report["missing_references"] == []
 
 
 def cache_count_files(path: Path) -> int:
@@ -863,3 +926,41 @@ def test_inspect_cache_lists_paths_by_commit_count(tmp_path: Path) -> None:
         report = inspect(cache, "acme/netclient")
     paths = [row["path"] for row in report["top_paths_by_commit_count"]]
     assert "pkg/config.py" in paths
+
+
+def test_fetched_counters_split_pull_requests_from_issues(tmp_path: Path) -> None:
+    """A batch may resolve to a mix, so the summary cannot infer the kind from the ask."""
+    from app.services.ingest.pipeline import fetch_references
+
+    client = FakeClient()
+    client.pull_requests[41] = pull_request_node(41)
+    client.issues[12] = {
+        "number": 12, "title": "Broken", "body": "b", "state": "CLOSED",
+        "labels": {"nodes": []},
+        "comments": {"totalCount": 0, "pageInfo": {"hasNextPage": False}, "nodes": []},
+    }
+    with SqliteCache(tmp_path / "c.sqlite3") as cache:
+        outcome = fetch_references(
+            client, "acme", "netclient", [41, 12], cache, "acme/netclient", "run1", refresh=False
+        )
+    assert outcome.fetched == 2
+    assert outcome.fetched_pull_requests == 1
+    assert outcome.fetched_issues == 1
+    assert outcome.stored == 2
+
+
+def test_a_number_that_resolves_to_an_issue_is_not_counted_as_a_pull_request(tmp_path: Path) -> None:
+    from app.services.ingest.pipeline import fetch_references
+
+    client = FakeClient()
+    client.issues[7] = {
+        "number": 7, "title": "Docs", "body": "b", "state": "OPEN",
+        "labels": {"nodes": []},
+        "comments": {"totalCount": 0, "pageInfo": {"hasNextPage": False}, "nodes": []},
+    }
+    with SqliteCache(tmp_path / "c.sqlite3") as cache:
+        outcome = fetch_references(
+            client, "acme", "netclient", [7], cache, "acme/netclient", "run1", refresh=False
+        )
+    assert outcome.fetched_pull_requests == 0
+    assert outcome.fetched_issues == 1

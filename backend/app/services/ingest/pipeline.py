@@ -16,14 +16,11 @@ from app.services.ingest.git_collect import (
 from app.services.ingest.github_objects import (
     IngestionStopped,
     build_issue_or_pull_request_query,
-    build_pull_request_query,
-    normalise_resolved,
-    resolve_kind,
     build_recent_merged_query,
     chunked,
-    normalise_issue,
-    normalise_pull_request,
+    normalise_resolved,
     parse_aliased,
+    resolve_kind,
 )
 from app.services.ingest.github_client import LOW_REMAINING_THRESHOLD
 from app.services.ingest.git_probe import (
@@ -133,6 +130,21 @@ def collect_target_commits(
     return list(seen.values()), pull_requests, sorted(numbers)
 
 
+@dataclass
+class FetchOutcome:
+    """What one batch of reference lookups actually resolved to, split by kind.
+
+    A number named by `Fixes: #5` may turn out to be an issue while `(#41)` is a pull
+    request, so the caller cannot infer the kind from how it asked.
+    """
+
+    stored: int = 0
+    fetched: int = 0
+    fetched_pull_requests: int = 0
+    fetched_issues: int = 0
+    cost: int = 0
+
+
 def fetch_references(
     client: Any,
     owner: str,
@@ -143,10 +155,9 @@ def fetch_references(
     run_id: str,
     *,
     refresh: bool,
-) -> tuple[int, int, int]:
+) -> FetchOutcome:
     """Resolve numbers that may be either a pull request or an issue, in one query per batch."""
-    stored = 0
-    fetched = 0
+    outcome = FetchOutcome()
     cost = 0
     pending = [
         number
@@ -165,89 +176,19 @@ def fetch_references(
             list(batch),
         )
         cost += result.cost
-        fetched += len(result.items)
+        for node in result.items.values():
+            kind = resolve_kind(node)
+            outcome.fetched_issues += kind == "issue"
+            outcome.fetched_pull_requests += kind == "pr"
+        outcome.fetched = len(result.items)
         for number, node in result.items.items():
             kind = resolve_kind(node)
             if cache.put_raw(kind, repo, str(number), normalise_resolved(node)):
-                stored += 1
+                outcome.stored += 1
         for number in result.missing:
             cache.record_missing(run_id, repo, "reference", number, "resolved to neither an issue nor a pull request")
-    return stored, fetched, cost
-
-
-def fetch_pull_requests(
-    client: Any,
-    owner: str,
-    name: str,
-    numbers: Sequence[int],
-    cache: SqliteCache,
-    repo: str,
-    run_id: str = "",
-    *,
-    refresh: bool,
-) -> tuple[int, int, int]:
-    stored = 0
-    fetched = 0
-    cost = 0
-    pending = [
-        number
-        for number in numbers
-        if refresh or not cache.has_raw("pr", repo, str(number))
-    ]
-    for batch in chunked(pending):
-        _guard_rate_limit(client)
-        result = parse_aliased(
-            client.query(
-                build_pull_request_query(list(batch)),
-                {"owner": owner, "name": name},
-                tolerate_unresolved=True,
-            ),
-            "pr",
-            list(batch),
-        )
-        cost += result.cost
-        fetched += len(result.items)
-        for number, node in result.items.items():
-            if cache.put_raw("pr", repo, str(number), normalise_pull_request(node)):
-                stored += 1
-        for number in result.missing:
-            cache.record_missing(run_id, repo, "reference", number, "no pull request with that number")
-    return stored, fetched, cost
-
-
-def fetch_issues(
-    client: Any,
-    owner: str,
-    name: str,
-    numbers: Sequence[int],
-    cache: SqliteCache,
-    repo: str,
-    *,
-    refresh: bool,
-) -> tuple[int, int, int]:
-    stored = 0
-    fetched = 0
-    cost = 0
-    pending = [
-        number for number in numbers if refresh or not cache.has_raw("issue", repo, str(number))
-    ]
-    for batch in chunked(pending):
-        _guard_rate_limit(client)
-        result = parse_aliased(
-            client.query(
-                build_issue_query(list(batch)),
-                {"owner": owner, "name": name},
-                tolerate_unresolved=True,
-            ),
-            "issue",
-            list(batch),
-        )
-        cost += result.cost
-        fetched += len(result.items)
-        for number, node in result.items.items():
-            if cache.put_raw("issue", repo, str(number), normalise_issue(node)):
-                stored += 1
-    return stored, fetched, cost
+    outcome.cost = cost
+    return outcome
 
 
 def _guard_rate_limit(client: Any) -> None:
@@ -365,11 +306,12 @@ def run_ingest(
     summary.documents_truncated = sum(1 for document in documents if document.truncated)
 
     try:
-        _, _, cost = fetch_references(
+        targets_outcome = fetch_references(
             client, owner, name, sorted(all_numbers), cache, repo, summary.run_id, refresh=refresh
         )
-        summary.graphql_cost += cost
-        summary.pull_requests_fetched += len(all_numbers)
+        summary.graphql_cost += targets_outcome.cost
+        summary.pull_requests_fetched += targets_outcome.fetched_pull_requests
+        summary.issues_fetched += targets_outcome.fetched_issues
 
         recent = recent_merged_numbers(client, owner, name, effective_prs)
         skipped = max(0, len(recent) - effective_prs)
@@ -381,10 +323,12 @@ def run_ingest(
                 {"kind": "pull_request", "reason": "max_ingestion_prs", "bound": effective_prs, "count": skipped}
             )
         recent_numbers = recent[:effective_prs]
-        _, fetched, cost = fetch_references(
+        recency_outcome = fetch_references(
             client, owner, name, recent_numbers, cache, repo, summary.run_id, refresh=refresh
         )
-        summary.graphql_cost += cost
+        summary.graphql_cost += recency_outcome.cost
+        summary.pull_requests_fetched += recency_outcome.fetched_pull_requests
+        summary.issues_fetched += recency_outcome.fetched_issues
 
         recent_issues = issue_numbers_from_cache(cache, repo, sorted(all_numbers) + recent_numbers)
         issue_list = sorted(recent_issues)[:effective_issues]
@@ -398,11 +342,12 @@ def run_ingest(
             )
         for number in sorted(recent_issues)[effective_issues:]:
             cache.record_missing(summary.run_id, repo, "issue", number, "over the max_ingestion_issues bound")
-        _, fetched_issues, cost = fetch_references(
+        issue_outcome = fetch_references(
             client, owner, name, issue_list, cache, repo, summary.run_id, refresh=refresh
         )
-        summary.graphql_cost += cost
-        summary.issues_fetched += fetched_issues
+        summary.graphql_cost += issue_outcome.cost
+        summary.pull_requests_fetched += issue_outcome.fetched_pull_requests
+        summary.issues_fetched += issue_outcome.fetched_issues
     except IngestionStopped as stopped:
         summary.status = "stopped_rate_limit"
         summary.notes.append(str(stopped))

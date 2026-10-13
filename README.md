@@ -296,11 +296,13 @@ Plain `sqlite3`, no ORM, at `data/ingest.sqlite3`:
 Rerunning creates no duplicates and refetches nothing already cached unless `--refresh`. A
 rerun of the urllib3 test bed dropped the GraphQL cost from 170 to 9 with identical row counts.
 
-A cache file created by an older build gains new columns on open; nothing needs to be deleted.
+A cache file created by an older build gains new columns on a **writable** open; nothing needs
+to be deleted. Only ingestion opens for writing.
 
 ### Inspecting a cache
 
-Read only. No network call, no writes, no credentials.
+Read only. No network call, no credentials, and the cache file is opened through the sqlite
+read-only URI, so inspecting it cannot create a table, migrate it or touch a byte of it.
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\inspect_cache.py
@@ -311,7 +313,8 @@ Read only. No network call, no writes, no credentials.
 It prints commit and commit-file counts, how many commit files have an empty or truncated diff,
 how many commits carry reference trailers, the objects per kind, the skips with their bounds,
 the numbers that could not be resolved, the last runs and the busiest paths. It is the fastest
-way to confirm a run collected what it claims.
+way to confirm a run collected what it claims. A cache written by an older build is reported
+as far as its schema allows rather than failing.
 
 ### Commit trailers and `(#123)`
 
@@ -371,6 +374,9 @@ work: thin ground for a reasoning corpus whatever the targets.
 
 - Commits come from `git` only. Pull requests and issues come from GraphQL, batched at most 20
   aliases per request, reusing `GitHubGraphQLClient`. No REST client exists.
+- One query resolves each number through `issueOrPullRequest`, so `Fixes: #5` and `(#41)` use the
+  same path and the cache learns which kind each number really was. A number that is neither is
+  recorded in `missing` rather than failing the run.
 - `(#123)` in a commit subject is treated as a pull request number, and `Fixes #5` is not.
   Numbers that do not resolve to a pull request are recorded as unresolved rather than failing
   the run, because in older histories those references are usually issues.

@@ -5,41 +5,6 @@ from typing import Any, Iterable, Optional, Sequence
 
 BATCH_LIMIT = 20
 
-PR_FIELDS = """
-fragment CodeWhyPullRequest on PullRequest {
-  number
-  title
-  body
-  state
-  merged
-  mergedAt
-  closedAt
-  author { login }
-  baseRefName
-  mergeCommit { oid }
-  reviews(first: 100) { totalCount pageInfo { hasNextPage } nodes { author { login } state body submittedAt } }
-  reviewThreads(first: 100) { totalCount pageInfo { hasNextPage } nodes { isResolved comments(first: 20) { nodes { author { login } body path createdAt } } } }
-  comments(first: 100) { totalCount pageInfo { hasNextPage } nodes { author { login } body createdAt } }
-  commits(first: 100) { totalCount pageInfo { hasNextPage } nodes { commit { oid messageHeadline } } }
-  files(first: 100) { totalCount pageInfo { hasNextPage } nodes { path } }
-  closingIssuesReferences(first: 20) { totalCount nodes { number } }
-}
-"""
-
-ISSUE_FIELDS = """
-fragment CodeWhyIssue on Issue {
-  number
-  title
-  body
-  state
-  closedAt
-  author { login }
-  labels(first: 20) { nodes { name } }
-  comments(first: 30) { totalCount pageInfo { hasNextPage } nodes { author { login } body createdAt } }
-}
-"""
-
-
 @dataclass
 class FetchResult:
     items: dict[int, dict[str, Any]] = field(default_factory=dict)
@@ -51,20 +16,6 @@ class FetchResult:
 def chunked(values: Sequence[int], size: int = BATCH_LIMIT) -> Iterable[Sequence[int]]:
     for start in range(0, len(values), size):
         yield values[start : start + size]
-
-
-def build_pull_request_query(numbers: Sequence[int]) -> str:
-    aliases = "\n".join(
-        f"    pr{number}: pullRequest(number: {number}) {{ ...CodeWhyPullRequest }}" for number in numbers
-    )
-    return f"query CodeWhyPRs($owner: String!, $name: String!) {{\n  rateLimit {{ cost remaining resetAt }}\n  repository(owner: $owner, name: $name) {{\n{aliases}\n  }}\n}}\n{PR_FIELDS}"
-
-
-def build_issue_query(numbers: Sequence[int]) -> str:
-    aliases = "\n".join(
-        f"    issue{number}: issue(number: {number}) {{ ...CodeWhyIssue }}" for number in numbers
-    )
-    return f"query CodeWhyIssues($owner: String!, $name: String!) {{\n  rateLimit {{ cost remaining resetAt }}\n  repository(owner: $owner, name: $name) {{\n{aliases}\n  }}\n}}\n{ISSUE_FIELDS}"
 
 
 def build_recent_merged_query(count: int) -> str:

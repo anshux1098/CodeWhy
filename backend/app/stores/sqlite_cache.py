@@ -102,14 +102,40 @@ def stable_id(kind: str, repo: str, key: str) -> str:
 
 
 class SqliteCache:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, *, read_only: bool = False) -> None:
+        """Open the cache. A writable open creates or upgrades the schema.
+
+        `read_only` opens the file through the sqlite read only URI and runs no DDL at
+        all, so inspecting a cache cannot alter it. The file must already exist.
+        """
         self.path = Path(path)
+        self.read_only = read_only
+        if read_only:
+            uri = f"file:{self.path.resolve().as_posix()}?mode=ro"
+            self._connection = sqlite3.connect(uri, uri=True)
+            self._connection.row_factory = sqlite3.Row
+            return
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._connection = sqlite3.connect(str(self.path))
         self._connection.row_factory = sqlite3.Row
         self._connection.executescript(SCHEMA)
         self._migrate()
         self._connection.commit()
+
+    def has_table(self, name: str) -> bool:
+        """Whether a table exists. A read only open of an older cache may lack one."""
+        row = self._connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", (name,)
+        ).fetchone()
+        return row is not None
+
+    def has_column(self, table: str, column: str) -> bool:
+        if not self.has_table(table):
+            return False
+        return any(
+            entry["name"] == column
+            for entry in self._connection.execute(f"PRAGMA table_info({table})")
+        )
 
     ADDED_COLUMNS: dict[str, dict[str, str]] = {
         "commits": {
@@ -320,14 +346,6 @@ class SqliteCache:
                 "SELECT * FROM missing WHERE repo = ? ORDER BY number", (repo,)
             )
         )
-
-    def missing_numbers(self, repo: str, kind: str = "number") -> set[int]:
-        return {
-            int(row["number"])
-            for row in self._connection.execute(
-                "SELECT number FROM missing WHERE repo = ?", (repo,)
-            )
-        }
 
     def skips(self, repo: Optional[str] = None) -> list[sqlite3.Row]:
         if repo is None:

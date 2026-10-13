@@ -350,3 +350,39 @@ def test_live_query_reaches_github() -> None:
     with GitHubGraphQLClient(global_settings) as client:
         payload = client.query("query { rateLimit { cost remaining } }")
     assert payload["data"]["rateLimit"]["remaining"] >= 0
+@pytest.mark.live
+def test_live_issue_or_pull_request_fragment_is_accepted() -> None:
+    """The unified resolver query must be valid against the real GitHub schema.
+
+    The fake client does not parse GraphQL, so a fragment that selects an
+    interface level field it does not expose would pass every offline test and
+    then fail on the first real run.
+    """
+    import os
+
+    if os.environ.get("RUN_LIVE") != "1":
+        pytest.skip("set RUN_LIVE=1 to hit the real GitHub API")
+    from app.config import settings as global_settings
+    from app.services.ingest.github_objects import (
+        build_issue_or_pull_request_query,
+        parse_aliased,
+    )
+
+    numbers = [1, 2]
+    global_settings.require_github()
+    with GitHubGraphQLClient(global_settings) as client:
+        payload = client.query(
+            build_issue_or_pull_request_query(numbers),
+            {"owner": "urllib3", "name": "urllib3"},
+            tolerate_unresolved=True,
+        )
+    assert "errors" not in payload, payload.get("errors")
+
+    result = parse_aliased(payload, "n", numbers)
+    assert result.items, "GitHub resolved neither alias"
+    for number, node in result.items.items():
+        assert node["__typename"] in {"Issue", "PullRequest"}
+        assert node["number"] == number
+    # The fragment must have filled the type specific connections, not just __typename.
+    sample = next(iter(result.items.values()))
+    assert "body" in sample and "title" in sample
