@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -79,6 +80,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS missing_unique ON missing (repo, kind, number)
 """
 
 
+EMAIL_WITH_NAME = re.compile(
+    r"(?P<name>[A-Za-z][\w .'-]*?)\s*<\s*(?P<email>[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,24})\s*>"
+)
+BARE_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,24}")
+
+
+def redact_emails(text: Optional[str]) -> Optional[str]:
+    """Remove contributor email addresses from stored prose, keeping the display name.
+
+    Commit bodies carry `Co-authored-by: Name <address>` and `Signed-off-by` trailers, so
+    storing a message verbatim would persist the addresses of people who only appear as
+    co-authors. The name is evidence; the address is not something the cache should hold.
+    """
+    if not text:
+        return text
+    text = EMAIL_WITH_NAME.sub(lambda m: f"{m.group('name')} <redacted-email>", text)
+    return BARE_EMAIL.sub("<redacted-email>", text)
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -99,6 +119,10 @@ def stable_id(kind: str, repo: str, key: str) -> str:
     if kind == "doc":
         return f"doc:{repo}:{key}"
     return f"{kind}:{repo}:{key}"
+
+
+def redact_trailers(trailers: dict[str, Any]) -> dict[str, list[str]]:
+    return {token: [redact_emails(value) or "" for value in values] for token, values in trailers.items()}
 
 
 class SqliteCache:
@@ -254,13 +278,13 @@ class SqliteCache:
                     record.get("authored_at"),
                     record.get("committed_at"),
                     record.get("author_name"),
-                    record.get("subject"),
-                    record.get("message"),
+                    redact_emails(record.get("subject")),
+                    redact_emails(record.get("message")),
                     json.dumps(record.get("parent_shas") or []),
                     json.dumps(record.get("pull_requests") or []),
                     json.dumps(record.get("closing") or []),
                     json.dumps(record.get("mentions") or []),
-                    json.dumps(record.get("trailers") or {}),
+                    json.dumps(redact_trailers(record.get("trailers") or {})),
                 ),
             )
         return True

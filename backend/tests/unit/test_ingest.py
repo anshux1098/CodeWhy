@@ -964,3 +964,130 @@ def test_a_number_that_resolves_to_an_issue_is_not_counted_as_a_pull_request(tmp
         )
     assert outcome.fetched_pull_requests == 0
     assert outcome.fetched_issues == 1
+
+
+# Contributor email addresses must never reach the cache
+
+
+def test_redact_emails_keeps_the_name_and_drops_the_address() -> None:
+    from app.stores.sqlite_cache import redact_emails
+
+    line = "Co-authored-by: Seth Larson <sethmichaellarson@gmail.com>"
+    assert redact_emails(line) == "Co-authored-by: Seth Larson <redacted-email>"
+    assert "sethmichaellarson" not in redact_emails(line)
+
+
+def test_redact_emails_handles_a_bare_address_and_leaves_other_text_alone() -> None:
+    from app.stores.sqlite_cache import redact_emails
+
+    assert "bob.smith" not in redact_emails("ping bob.smith@example.co.uk now")
+    assert redact_emails("Fixes #12 with no address") == "Fixes #12 with no address"
+    assert redact_emails(None) is None
+
+
+def test_a_stored_commit_never_contains_an_email_address(tmp_path: Path) -> None:
+    import re
+
+    from app.stores.sqlite_cache import redact_emails
+
+    cache = SqliteCache(tmp_path / "c.sqlite3")
+    cache.put_commit(
+        "acme/netclient",
+        {
+            "sha": "a" * 40,
+            "repo": "acme/netclient",
+            "author_name": "Dev Person",
+            "subject": "Fix the retry cap",
+            "message": "Why it broke.\n\nCo-authored-by: Jo Example <jo@example.com>",
+            "parent_shas": [],
+            "pull_requests": [],
+            "closing": [],
+            "mentions": [],
+            "trailers": {"Co-authored-by": ["Jo Example <jo@example.com>"]},
+        },
+    )
+    row = cache._connection.execute(
+        "SELECT subject, message, trailers FROM commits WHERE sha = ?", ("a" * 40,)
+    ).fetchone()
+    cache.close()
+
+    stored = " ".join(str(row[column]) for column in ("subject", "message", "trailers"))
+    assert re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", stored) is None
+    assert "Jo Example" in stored
+    assert "Fix the retry cap" in stored
+
+
+def test_no_email_address_survives_into_the_cache_from_real_git_output(tmp_path: Path) -> None:
+    import re
+
+    clone = build_clone(tmp_path) / "acme__netclient"
+    (clone / "pkg" / "config.py").write_text("MAX_RETRIES = 9\n", encoding="utf-8")
+    git(
+        clone,
+        "commit",
+        "-qam",
+        "Raise the cap\\n\\nThe mobile client times out.\\n\\nCo-authored-by: Jo Example <jo@example.com>\\nFixes: #77",
+    )
+    commits = collect_file_commits(clone, "pkg/config.py", "main", repo="acme/netclient")
+    with SqliteCache(tmp_path / "c.sqlite3") as cache:
+        for commit in commits:
+            cache.put_commit("acme/netclient", commit.as_row())
+        rows = cache._connection.execute("SELECT message, trailers FROM commits").fetchall()
+    for row in rows:
+        assert re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", f"{row['message']}{row['trailers']}") is None
+
+
+def test_a_fixes_trailer_with_a_full_issue_url_is_a_closing_reference() -> None:
+    """GitHub's web UI writes full URLs, so a bare #N regex alone misses real trailers."""
+    references = extract_references(
+        "Fixes: https://github.com/urllib3/urllib3/issues/3616", "urllib3/urllib3"
+    )
+    assert references.closing == [3616]
+
+
+def test_an_issue_url_for_another_repository_is_not_a_closing_reference() -> None:
+    references = extract_references(
+        "Fixes: https://github.com/requests/requests/issues/3616", "urllib3/urllib3"
+    )
+    assert references.closing == []
+
+
+def test_a_references_trailer_with_an_issue_url_is_a_mention() -> None:
+    references = extract_references(
+        "References: https://github.com/urllib3/urllib3/issues/1634", "urllib3/urllib3"
+    )
+    assert references.mentions == [1634]
+
+
+def test_both_spellings_of_a_closing_trailer_are_found() -> None:
+    references = extract_references(
+        "Fixes: #12\nCloses: https://github.com/acme/netclient/issues/34\n", "acme/netclient"
+    )
+    assert references.closing == [12, 34]
+
+
+def test_a_fixes_trailer_separated_from_signed_off_by_still_counts() -> None:
+    """Git writes Fixes: and then a blank line before Signed-off-by:, so the trailer
+    region spans two paragraphs."""
+    message = (
+        "Fixes: https://github.com/urllib3/urllib3/issues/3616\n\n"
+        "Signed-off-by: Someone <someone@example.com>\n"
+    )
+    references = extract_references(message, "urllib3/urllib3")
+    assert references.closing == [3616]
+    assert "Signed-off-by" in references.trailers
+
+
+def test_prose_after_the_trailers_stops_the_trailer_region() -> None:
+    """Trailers belong at the end, so prose after them means they were not trailers."""
+    message = "Change-Id: Iabc\n\nThis paragraph came after, and mentions Fixes: #5 in prose.\n"
+    references = extract_references(message, "a/b")
+    assert references.trailers == {}
+    assert references.closing == []
+
+
+def test_trailers_before_body_prose_are_not_lost_when_the_body_is_separate() -> None:
+    message = "What changed and why.\n\nChange-Id: Iabc\nFixes: #9\n"
+    references = extract_references(message, "a/b")
+    assert references.closing == [9]
+    assert references.trailers["Change-Id"] == ["Iabc"]

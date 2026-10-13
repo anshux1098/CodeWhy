@@ -33,6 +33,9 @@ TRAILER_LINE = re.compile(r"^(?P<token>[A-Za-z][A-Za-z0-9_-]*):[ \t]*(?P<value>\
 GITHUB_PULL_URL = re.compile(
     r"https?://github\.com/(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+)/pull/(?P<number>\d+)\b"
 )
+GITHUB_ISSUE_URL = re.compile(
+    r"https?://github\.com/(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+)/issues/(?P<number>\d+)\b"
+)
 CLOSING_TRAILERS = ("fixes", "closes", "resolves")
 MENTION_TRAILERS = ("references", "related", "see-also")
 
@@ -108,20 +111,51 @@ def extract_closing_issue_numbers(text: str) -> list[int]:
 
 
 def parse_trailer_block(message: str) -> dict[str, list[str]]:
+    """Read the trailing run of trailer paragraphs.
+
+    Git separates the trailer it writes for you from the Signed-off-by block with a blank
+    line, so `Fixes: <url>` followed by `Signed-off-by: ...` arrives as two paragraphs.
+    Walk backwards while each paragraph is entirely trailer shaped and merge them, but
+    stop at the first paragraph that is not, so a `Fixes: #99` mentioned in prose never
+    counts as one.
+    """
     paragraphs = [block for block in (message or "").split("\n\n") if block.strip()]
     if not paragraphs:
         return {}
-    last = paragraphs[-1]
-    lines = [line for line in last.splitlines() if line.strip()]
-    if len(lines) < 1:
-        return {}
+
+    def trailer_lines(block: str) -> Optional[list[tuple[str, str]]]:
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        if not lines:
+            return None
+        entries = []
+        for line in lines:
+            match = TRAILER_LINE.match(line)
+            if match is None:
+                return None
+            entries.append((match.group("token"), match.group("value")))
+        return entries
+
     parsed: dict[str, list[str]] = {}
-    for line in lines:
-        match = TRAILER_LINE.match(line.strip())
-        if match is None:
-            return {}
-        parsed.setdefault(match.group("token"), []).append(match.group("value"))
+    for block in reversed(paragraphs):
+        entries = trailer_lines(block)
+        if entries is None:
+            break
+        for token, value in entries:
+            parsed.setdefault(token, []).insert(0, value)
     return parsed
+
+
+def _same_repo_issue_numbers(value: str, repo: str) -> list[int]:
+    """Issue numbers from a full github.com URL naming this repository.
+
+    GitHub's own web UI writes `Fixes: https://github.com/owner/repo/issues/123`, so a
+    bare `#123` regex alone misses most contemporary closing trailers.
+    """
+    numbers: list[int] = []
+    for match in GITHUB_ISSUE_URL.finditer(value or ""):
+        if f"{match.group('owner')}/{match.group('repo')}".lower() == repo.lower():
+            numbers.append(int(match.group("number")))
+    return numbers
 
 
 def _trailer_values(trailers: dict[str, list[str]], *names: str) -> list[str]:
@@ -161,8 +195,10 @@ def extract_references(message: str, repo: str) -> MessageReferences:
     references.pull_requests = sorted(set(references.pull_requests))
     for value in _trailer_values(trailers, *CLOSING_TRAILERS):
         references.closing.extend(extract_issue_numbers(value))
+        references.closing.extend(_same_repo_issue_numbers(value, repo))
     for value in _trailer_values(trailers, *MENTION_TRAILERS):
         references.mentions.extend(extract_issue_numbers(value))
+        references.mentions.extend(_same_repo_issue_numbers(value, repo))
     references.closing = sorted(set(references.closing))
     references.mentions = sorted(set(references.mentions))
     return references
