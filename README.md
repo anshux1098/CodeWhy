@@ -287,19 +287,85 @@ Plain `sqlite3`, no ORM, at `data/ingest.sqlite3`:
 | table | contents |
 |---|---|
 | `raw_objects` | cached PRs, issues, commits and documents under stable ids such as `pr:owner/repo#123` |
-| `commits` | commit metadata, author **name** only, never the email |
+| `commits` | commit metadata, author **name** only, never the email, plus `closing`, `mentions`, `pull_requests` and `trailers` |
 | `commit_files` | per commit path, old path for renames, status, diff and `diff_truncated` |
 | `ingest_runs` | one row per run with status and GraphQL cost |
-| `skips` | what a bound stopped, with the reason and the count |
+| `skips` | what a bound stopped, with the reason, the count and the `bound` actually used |
+| `missing` | numbers that resolved to neither a pull request nor an issue |
 
 Rerunning creates no duplicates and refetches nothing already cached unless `--refresh`. A
 rerun of the urllib3 test bed dropped the GraphQL cost from 170 to 9 with identical row counts.
+
+A cache file created by an older build gains new columns on open; nothing needs to be deleted.
+
+### Inspecting a cache
+
+Read only. No network call, no writes, no credentials.
+
+```powershell
+.\.venv\Scripts\python.exe scripts\inspect_cache.py
+.\.venv\Scripts\python.exe scripts\inspect_cache.py --repo owner/repo
+.\.venv\Scripts\python.exe scripts\inspect_cache.py --repo owner/repo --json
+```
+
+It prints commit and commit-file counts, how many commit files have an empty or truncated diff,
+how many commits carry reference trailers, the objects per kind, the skips with their bounds,
+the numbers that could not be resolved, the last runs and the busiest paths. It is the fastest
+way to confirm a run collected what it claims.
+
+### Commit trailers and `(#123)`
+
+Two different signals, deliberately kept apart:
+
+- **`(#123)` in a subject** means the commit came from that pull request. It is a link, not a
+  statement of intent, and it is exempt from the recency bounds so target history is never
+  truncated.
+- **A trailer block** at the end of the message is a statement someone made deliberately:
+  `Fixes:`, `Closes:` and `Resolves:` are closing references; `References:` and `Related:` are
+  mentions; `Pull-request: <url>` is a link, used only when the URL names the same repository.
+
+Only the final paragraph of a message is read as trailers, so a line like `Fixes: #99` in the
+middle of a discussion is not mistaken for one. `Fixes #5` written in prose is deliberately not
+a closing reference, because it carries no intent signal. A trailer may also carry values with
+no number at all, such as `Change-Id:` or `Pull-request-sha:`; those are stored verbatim.
 
 ### Test bed
 
 `targets/urllib3__urllib3.json` is a **test bed, not a decision**. It exercises the pipeline
 against `urllib3/urllib3` because that clone already exists on this machine. The real
 repository has not been chosen; replace this file and pass a different `--repo` when you decide.
+
+### Draft target: `sqlalchemy/alembic`
+
+`targets/sqlalchemy__alembic.json` is a **draft chosen from measurements, not a decision**.
+Every number behind it is in `review/`, measured from a full clone with plain `git`, and the
+probes never import or execute target code.
+
+| file | commits | PR-linked | reverted | long messages |
+|---|---|---|---|---|
+| `alembic/autogenerate/api.py` | 55 | 0 | 1 | 27 |
+| `alembic/autogenerate/render.py` | 116 | 0 | 1 | 58 |
+| `alembic/ddl/base.py` | 49 | 0 | 1 | 21 |
+| `alembic/ddl/impl.py` | 110 | 0 | 1 | 47 |
+| `alembic/operations/ops.py` | 165 | 5 | 0 | 62 |
+
+- `docs/` and `docs/build/` are the document directories. Alembic has no `changelog/` directory:
+  the changelog lives in `docs/build/changelog.rst`, and the top-level `CHANGES` is a redirect
+  file that only points at it.
+- The only config key is `MAX_PYTHON_ARGS` in `alembic/autogenerate/render.py` (currently 255,
+  2 commits touching the defining line). It is the sole module constant in the repository with
+  at least 2 line-touching commits **that also lives in a target file**.
+- `USE_TWOPHASE` in `alembic/templates/multidb/env.py` also has 2 commits and is excluded only
+  because that file is not a target; a config key must point at a listed file.
+- No class-level constant in the repository has 2 or more commits, so none is listed.
+
+Caveats worth stating plainly. Four of the five files have **zero** PR-linked commits and each
+has exactly one revert, which is the same `pep484 updates` revert in three of them, so the
+revert counts are not independent signals. The whole history is 2095 commits with 5 reverts
+total, so this is a repository with unusually little revert history, which limits how much
+supersession evidence it can offer at all. A recent-PR sample over a 2018-11-30 to 2026-06-30
+window returned only 49 merged pull requests, of which 16 were reviewed and 2 read as incident
+work: thin ground for a reasoning corpus whatever the targets.
 
 ### What ingestion does and does not do
 

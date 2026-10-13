@@ -1,0 +1,20 @@
+{
+  "repo": "sqlalchemy/alembic",
+  "files": [
+    "alembic/autogenerate/api.py",
+    "alembic/autogenerate/render.py",
+    "alembic/ddl/base.py",
+    "alembic/ddl/impl.py",
+    "alembic/operations/ops.py"
+  ],
+  "dirs": [
+    "docs/",
+    "docs/build/"
+  ],
+  "config_keys": [
+    {
+      "file": "alembic/autogenerate/render.py",
+      "name": "MAX_PYTHON_ARGS"
+    }
+  ]
+}
