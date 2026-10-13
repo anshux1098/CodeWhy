@@ -1,0 +1,21 @@
+{
+  "repo": "urllib3/urllib3",
+  "files": [
+    "src/urllib3/connectionpool.py",
+    "src/urllib3/connection.py",
+    "src/urllib3/util/ssl_.py"
+  ],
+  "dirs": [
+    "docs/"
+  ],
+  "config_keys": [
+    {
+      "file": "src/urllib3/util/ssl_.py",
+      "name": "ALPN_PROTOCOLS"
+    },
+    {
+      "file": "src/urllib3/util/ssl_.py",
+      "name": "SSL_VERSION_TO_TLS_VERSION"
+    }
+  ]
+}
