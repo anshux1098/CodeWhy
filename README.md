@@ -327,8 +327,10 @@ Two different signals, deliberately kept apart:
   `Fixes:`, `Closes:` and `Resolves:` are closing references; `References:` and `Related:` are
   mentions; `Pull-request: <url>` is a link, used only when the URL names the same repository.
 
-Only the final paragraph of a message is read as trailers, so a line like `Fixes: #99` in the
-middle of a discussion is not mistaken for one. `Fixes #5` written in prose is deliberately not
+Only the trailing run of trailer paragraphs is read, so a line like `Fixes: #99` in the middle
+of a discussion is not mistaken for one. Both spellings Git produces are understood, the bare
+`Fixes: #99` and the full `Fixes: https://github.com/owner/repo/issues/99`, because the web UI
+writes the second form and a bare `#N` pattern alone would miss most real trailers. `Fixes #5` written in prose is deliberately not
 a closing reference, because it carries no intent signal. A trailer may also carry values with
 no number at all, such as `Change-Id:` or `Pull-request-sha:`; those are stored verbatim.
 
@@ -380,6 +382,9 @@ work: thin ground for a reasoning corpus whatever the targets.
 - `(#123)` in a commit subject is treated as a pull request number, and `Fixes #5` is not.
   Numbers that do not resolve to a pull request are recorded as unresolved rather than failing
   the run, because in older histories those references are usually issues.
-- Repository text is stored as untrusted data. Nothing is imported or executed, no author
-  email is ever stored, and INFO-level logging records counts and ids only.
+- Repository text is stored as untrusted data. Nothing is imported or executed, and INFO-level
+  logging records counts and ids only. Contributor email addresses are redacted from stored
+  prose while the display name is kept, because `Co-authored-by` and `Signed-off-by` trailers
+  are part of the message body. Diffs are left alone: they are code, where `@decorator` is not
+  an address.
 - Every connection records a `truncated` flag when more pages existed than were fetched.
