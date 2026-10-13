@@ -789,3 +789,77 @@ def test_an_existing_cache_file_gains_the_new_columns(tmp_path: Path) -> None:
         cache.record_skip("run1", "acme/netclient", "pull_request", "max_ingestion_prs", 3, 4)
         stored = cache.skips("acme/netclient")[0]
         assert stored["bound"] == 4
+
+
+# Part C: the read only cache inspector
+
+
+def test_inspect_cache_reports_counts_without_writing(tmp_path: Path) -> None:
+    from scripts.inspect_cache import inspect
+
+    clone_root = build_clone(tmp_path)
+    client = FakeClient()
+    client.pull_requests[41] = pull_request_node(41)
+    path = tmp_path / "c.sqlite3"
+    with SqliteCache(path) as cache:
+        run_ingest(
+            "acme/netclient", TARGETS, settings(), cache=cache, clone_root=clone_root,
+            client=client, max_prs=2, max_issues=2,
+        )
+
+    with SqliteCache(path) as cache:
+        before = cache._connection.total_changes
+        report = inspect(cache, "acme/netclient")
+        after = cache._connection.total_changes
+
+    counts = report["counts"]
+    assert counts["commits"] == 2
+    assert counts["commit_files"] == cache_count_files(path)
+    assert counts["commit_files_with_empty_diff"] == 0
+    assert counts["pull_requests"] == 1
+    assert counts["issues"] == 0
+    assert after == before, "inspect must not write to the cache"
+
+
+def cache_count_files(path: Path) -> int:
+    import sqlite3
+
+    connection = sqlite3.connect(path)
+    try:
+        return int(connection.execute("SELECT COUNT(*) FROM commit_files").fetchone()[0])
+    finally:
+        connection.close()
+
+
+def test_inspect_cache_can_filter_by_repo(tmp_path: Path) -> None:
+    from scripts.inspect_cache import inspect
+
+    clone_root = build_clone(tmp_path)
+    client = FakeClient()
+    client.pull_requests[41] = pull_request_node(41)
+    path = tmp_path / "c.sqlite3"
+    with SqliteCache(path) as cache:
+        run_ingest(
+            "acme/netclient", TARGETS, settings(), cache=cache, clone_root=clone_root,
+            client=client, max_prs=2, max_issues=2,
+        )
+
+    with SqliteCache(path) as cache:
+        assert inspect(cache, "other/repo")["counts"]["commits"] == 0
+        assert inspect(cache, None)["counts"]["commits"] == 2
+
+
+def test_inspect_cache_lists_paths_by_commit_count(tmp_path: Path) -> None:
+    from scripts.inspect_cache import inspect
+
+    clone_root = build_clone(tmp_path)
+    client = FakeClient()
+    client.pull_requests[41] = pull_request_node(41)
+    with SqliteCache(tmp_path / "c.sqlite3") as cache:
+        run_ingest(
+            "acme/netclient", TARGETS, settings(), cache=cache, clone_root=clone_root,
+            client=client, max_prs=2, max_issues=2,
+        )
+        report = inspect(cache, "acme/netclient")
+    paths = [row["path"] for row in report["top_paths_by_commit_count"]]
+    assert "pkg/config.py" in paths
