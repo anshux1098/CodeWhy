@@ -148,7 +148,11 @@ def fetch_pull_requests(
     for batch in chunked(pending):
         _guard_rate_limit(client)
         result = parse_aliased(
-            client.query(build_pull_request_query(list(batch)), {"owner": owner, "name": name}),
+            client.query(
+                build_pull_request_query(list(batch)),
+                {"owner": owner, "name": name},
+                tolerate_unresolved=True,
+            ),
             "pr",
             list(batch),
         )
@@ -179,7 +183,11 @@ def fetch_issues(
     for batch in chunked(pending):
         _guard_rate_limit(client)
         result = parse_aliased(
-            client.query(build_issue_query(list(batch)), {"owner": owner, "name": name}),
+            client.query(
+                build_issue_query(list(batch)),
+                {"owner": owner, "name": name},
+                tolerate_unresolved=True,
+            ),
             "issue",
             list(batch),
         )

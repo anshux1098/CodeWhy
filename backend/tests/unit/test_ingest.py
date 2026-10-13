@@ -79,7 +79,12 @@ class FakeClient:
 
         self.rate_limit = replace(self.rate_limit, remaining=remaining)
 
-    def query(self, document: str, variables: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    def query(
+        self,
+        document: str,
+        variables: Optional[dict[str, Any]] = None,
+        tolerate_unresolved: bool = False,
+    ) -> dict[str, Any]:
         self.queries.append(document)
         if "pullRequests(states: MERGED" in document:
             numbers = self.recent

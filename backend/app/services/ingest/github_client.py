@@ -99,7 +99,12 @@ class GitHubGraphQLClient:
     def rate_limit(self) -> Optional[RateLimitSnapshot]:
         return self._rate_limit
 
-    def query(self, document: str, variables: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    def query(
+        self,
+        document: str,
+        variables: Optional[dict[str, Any]] = None,
+        tolerate_unresolved: bool = False,
+    ) -> dict[str, Any]:
         payload: dict[str, Any] = {"query": document}
         if variables:
             payload["variables"] = variables
@@ -141,8 +146,10 @@ class GitHubGraphQLClient:
             except ValueError:
                 raise GitHubProtocolError("GitHub returned a response that is not valid JSON")
             if isinstance(parsed, dict) and parsed.get("errors"):
-                messages = "; ".join(str(error.get("message", "")) for error in parsed["errors"])
-                raise GitHubProtocolError(self._redact(f"GraphQL errors: {messages}"))
+                messages = [str(error.get("message", "")) for error in parsed["errors"]]
+                unresolved = all("Could not resolve to a" in message for message in messages)
+                if not (tolerate_unresolved and unresolved):
+                    raise GitHubProtocolError(self._redact(f"GraphQL errors: {'; '.join(messages)}"))
             return parsed
         raise GitHubRetryExhaustedError(
             f"giving up after {MAX_ATTEMPTS} attempts; last failure was {last_failure}"

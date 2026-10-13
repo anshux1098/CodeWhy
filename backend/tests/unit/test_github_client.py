@@ -234,6 +234,40 @@ def test_graphql_errors_surface_as_a_protocol_error() -> None:
     assert "Field does not exist" in str(excinfo.value)
 
 
+def test_unresolved_aliases_are_fatal_by_default() -> None:
+    payload = {
+        "data": {"repository": {"pr7": None}},
+        "errors": [{"message": "Could not resolve to a PullRequest with the number of 7."}],
+    }
+    recorder = Recorder([response(payload=payload)])
+    with build(recorder) as client, pytest.raises(GitHubProtocolError):
+        client.query("query { pr7: pullRequest(number: 7) { number } }")
+
+
+def test_unresolved_aliases_are_returned_when_explicitly_tolerated() -> None:
+    payload = {
+        "data": {"repository": {"pr7": None}},
+        "errors": [{"message": "Could not resolve to a PullRequest with the number of 7."}],
+    }
+    recorder = Recorder([response(payload=payload)])
+    with build(recorder) as client:
+        result = client.query("query { pr7: pullRequest(number: 7) { number } }", tolerate_unresolved=True)
+    assert result["data"]["repository"]["pr7"] is None
+
+
+def test_tolerance_does_not_swallow_other_errors() -> None:
+    payload = {
+        "data": {"repository": None},
+        "errors": [
+            {"message": "Could not resolve to a PullRequest with the number of 7."},
+            {"message": "Something else is wrong."},
+        ],
+    }
+    recorder = Recorder([response(payload=payload)])
+    with build(recorder) as client, pytest.raises(GitHubProtocolError):
+        client.query("query { pr7: pullRequest(number: 7) { number } }", tolerate_unresolved=True)
+
+
 def test_non_json_response_is_a_protocol_error() -> None:
     recorder = Recorder([httpx.Response(200, text="<html>not json</html>")])
     with build(recorder) as client, pytest.raises(GitHubProtocolError):

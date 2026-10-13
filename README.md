@@ -234,3 +234,80 @@ the section 6 rules; no code computes them yet.
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Ingestion (Phase 1b)
+
+Ingestion is **repo-agnostic**. The repository and its demo targets are inputs, never code.
+Swapping to a different repository is a command-line change plus a new targets file; no code
+is edited.
+
+### Targets file
+
+`targets/<owner>__<repo>.json`, validated with Pydantic. Unknown fields are rejected, and a
+`config_keys` entry must point at a file that is also listed in `files`.
+
+```json
+{
+  "repo": "owner/repo",
+  "files": ["src/pkg/a.py", "src/pkg/b.py"],
+  "dirs": ["docs/"],
+  "config_keys": [{ "file": "src/pkg/a.py", "name": "SOME_CONSTANT" }]
+}
+```
+
+- `repo` must match `--repo` exactly, or ingestion refuses to start.
+- `files` are tracked with `git log --follow`, so renames are followed.
+- `dirs` are extra document directories to scan alongside `docs/`, `adr/` and `rfcs/`.
+- `config_keys` are the constants you expect to have value histories.
+
+### Running it
+
+```powershell
+# Plan only. No network call, no clone, no database writes.
+.\.venv\Scripts\python.exe scripts\ingest.py --repo owner/repo --targets targets\owner__repo.json --dry-run
+
+# Ingest.
+.\.venv\Scripts\python.exe scripts\ingest.py --repo owner/repo --targets targets\owner__repo.json
+
+# Bound the recency fill. Target pull requests and issues never count against these bounds.
+.\.venv\Scripts\python.exe scripts\ingest.py --repo owner/repo --targets targets\owner__repo.json --max-prs 40 --max-issues 40
+
+# Refetch objects already in the cache.
+.\.venv\Scripts\python.exe scripts\ingest.py --repo owner/repo --targets targets\owner__repo.json --refresh
+```
+
+Requires `GITHUB_TOKEN` in `.env`. Output goes to stdout, `data/ingest_summary.json` and the
+SQLite cache at `data/ingest.sqlite3`. Everything under `data/` is git-ignored, and no
+ingested data is ever committed.
+
+### Cache
+
+Plain `sqlite3`, no ORM, at `data/ingest.sqlite3`:
+
+| table | contents |
+|---|---|
+| `raw_objects` | cached PRs, issues, commits and documents under stable ids such as `pr:owner/repo#123` |
+| `commits` | commit metadata, author **name** only, never the email |
+| `commit_files` | per commit path, old path for renames, status, diff and `diff_truncated` |
+| `ingest_runs` | one row per run with status and GraphQL cost |
+| `skips` | what a bound stopped, with the reason and the count |
+
+Rerunning creates no duplicates and refetches nothing already cached unless `--refresh`. A
+rerun of the urllib3 test bed dropped the GraphQL cost from 170 to 9 with identical row counts.
+
+### Test bed
+
+`targets/urllib3__urllib3.json` is a **test bed, not a decision**. It exercises the pipeline
+against `urllib3/urllib3` because that clone already exists on this machine. The real
+repository has not been chosen; replace this file and pass a different `--repo` when you decide.
+
+### What ingestion does and does not do
+
+- Commits come from `git` only. Pull requests and issues come from GraphQL, batched at most 20
+  aliases per request, reusing `GitHubGraphQLClient`. No REST client exists.
+- `(#123)` in a commit subject is treated as a pull request number, and `Fixes #5` is not.
+  Numbers that do not resolve to a pull request are recorded as unresolved rather than failing
+  the run, because in older histories those references are usually issues.
+- Repository text is stored as untrusted data. Nothing is imported or executed, no author
+  email is ever stored, and INFO-level logging records counts and ids only.
+- Every connection records a `truncated` flag when more pages existed than were fetched.
