@@ -1,0 +1,446 @@
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Any, Optional, Sequence
+
+
+# ---------------------------------------------------------------------------
+# Noise reason codes
+# ---------------------------------------------------------------------------
+
+class NoiseReason(StrEnum):
+    BOT_AUTHOR        = "bot_author"
+    DEPENDENCY_UPDATE = "dependency_update"
+    FORMATTING_ONLY   = "formatting_only"
+    TYPO_FIX          = "typo_fix"
+    CI_CONFIG         = "ci_config"
+    VERSION_BUMP      = "version_bump"
+    RELEASE_COMMIT    = "release_commit"
+    GENERATED_FILE    = "generated_file"
+    MERGE_COMMIT      = "merge_commit"
+    EMPTY_BODY        = "empty_body"
+
+
+# ---------------------------------------------------------------------------
+# Bot author patterns
+# ---------------------------------------------------------------------------
+
+BOT_LOGINS: frozenset[str] = frozenset({
+    "dependabot",
+    "dependabot[bot]",
+    "renovate",
+    "renovate[bot]",
+    "github-actions",
+    "github-actions[bot]",
+    "pre-commit-ci",
+    "pre-commit-ci[bot]",
+    "snyk-bot",
+    "greenkeeper",
+    "imgbot",
+    "imgbot[bot]",
+    "allcontributors",
+    "allcontributors[bot]",
+    "semantic-release-bot",
+    "pyup-bot",
+    "pyup.io bot",
+})
+
+BOT_EMAIL_PATTERN = re.compile(
+    r"(?:bot|noreply|no-reply|automated)\b",
+    re.IGNORECASE,
+)
+
+
+# ---------------------------------------------------------------------------
+# Subject / title patterns
+# ---------------------------------------------------------------------------
+
+# Dependency update keywords (Dependabot, Renovate, manual bumps)
+DEPENDENCY_TITLE = re.compile(
+    r"""
+    (?:^|\b)
+    (?:
+        bump(?:s|ed|ing)?\ +[\w./\-]+ |          # "Bump requests from 2.x to 2.y"
+        update(?:s|d|ing)?\ +[\w./\-]+\ +to\ |   # "Update requests to 2.y"
+        chore[\(:].*(?:deps|dependencies) |       # "chore(deps): bump ..."
+        (?:build|chore)\s*[\(:].*dep              # "build(deps): ..."
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+# Formatting/linting-only changes
+FORMATTING_TITLE = re.compile(
+    r"""
+    (?:^|\b)
+    (?:
+        (?:run\ +)?(?:black|isort|ruff|flake8|pylint|autopep8|yapf|prettier|eslint|tslint)
+        |
+        (?:fix|apply)\ +(?:black|isort|ruff|linting|lint|formatting|style|whitespace|trailing\ whitespace)
+        |
+        (?:re)?format(?:ting)?
+        |
+        style[\s:]+fix
+        |
+        whitespace[\s:]+fix
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+# Typo-fix commits that carry no engineering rationale
+TYPO_TITLE = re.compile(
+    r"(?:^|\b)(?:fix|correct|typo|spelling|wording)(?:s|ed|ing)?[\s:]+(?:typo|typos|spelling|wording\b)",
+    re.IGNORECASE,
+)
+
+# CI/CD config-only changes
+CI_CONFIG_TITLE = re.compile(
+    r"""
+    (?:^|\b)
+    (?:
+        (?:update|fix|add|bump)\ +(?:ci|github\ actions|github-actions|\.github|tox|circleci|travis|appveyor)
+        |
+        (?:ci|chore)[\s(\[:].*(?:fix|update|bump|action|workflow)
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+# Version bumps (e.g. "Bump version to 2.0.1", "Release 2.0.0")
+VERSION_BUMP_TITLE = re.compile(
+    r"""
+    (?:^|\b)
+    (?:
+        (?:bump|set|update)\ +version\ +(?:to\ +)?v?\d |   # "Bump version to 2.x"
+        prepare\ +(?:release\ +)?v?\d |                    # "Prepare release 2.x"
+        release\ +v?\d[\d.]+                               # "Release 2.0.0"
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+# Merge-commit subjects (not squash merges with meaningful titles)
+MERGE_COMMIT_TITLE = re.compile(
+    r"^Merge (?:branch|pull request|remote-tracking branch)\b",
+    re.IGNORECASE,
+)
+
+
+# ---------------------------------------------------------------------------
+# File path patterns
+# ---------------------------------------------------------------------------
+
+# CI config files that have no engineering rationale
+CI_FILE_PATTERN = re.compile(
+    r"""
+    (?:
+        ^\.github/                |   # GitHub Actions
+        ^\.circleci/              |   # CircleCI
+        ^\.travis\.yml$           |   # Travis CI
+        tox\.ini$                 |   # tox
+        \.pre-commit-config\.yaml$|   # pre-commit
+        ^appveyor\.yml$
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+# Files that are always auto-generated
+GENERATED_FILE_PATTERN = re.compile(
+    r"""
+    (?:
+        \.lock$        |   # lock files (Pipfile.lock, yarn.lock, poetry.lock)
+        package-lock\.json$ |
+        Pipfile\.lock$ |
+        poetry\.lock$  |
+        \.min\.js$     |   # minified JS
+        \.min\.css$    |   # minified CSS
+        \.pb\.go$      |   # protobuf generated Go
+        \.pb2\.py$     |   # protobuf generated Python
+        _pb2\.py$      |
+        migrations/.*\.py$ |  # DB migration files generated by tools
+        CHANGELOG\.(?:md|rst|txt)$  # auto-generated changelogs
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+# ---------------------------------------------------------------------------
+# Result dataclass
+# ---------------------------------------------------------------------------
+
+@dataclass
+class NoiseLabel:
+    """A single noise signal attached to a PR or commit record.
+
+    Per Spec v2 Rule: Flag, never delete. Noise labels are additive metadata
+    stored alongside the raw record. A record can carry multiple reasons.
+    """
+    reason: str                      # NoiseReason value
+    confidence: float = 1.0          # 1.0 = certain, 0.8 = probable
+    detail: Optional[str] = None     # human-readable explanation
+
+
+@dataclass
+class NoiseResult:
+    """Aggregated noise assessment for a single PR or commit record.
+
+    ``is_noise`` is True only when at least one label is present AND the record
+    is not protected as a revert target.  Consumers must check ``is_revert_target``
+    before using ``is_noise`` to make filter decisions.
+    """
+    record_id: str
+    labels: list[NoiseLabel] = field(default_factory=list)
+    is_revert_target: bool = False   # True → never suppress, even if noisy
+
+    @property
+    def is_noise(self) -> bool:
+        return bool(self.labels) and not self.is_revert_target
+
+    @property
+    def reasons(self) -> list[str]:
+        return [lbl.reason for lbl in self.labels]
+
+    def add(self, reason: str, confidence: float = 1.0, detail: Optional[str] = None) -> None:
+        self.labels.append(NoiseLabel(reason=reason, confidence=confidence, detail=detail))
+
+
+# ---------------------------------------------------------------------------
+# Individual signal detectors
+# ---------------------------------------------------------------------------
+
+def _is_bot_author(author_login: Optional[str], author_email: Optional[str] = None) -> bool:
+    """Return True when the author is a known automation account."""
+    if author_login:
+        clean = author_login.strip().lower()
+        if clean in {b.lower() for b in BOT_LOGINS}:
+            return True
+        if clean.endswith("[bot]") or clean.endswith("-bot"):
+            return True
+    if author_email and BOT_EMAIL_PATTERN.search(author_email):
+        return True
+    return False
+
+
+def _is_dependency_update(title: str) -> bool:
+    return bool(DEPENDENCY_TITLE.search(title))
+
+
+def _is_formatting_only(title: str, changed_files: Sequence[str]) -> bool:
+    if FORMATTING_TITLE.search(title):
+        return True
+    # If every changed file is a Python/JS/TS source and title says nothing,
+    # we rely purely on title patterns — no false positives from file list alone.
+    return False
+
+
+def _is_typo_fix(title: str) -> bool:
+    return bool(TYPO_TITLE.search(title))
+
+
+def _is_ci_config(title: str, changed_files: Sequence[str]) -> bool:
+    if CI_CONFIG_TITLE.search(title):
+        return True
+    # If every changed file is a CI config, treat as CI noise
+    if changed_files and all(CI_FILE_PATTERN.search(f) for f in changed_files):
+        return True
+    return False
+
+
+def _is_version_bump(title: str) -> bool:
+    return bool(VERSION_BUMP_TITLE.search(title))
+
+
+def _is_merge_commit(title: str, parent_count: int) -> bool:
+    """True for vanilla merge commits (2+ parents, no PR-linked squash)."""
+    if parent_count >= 2 and MERGE_COMMIT_TITLE.match(title.strip()):
+        return True
+    return False
+
+
+def _all_generated_files(changed_files: Sequence[str]) -> bool:
+    return bool(changed_files) and all(
+        GENERATED_FILE_PATTERN.search(f) for f in changed_files
+    )
+
+
+def _has_meaningful_body(body: str, min_chars: int = 30) -> bool:
+    """Return True when the body contains real prose (ignoring trailers and blanks)."""
+    if not body:
+        return False
+    for line in body.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        # Skip trailer lines (Token: value)
+        if re.match(r"^[A-Za-z][A-Za-z0-9_-]+:", stripped):
+            continue
+        if len(stripped) >= min_chars:
+            return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Primary public API
+# ---------------------------------------------------------------------------
+
+def assess_pr_noise(
+    pr_id: str,
+    title: str,
+    body: Optional[str],
+    author_login: Optional[str],
+    author_email: Optional[str],
+    changed_files: Sequence[str],
+    is_revert_target: bool = False,
+) -> NoiseResult:
+    """Assess how noisy a pull request is.
+
+    Rules applied (highest confidence first):
+    1. Bot authors → ``bot_author`` (1.0)
+    2. Dependency update title → ``dependency_update`` (1.0)
+    3. Formatting-only title → ``formatting_only`` (1.0)
+    4. Typo-fix title → ``typo_fix`` (0.9)
+    5. CI/CD config title or all-CI files → ``ci_config`` (1.0)
+    6. Version bump / release title → ``version_bump`` (1.0)
+    7. All changed files are auto-generated → ``generated_file`` (0.9)
+    8. Title is a vanilla merge commit → ``merge_commit`` (1.0)
+
+    The is_revert_target flag prevents any of the above from suppressing the
+    record (Spec v2 Rule: never drop a record pointed to by a revert).
+    """
+    result = NoiseResult(record_id=pr_id, is_revert_target=is_revert_target)
+    clean_title = (title or "").strip()
+    clean_body = body or ""
+
+    if _is_bot_author(author_login, author_email):
+        result.add(NoiseReason.BOT_AUTHOR, detail=f"author={author_login!r}")
+
+    if _is_dependency_update(clean_title):
+        result.add(NoiseReason.DEPENDENCY_UPDATE, detail=clean_title[:80])
+
+    if _is_formatting_only(clean_title, changed_files):
+        result.add(NoiseReason.FORMATTING_ONLY, detail=clean_title[:80])
+
+    if _is_typo_fix(clean_title):
+        result.add(NoiseReason.TYPO_FIX, confidence=0.9, detail=clean_title[:80])
+
+    if _is_ci_config(clean_title, changed_files):
+        result.add(NoiseReason.CI_CONFIG, detail=clean_title[:80])
+
+    if _is_version_bump(clean_title):
+        result.add(NoiseReason.VERSION_BUMP, detail=clean_title[:80])
+
+    if _all_generated_files(changed_files) and not result.labels:
+        result.add(NoiseReason.GENERATED_FILE, confidence=0.9,
+                   detail=f"{len(changed_files)} generated file(s)")
+
+    return result
+
+
+def assess_commit_noise(
+    commit_id: str,
+    subject: str,
+    body: Optional[str],
+    author_email: Optional[str],
+    changed_files: Sequence[str],
+    parent_count: int = 1,
+    is_revert_target: bool = False,
+) -> NoiseResult:
+    """Assess how noisy a commit is.
+
+    All the same rules as PRs, plus:
+    - Vanilla merge commits (≥2 parents, standard subject) → ``merge_commit``
+    - Commits with no meaningful body and a noisy title → ``empty_body``
+    """
+    result = NoiseResult(record_id=commit_id, is_revert_target=is_revert_target)
+    clean_subject = (subject or "").strip()
+    clean_body = body or ""
+
+    if _is_bot_author(None, author_email):
+        result.add(NoiseReason.BOT_AUTHOR, detail=f"email={author_email!r}")
+
+    if _is_dependency_update(clean_subject):
+        result.add(NoiseReason.DEPENDENCY_UPDATE, detail=clean_subject[:80])
+
+    if _is_formatting_only(clean_subject, changed_files):
+        result.add(NoiseReason.FORMATTING_ONLY, detail=clean_subject[:80])
+
+    if _is_typo_fix(clean_subject):
+        result.add(NoiseReason.TYPO_FIX, confidence=0.9, detail=clean_subject[:80])
+
+    if _is_ci_config(clean_subject, changed_files):
+        result.add(NoiseReason.CI_CONFIG, detail=clean_subject[:80])
+
+    if _is_version_bump(clean_subject):
+        result.add(NoiseReason.VERSION_BUMP, detail=clean_subject[:80])
+
+    if _is_merge_commit(clean_subject, parent_count):
+        result.add(NoiseReason.MERGE_COMMIT, detail=clean_subject[:80])
+
+    if _all_generated_files(changed_files) and not result.labels:
+        result.add(NoiseReason.GENERATED_FILE, confidence=0.9,
+                   detail=f"{len(changed_files)} generated file(s)")
+
+    return result
+
+
+def filter_noise(
+    results: Sequence[NoiseResult],
+    *,
+    min_confidence: float = 0.8,
+    protected_ids: Optional[set[str]] = None,
+) -> tuple[list[str], list[str]]:
+    """Split a batch of NoiseResults into (noisy_ids, clean_ids).
+
+    ``protected_ids`` is an extra set of record IDs that must never be flagged
+    (e.g. revert targets discovered from the full commit graph that were not
+    already marked on the individual result).
+
+    Returns:
+        noisy_ids: IDs of records that should be flagged as noise.
+        clean_ids: IDs that are clean or protected.
+    """
+    protected = protected_ids or set()
+    noisy: list[str] = []
+    clean: list[str] = []
+
+    for result in results:
+        if result.is_revert_target or result.record_id in protected:
+            clean.append(result.record_id)
+            continue
+        if any(lbl.confidence >= min_confidence for lbl in result.labels):
+            noisy.append(result.record_id)
+        else:
+            clean.append(result.record_id)
+
+    return noisy, clean
+
+
+def build_revert_target_set(commit_rows: Sequence[dict[str, Any]]) -> set[str]:
+    """Build the set of commit SHAs that are the *target* of a revert.
+
+    Accepts dicts that have at least ``sha`` and ``subject``/``message`` keys
+    as stored in the SQLite cache commits table.
+
+    This is used to seed the ``is_revert_target`` flag before calling
+    ``assess_commit_noise``, ensuring the no-drop invariant is met even when
+    the revert commit appears later in the stream.
+    """
+    from app.services.linking import REVERT_COMMIT_PATTERN, REVERT_TRAILER_PATTERN
+
+    target_shas: set[str] = set()
+    for row in commit_rows:
+        # Search each text field independently so that ^ anchors in
+        # REVERT_TRAILER_PATTERN (MULTILINE) always sit at a real line start.
+        for text in (row.get("subject", ""), row.get("message", "")):
+            if not text:
+                continue
+            for match in REVERT_COMMIT_PATTERN.finditer(text):
+                target_shas.add(match.group(1).lower())
+            for match in REVERT_TRAILER_PATTERN.finditer(text):
+                target_shas.add(match.group(1).lower())
+    return target_shas

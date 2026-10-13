@@ -1,0 +1,17 @@
+{
+  "repo": "hynek/structlog",
+  "files": [
+    "src/structlog/_config.py",
+    "src/structlog/processors.py",
+    "src/structlog/stdlib.py"
+  ],
+  "dirs": [
+    "docs/"
+  ],
+  "config_keys": [
+    {
+      "file": "src/structlog/processors.py",
+      "name": "NAME_TO_LEVEL"
+    }
+  ]
+}
