@@ -15,8 +15,10 @@ from app.services.ingest.git_collect import (
 )
 from app.services.ingest.github_objects import (
     IngestionStopped,
-    build_issue_query,
+    build_issue_or_pull_request_query,
     build_pull_request_query,
+    normalise_resolved,
+    resolve_kind,
     build_recent_merged_query,
     chunked,
     normalise_issue,
@@ -104,14 +106,18 @@ def collect_target_commits(
     targets: IngestTargets,
     cache: SqliteCache,
     repo: str,
-) -> tuple[list[Any], set[int]]:
+) -> tuple[list[Any], set[int], list[int]]:
     seen: dict[str, Any] = {}
     pull_requests: set[int] = set()
+    numbers: set[int] = set()
     for relative in targets.all_files():
-        commits = collect_file_commits(clone, relative, branch)
+        commits = collect_file_commits(clone, relative, branch, repo=repo)
         for commit in commits:
             seen[commit.sha] = commit
             pull_requests.update(commit.pull_requests)
+            numbers.update(commit.pull_requests)
+            numbers.update(commit.closing)
+            numbers.update(commit.mentions)
         for commit in commits:
             cache.put_commit(repo, commit.as_row())
             cache.put_commit_file(
@@ -124,7 +130,49 @@ def collect_target_commits(
                     "diff_truncated": commit.diff_truncated,
                 },
             )
-    return list(seen.values()), pull_requests
+    return list(seen.values()), pull_requests, sorted(numbers)
+
+
+def fetch_references(
+    client: Any,
+    owner: str,
+    name: str,
+    numbers: Sequence[int],
+    cache: SqliteCache,
+    repo: str,
+    run_id: str,
+    *,
+    refresh: bool,
+) -> tuple[int, int, int]:
+    """Resolve numbers that may be either a pull request or an issue, in one query per batch."""
+    stored = 0
+    fetched = 0
+    cost = 0
+    pending = [
+        number
+        for number in numbers
+        if refresh or not cache.has_raw("pr", repo, str(number)) and not cache.has_raw("issue", repo, str(number))
+    ]
+    for batch in chunked(pending):
+        _guard_rate_limit(client)
+        result = parse_aliased(
+            client.query(
+                build_issue_or_pull_request_query(list(batch)),
+                {"owner": owner, "name": name},
+                tolerate_unresolved=True,
+            ),
+            "n",
+            list(batch),
+        )
+        cost += result.cost
+        fetched += len(result.items)
+        for number, node in result.items.items():
+            kind = resolve_kind(node)
+            if cache.put_raw(kind, repo, str(number), normalise_resolved(node)):
+                stored += 1
+        for number in result.missing:
+            cache.record_missing(run_id, repo, "reference", number, "resolved to neither an issue nor a pull request")
+    return stored, fetched, cost
 
 
 def fetch_pull_requests(
@@ -134,6 +182,7 @@ def fetch_pull_requests(
     numbers: Sequence[int],
     cache: SqliteCache,
     repo: str,
+    run_id: str = "",
     *,
     refresh: bool,
 ) -> tuple[int, int, int]:
@@ -161,6 +210,8 @@ def fetch_pull_requests(
         for number, node in result.items.items():
             if cache.put_raw("pr", repo, str(number), normalise_pull_request(node)):
                 stored += 1
+        for number in result.missing:
+            cache.record_missing(run_id, repo, "reference", number, "no pull request with that number")
     return stored, fetched, cost
 
 
@@ -300,9 +351,9 @@ def run_ingest(
     branch = default_branch(clone)
     summary.notes.append(f"clone branch {branch}")
 
-    target_commits, target_prs = collect_target_commits(clone, branch, targets, cache, repo)
+    target_commits, target_prs, all_numbers = collect_target_commits(clone, branch, targets, cache, repo)
     summary.commits = len(target_commits)
-    summary.commit_files = len(targets.all_files())
+    summary.commit_files = cache.count_commit_files()
     logger.info("collected %d commits across %d target files", len(target_commits), len(targets.all_files()))
 
     history = read_history(clone, branch)
@@ -314,36 +365,44 @@ def run_ingest(
     summary.documents_truncated = sum(1 for document in documents if document.truncated)
 
     try:
-        _, _, cost = fetch_pull_requests(
-            client, owner, name, sorted(target_prs), cache, repo, refresh=refresh
+        _, _, cost = fetch_references(
+            client, owner, name, sorted(all_numbers), cache, repo, summary.run_id, refresh=refresh
         )
         summary.graphql_cost += cost
-
-        target_issues = issue_numbers_from_cache(cache, repo, sorted(target_prs))
-        _, _, cost = fetch_issues(client, owner, name, sorted(target_issues), cache, repo, refresh=refresh)
-        summary.graphql_cost += cost
+        summary.pull_requests_fetched += len(all_numbers)
 
         recent = recent_merged_numbers(client, owner, name, effective_prs)
         skipped = max(0, len(recent) - effective_prs)
         if skipped:
-            cache.record_skip(summary.run_id, repo, "pull_request", "max_ingestion_prs", skipped)
-            summary.skips.append({"kind": "pull_request", "reason": "max_ingestion_prs", "count": skipped})
+            cache.record_skip(
+                summary.run_id, repo, "pull_request", "max_ingestion_prs", skipped, effective_prs
+            )
+            summary.skips.append(
+                {"kind": "pull_request", "reason": "max_ingestion_prs", "bound": effective_prs, "count": skipped}
+            )
         recent_numbers = recent[:effective_prs]
-        _, fetched, cost = fetch_pull_requests(
-            client, owner, name, recent_numbers, cache, repo, refresh=refresh
+        _, fetched, cost = fetch_references(
+            client, owner, name, recent_numbers, cache, repo, summary.run_id, refresh=refresh
         )
         summary.graphql_cost += cost
 
-        recent_issues = issue_numbers_from_cache(cache, repo, recent_numbers)
+        recent_issues = issue_numbers_from_cache(cache, repo, sorted(all_numbers) + recent_numbers)
         issue_list = sorted(recent_issues)[:effective_issues]
         if len(recent_issues) > effective_issues:
             dropped = len(recent_issues) - effective_issues
-            cache.record_skip(summary.run_id, repo, "issue", "max_ingestion_issues", dropped)
-            summary.skips.append({"kind": "issue", "reason": "max_ingestion_issues", "count": dropped})
-        _, fetched_issues, cost = fetch_issues(
-            client, owner, name, issue_list, cache, repo, refresh=refresh
+            cache.record_skip(
+                summary.run_id, repo, "issue", "max_ingestion_issues", dropped, effective_issues
+            )
+            summary.skips.append(
+                {"kind": "issue", "reason": "max_ingestion_issues", "bound": effective_issues, "count": dropped}
+            )
+        for number in sorted(recent_issues)[effective_issues:]:
+            cache.record_missing(summary.run_id, repo, "issue", number, "over the max_ingestion_issues bound")
+        _, fetched_issues, cost = fetch_references(
+            client, owner, name, issue_list, cache, repo, summary.run_id, refresh=refresh
         )
         summary.graphql_cost += cost
+        summary.issues_fetched += fetched_issues
     except IngestionStopped as stopped:
         summary.status = "stopped_rate_limit"
         summary.notes.append(str(stopped))

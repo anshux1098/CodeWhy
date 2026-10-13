@@ -79,6 +79,42 @@ def build_recent_merged_query(count: int) -> str:
     )
 
 
+def build_issue_or_pull_request_query(numbers: Sequence[int]) -> str:
+    aliases = "\n".join(
+        f"    n{number}: issueOrPullRequest(number: {number}) {{ ...CodeWhyIssueOrPullRequest }}"
+        for number in numbers
+    )
+    return (
+        "query CodeWhyNumbers($owner: String!, $name: String!) {\n"
+        "  rateLimit { cost remaining resetAt }\n"
+        "  repository(owner: $owner, name: $name) {\n"
+        f"{aliases}\n"
+        "  }\n"
+        "}\n"
+        "fragment CodeWhyIssueOrPullRequest on IssueOrPullRequest {\n"
+        "  __typename\n"
+        "  ... on PullRequest {\n"
+        "    number title body state merged mergedAt closedAt\n"
+        "    author { login }\n"
+        "    baseRefName\n"
+        "    mergeCommit { oid }\n"
+        "    reviews(first: 100) { totalCount pageInfo { hasNextPage } nodes { author { login } state body submittedAt } }\n"
+        "    reviewThreads(first: 100) { totalCount pageInfo { hasNextPage } nodes { isResolved comments(first: 20) { nodes { author { login } body path createdAt } } } }\n"
+        "    comments(first: 100) { totalCount pageInfo { hasNextPage } nodes { author { login } body createdAt } }\n"
+        "    commits(first: 100) { totalCount pageInfo { hasNextPage } nodes { commit { oid messageHeadline } } }\n"
+        "    files(first: 100) { totalCount pageInfo { hasNextPage } nodes { path } }\n"
+        "    closingIssuesReferences(first: 20) { totalCount nodes { number } }\n"
+        "  }\n"
+        "  ... on Issue {\n"
+        "    number title body state closedAt\n"
+        "    author { login }\n"
+        "    labels(first: 20) { nodes { name } }\n"
+        "    comments(first: 30) { totalCount pageInfo { hasNextPage } nodes { author { login } body createdAt } }\n"
+        "  }\n"
+        "}\n"
+    )
+
+
 def _truncated(connection: Any) -> bool:
     if not isinstance(connection, dict):
         return False
@@ -195,6 +231,21 @@ def parse_aliased(payload: dict[str, Any], prefix: str, numbers: Sequence[int]) 
         else:
             result.missing.append(number)
     return result
+
+
+KIND_BY_TYPENAME = {"PullRequest": "pr", "Issue": "issue"}
+
+
+def resolve_kind(node: dict[str, Any]) -> str:
+    """Return the cache kind for a resolved object: `pr` or `issue`."""
+    typename = node.get("__typename")
+    if isinstance(typename, str) and typename in KIND_BY_TYPENAME:
+        return KIND_BY_TYPENAME[typename]
+    return "pr" if "merged" in node else "issue"
+
+
+def normalise_resolved(node: dict[str, Any]) -> dict[str, Any]:
+    return normalise_pull_request(node) if resolve_kind(node) == "pr" else normalise_issue(node)
 
 
 class IngestionStopped(RuntimeError):

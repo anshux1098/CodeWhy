@@ -28,7 +28,10 @@ CREATE TABLE IF NOT EXISTS commits (
     subject TEXT,
     message TEXT,
     parent_shas TEXT,
-    pull_requests TEXT
+    pull_requests TEXT,
+    closing TEXT,
+    mentions TEXT,
+    trailers TEXT
 );
 
 CREATE TABLE IF NOT EXISTS commit_files (
@@ -59,8 +62,20 @@ CREATE TABLE IF NOT EXISTS skips (
     kind TEXT NOT NULL,
     reason TEXT NOT NULL,
     count INTEGER NOT NULL,
+    bound INTEGER,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS missing (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    repo TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    number INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS missing_unique ON missing (repo, kind, number);
 """
 
 
@@ -93,7 +108,31 @@ class SqliteCache:
         self._connection = sqlite3.connect(str(self.path))
         self._connection.row_factory = sqlite3.Row
         self._connection.executescript(SCHEMA)
+        self._migrate()
         self._connection.commit()
+
+    ADDED_COLUMNS: dict[str, dict[str, str]] = {
+        "commits": {
+            "closing": "TEXT",
+            "mentions": "TEXT",
+            "trailers": "TEXT",
+        },
+        "skips": {"bound": "INTEGER"},
+    }
+
+    def _migrate(self) -> None:
+        """Add columns introduced after a cache file was first created."""
+        for table, columns in self.ADDED_COLUMNS.items():
+            existing = {
+                row["name"] for row in self._connection.execute(f"PRAGMA table_info({table})")
+            }
+            if not existing:
+                continue
+            for column, column_type in columns.items():
+                if column not in existing:
+                    self._connection.execute(
+                        f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"
+                    )
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
@@ -167,8 +206,12 @@ class SqliteCache:
             ).fetchone()
         return int(row["n"])
 
+    def count_commit_files(self) -> int:
+        """Count stored commit_files rows, which are per commit and path."""
+        row = self._connection.execute("SELECT COUNT(*) AS n FROM commit_files").fetchone()
+        return int(row["n"])
+
     def put_commit(self, repo: str, record: dict[str, Any]) -> bool:
-        digest = content_hash(record)
         row = self._connection.execute(
             "SELECT sha FROM commits WHERE sha = ?", (record["sha"],)
         ).fetchone()
@@ -177,7 +220,8 @@ class SqliteCache:
         with self.transaction() as connection:
             connection.execute(
                 "INSERT INTO commits (sha, repo, authored_at, committed_at, author_name, subject, "
-                "message, parent_shas, pull_requests) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "message, parent_shas, pull_requests, closing, mentions, trailers) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     record["sha"],
                     repo,
@@ -188,9 +232,11 @@ class SqliteCache:
                     record.get("message"),
                     json.dumps(record.get("parent_shas") or []),
                     json.dumps(record.get("pull_requests") or []),
+                    json.dumps(record.get("closing") or []),
+                    json.dumps(record.get("mentions") or []),
+                    json.dumps(record.get("trailers") or {}),
                 ),
             )
-        del digest
         return True
 
     def put_commit_file(self, sha: str, record: dict[str, Any]) -> None:
@@ -242,13 +288,46 @@ class SqliteCache:
                 (utc_now(), status, graphql_cost, json.dumps(summary, ensure_ascii=False), run_id),
             )
 
-    def record_skip(self, run_id: str, repo: str, kind: str, reason: str, count: int) -> None:
+    def record_skip(
+        self,
+        run_id: str,
+        repo: str,
+        kind: str,
+        reason: str,
+        count: int,
+        bound: Optional[int] = None,
+    ) -> None:
         with self.transaction() as connection:
             connection.execute(
-                "INSERT INTO skips (run_id, repo, kind, reason, count, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (run_id, repo, kind, reason, count, utc_now()),
+                "INSERT INTO skips (run_id, repo, kind, reason, count, bound, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (run_id, repo, kind, reason, count, bound, utc_now()),
             )
+
+    def record_missing(self, run_id: str, repo: str, kind: str, number: int, reason: str) -> None:
+        with self.transaction() as connection:
+            connection.execute(
+                "INSERT OR IGNORE INTO missing (run_id, repo, kind, number, reason, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (run_id, repo, kind, number, reason, utc_now()),
+            )
+
+    def missing(self, repo: Optional[str] = None) -> list[sqlite3.Row]:
+        if repo is None:
+            return list(self._connection.execute("SELECT * FROM missing ORDER BY number"))
+        return list(
+            self._connection.execute(
+                "SELECT * FROM missing WHERE repo = ? ORDER BY number", (repo,)
+            )
+        )
+
+    def missing_numbers(self, repo: str, kind: str = "number") -> set[int]:
+        return {
+            int(row["number"])
+            for row in self._connection.execute(
+                "SELECT number FROM missing WHERE repo = ?", (repo,)
+            )
+        }
 
     def skips(self, repo: Optional[str] = None) -> list[sqlite3.Row]:
         if repo is None:

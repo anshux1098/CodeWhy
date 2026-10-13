@@ -25,6 +25,17 @@ TEXT_SUFFIXES = frozenset({".md", ".rst", ".txt", ".adoc", ".markdown"})
 CHANGELOG_NAMES = ("CHANGES", "CHANGELOG")
 DEFAULT_DOC_DIRS = ("docs", "adr", "rfcs")
 
+FENCED_CODE = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
+INLINE_CODE = re.compile(r"`[^`\n]*`")
+ISSUE_REFERENCE = re.compile(r"(?<![\w&/])#(\d{1,6})(?![\w&])")
+
+TRAILER_LINE = re.compile(r"^(?P<token>[A-Za-z][A-Za-z0-9_-]*):[ \t]*(?P<value>\S.*?)[ \t]*$")
+GITHUB_PULL_URL = re.compile(
+    r"https?://github\.com/(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+)/pull/(?P<number>\d+)\b"
+)
+CLOSING_TRAILERS = ("fixes", "closes", "resolves")
+MENTION_TRAILERS = ("references", "related", "see-also")
+
 
 @dataclass
 class CollectedCommit:
@@ -36,6 +47,9 @@ class CollectedCommit:
     subject: str = ""
     message: str = ""
     pull_requests: list[int] = field(default_factory=list)
+    closing: list[int] = field(default_factory=list)
+    mentions: list[int] = field(default_factory=list)
+    trailers: dict[str, list[str]] = field(default_factory=dict)
     files: list[dict[str, Optional[str]]] = field(default_factory=list)
     diff: str = ""
     diff_truncated: bool = False
@@ -50,6 +64,9 @@ class CollectedCommit:
             "message": self.message,
             "parent_shas": self.parent_shas,
             "pull_requests": self.pull_requests,
+            "closing": self.closing,
+            "mentions": self.mentions,
+            "trailers": self.trailers,
         }
 
 
@@ -74,11 +91,84 @@ def extract_pull_request_numbers(subject: str) -> list[int]:
     return numbers
 
 
+def strip_code(text: str) -> str:
+    without_fences = FENCED_CODE.sub(" ", text or "")
+    return INLINE_CODE.sub(" ", without_fences)
+
+
 def extract_issue_numbers(text: str) -> list[int]:
-    return sorted({int(number) for number in re.findall(r"(?<![\w(])#(\d+)", text or "")})
+    return sorted({int(number) for number in ISSUE_REFERENCE.findall(strip_code(text))})
 
 
-def parse_commit_records(raw: str) -> list[CollectedCommit]:
+def extract_closing_issue_numbers(text: str) -> list[int]:
+    trailing = text or ""
+    if trailing.endswith("."):
+        trailing = trailing[:-1]
+    return sorted({int(number) for number in ISSUE_REFERENCE.findall(strip_code(trailing))})
+
+
+def parse_trailer_block(message: str) -> dict[str, list[str]]:
+    paragraphs = [block for block in (message or "").split("\n\n") if block.strip()]
+    if not paragraphs:
+        return {}
+    last = paragraphs[-1]
+    lines = [line for line in last.splitlines() if line.strip()]
+    if len(lines) < 1:
+        return {}
+    parsed: dict[str, list[str]] = {}
+    for line in lines:
+        match = TRAILER_LINE.match(line.strip())
+        if match is None:
+            return {}
+        parsed.setdefault(match.group("token"), []).append(match.group("value"))
+    return parsed
+
+
+def _trailer_values(trailers: dict[str, list[str]], *names: str) -> list[str]:
+    values: list[str] = []
+    for name in names:
+        for token, entries in trailers.items():
+            if token.lower() == name:
+                values.extend(entries)
+    return values
+
+
+@dataclass
+class MessageReferences:
+    pull_requests: list[int] = field(default_factory=list)
+    closing: list[int] = field(default_factory=list)
+    mentions: list[int] = field(default_factory=list)
+    trailers: dict[str, list[str]] = field(default_factory=dict)
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "pull_requests": self.pull_requests,
+            "closing": self.closing,
+            "mentions": self.mentions,
+            "trailers": self.trailers,
+        }
+
+
+def extract_references(message: str, repo: str) -> MessageReferences:
+    trailers = parse_trailer_block(message)
+    references = MessageReferences(trailers=trailers)
+    for value in _trailer_values(trailers, "pull-request", "pull_request"):
+        match = GITHUB_PULL_URL.search(value)
+        if match is None:
+            continue
+        if f"{match.group('owner')}/{match.group('repo')}".lower() == repo.lower():
+            references.pull_requests.append(int(match.group("number")))
+    references.pull_requests = sorted(set(references.pull_requests))
+    for value in _trailer_values(trailers, *CLOSING_TRAILERS):
+        references.closing.extend(extract_issue_numbers(value))
+    for value in _trailer_values(trailers, *MENTION_TRAILERS):
+        references.mentions.extend(extract_issue_numbers(value))
+    references.closing = sorted(set(references.closing))
+    references.mentions = sorted(set(references.mentions))
+    return references
+
+
+def parse_commit_records(raw: str, repo: str = "") -> list[CollectedCommit]:
     commits: list[CollectedCommit] = []
     for chunk in raw.split(RECORD_START):
         if not chunk.strip():
@@ -88,7 +178,8 @@ def parse_commit_records(raw: str) -> list[CollectedCommit]:
         if len(fields) < 7:
             continue
         sha, parents, authored, committed, author, subject, message = fields[:7]
-        message = FIELD_SEP.join(fields[7:])
+        message = FIELD_SEP.join(fields[6:])
+        references = extract_references(message, repo)
         commits.append(
             CollectedCommit(
                 sha=sha,
@@ -98,7 +189,10 @@ def parse_commit_records(raw: str) -> list[CollectedCommit]:
                 author_name=author,
                 subject=subject,
                 message=message,
-                pull_requests=extract_pull_request_numbers(subject),
+                pull_requests=sorted(set(extract_pull_request_numbers(subject) + references.pull_requests)),
+                closing=references.closing,
+                mentions=references.mentions,
+                trailers=references.trailers,
                 files=parse_name_status(remainder),
             )
         )
@@ -144,6 +238,7 @@ def collect_file_commits(
     branch: str,
     *,
     runner: CommandRunner = default_runner,
+    repo: str = "",
 ) -> list[CollectedCommit]:
     metadata = runner(
         [
@@ -161,7 +256,7 @@ def collect_file_commits(
     )
     if metadata.returncode != 0:
         raise RuntimeError(f"git log failed for {relative_path}")
-    commits = parse_commit_records(metadata.stdout or "")
+    commits = parse_commit_records(metadata.stdout or "", repo)
 
     patches_run = runner(
         [

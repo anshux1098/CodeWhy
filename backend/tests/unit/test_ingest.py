@@ -15,6 +15,7 @@ from app.services.ingest.git_collect import (
     collect_file_commits,
     extract_issue_numbers,
     extract_pull_request_numbers,
+    extract_references,
 )
 from app.services.ingest.github_objects import (
     IngestionStopped,
@@ -94,12 +95,16 @@ class FakeClient:
                     "repository": {"pullRequests": {"nodes": [{"number": n} for n in numbers]}},
                 }
             }
-        prefix = "issue" if "CodeWhyIssues" in document else "pr"
-        source = self.issues if prefix == "issue" else self.pull_requests
+        prefix = "n" if "CodeWhyNumbers" in document else "pr"
         repository = {}
-        for number in source:
-            if f"{prefix}{number}:" in document:
-                repository[f"{prefix}{number}"] = source[number]
+        for number in sorted({*self.pull_requests, *self.issues}):
+            key = f"{prefix}{number}"
+            if f"{key}:" not in document:
+                continue
+            if number in self.pull_requests:
+                repository[key] = {**self.pull_requests[number], "__typename": "PullRequest"}
+            else:
+                repository[key] = {**self.issues[number], "__typename": "Issue"}
         return {
             "data": {
                 "rateLimit": {"cost": 25, "remaining": 4900, "resetAt": None},
@@ -569,3 +574,218 @@ def test_aliased_query_with_nothing_returned_is_not_an_error() -> None:
     assert result.items == {}
     assert result.missing == [1]
     assert result.cost == 1
+
+# Part A: every collected commit has a commit_files row with a diff
+
+
+def test_every_collected_commit_has_a_commit_files_row_with_a_diff(tmp_path: Path) -> None:
+    clone_root = build_clone(tmp_path)
+    client = FakeClient()
+    client.pull_requests[41] = pull_request_node(41)
+    with SqliteCache(tmp_path / "c.sqlite3") as cache:
+        run_ingest(
+            "acme/netclient", TARGETS, settings(), cache=cache, clone_root=clone_root,
+            client=client, max_prs=2, max_issues=2,
+        )
+        commits = [row["sha"] for row in cache._connection.execute("SELECT sha FROM commits")]
+        assert commits
+        for sha in commits:
+            rows = cache._connection.execute(
+                "SELECT path, diff, diff_truncated FROM commit_files WHERE sha = ?", (sha,)
+            ).fetchall()
+            assert rows, f"commit {sha} has no commit_files row"
+            for row in rows:
+                assert row["diff"], f"commit {sha} path {row['path']} stored an empty diff"
+
+
+def test_commit_files_row_count_is_reported_as_rows_not_target_files(tmp_path: Path) -> None:
+    clone_root = build_clone(tmp_path)
+    client = FakeClient()
+    client.pull_requests[41] = pull_request_node(41)
+    with SqliteCache(tmp_path / "c.sqlite3") as cache:
+        summary = run_ingest(
+            "acme/netclient", TARGETS, settings(), cache=cache, clone_root=clone_root,
+            client=client, max_prs=2, max_issues=2,
+        )
+        rows = cache._connection.execute("SELECT COUNT(*) AS n FROM commit_files").fetchone()["n"]
+    assert summary.commit_files == rows
+    assert summary.commit_files >= summary.commits
+
+
+def test_skip_rows_record_the_bound_actually_used(tmp_path: Path) -> None:
+    clone_root = build_clone(tmp_path)
+    client = FakeClient()
+    client.pull_requests[41] = pull_request_node(41)
+    client.recent = list(range(100, 130))
+    for number in client.recent:
+        client.pull_requests[number] = pull_request_node(number)
+    with SqliteCache(tmp_path / "c.sqlite3") as cache:
+        run_ingest(
+            "acme/netclient", TARGETS, settings(), cache=cache, clone_root=clone_root,
+            client=client, max_prs=4, max_issues=7,
+        )
+        rows = [dict(row) for row in cache.skips("acme/netclient")]
+    pr_row = next(row for row in rows if row["kind"] == "pull_request")
+    assert pr_row["bound"] == 4
+
+
+def test_numbers_that_resolve_to_neither_kind_are_recorded_missing(tmp_path: Path) -> None:
+    clone_root = build_clone(tmp_path)
+    client = FakeClient()
+    client.pull_requests[41] = pull_request_node(41)
+    with SqliteCache(tmp_path / "c.sqlite3") as cache:
+        run_ingest(
+            "acme/netclient", TARGETS, settings(), cache=cache, clone_root=clone_root,
+            client=client, max_prs=2, max_issues=2,
+        )
+        missing = [dict(row) for row in cache.missing("acme/netclient")]
+    assert all("neither" in row["reason"] or "no pull request" in row["reason"] for row in missing)
+
+
+def test_a_number_stored_as_an_issue_is_counted_as_an_issue(tmp_path: Path) -> None:
+    from app.services.ingest.pipeline import fetch_references
+
+    client = FakeClient()
+    client.issues[12] = {
+        "number": 12, "title": "Broken", "body": "b", "state": "CLOSED",
+        "labels": {"nodes": []},
+        "comments": {"totalCount": 0, "pageInfo": {"hasNextPage": False}, "nodes": []},
+    }
+    with SqliteCache(tmp_path / "c.sqlite3") as cache:
+        fetch_references(client, "acme", "netclient", [12], cache, "acme/netclient", "run1", refresh=False)
+        assert cache.count_kind("issue", "acme/netclient") == 1
+        assert cache.count_kind("pr", "acme/netclient") == 0
+        assert cache.has_raw("issue", "acme/netclient", "12") is True
+
+
+# Part A4: the issue reference regex
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Fixes #1234", [1234]),
+        ("closes #7 and references #8", [7, 8]),
+        ("a plain #42", [42]),
+        ("version 1.2#3 is not a reference", []),
+        ("hex colour #ff00ff is not a reference", []),
+        ("n@pytest.mark.skipif has no reference", []),
+        ("see path/to/file.py#12", []),
+        ("word#9", []),
+        ("`#77` inside inline code is ignored", []),
+        ("```\n#88 inside a fenced block\n```", []),
+        ("#1234567 is too long", []),
+    ],
+)
+def test_issue_reference_extraction(text: str, expected: list[int]) -> None:
+    assert extract_issue_numbers(text) == expected
+
+
+# Part B: commit trailers
+
+
+def test_fixes_trailer_is_a_closing_reference() -> None:
+    references = extract_references("Body text\n\nFixes: #1234", "a/b")
+    assert references.closing == [1234]
+
+
+def test_closes_and_resolves_trailers_are_closing_references() -> None:
+    assert extract_references("Closes: #1", "a/b").closing == [1]
+    assert extract_references("Resolves: #2", "a/b").closing == [2]
+
+
+def test_references_and_related_trailers_are_mentions() -> None:
+    assert extract_references("References: #5", "a/b").mentions == [5]
+    assert extract_references("Related: #6", "a/b").mentions == [6]
+
+
+def test_pull_request_trailer_for_the_same_repository_yields_a_pull_request() -> None:
+    references = extract_references(
+        "Pull-request: https://github.com/a/b/pull/99\n", "a/b"
+    )
+    assert references.pull_requests == [99]
+
+
+def test_pull_request_trailer_for_another_repository_is_ignored() -> None:
+    references = extract_references(
+        "Pull-request: https://github.com/other/repo/pull/99\n", "a/b"
+    )
+    assert references.pull_requests == []
+
+
+def test_pull_request_sha_and_change_id_are_stored_as_trailers() -> None:
+    references = extract_references(
+        "Pull-request-sha: abc123\nChange-Id: Ideadbeefcafe\n", "a/b"
+    )
+    assert references.trailers["Change-Id"] == ["Ideadbeefcafe"]
+    assert references.trailers["Pull-request-sha"] == ["abc123"]
+
+
+def test_a_trailer_line_inside_the_body_is_not_a_trailer() -> None:
+    message = "We thought about Fixes: #99 here.\n\nChange-Id: Iabc\n"
+    references = extract_references(message, "a/b")
+    assert references.closing == []
+    assert references.trailers == {"Change-Id": ["Iabc"]}
+
+
+def test_multiple_trailers_are_all_captured() -> None:
+    references = extract_references(
+        "Fixes: #1\nReferences: #2\nChange-Id: Iabc\n", "a/b"
+    )
+    assert references.closing == [1]
+    assert references.mentions == [2]
+
+
+def test_a_commit_with_no_trailers_yields_nothing() -> None:
+    references = extract_references("Just a normal commit message\n\nWith a body.\n", "a/b")
+    assert references.trailers == {}
+    assert references.closing == []
+    assert references.mentions == []
+
+
+def test_trailers_reach_the_commit_row(tmp_path: Path) -> None:
+    clone = build_clone(tmp_path) / "acme__netclient"
+    (clone / "pkg" / "config.py").write_text("MAX_RETRIES = 9\n", encoding="utf-8")
+    git(clone, "commit", "-qam", "Raise the cap\n\nBecause the mobile client times out.\n\nFixes: #77\nChange-Id: Iabc123")
+    commits = collect_file_commits(clone, "pkg/config.py", "main", repo="acme/netclient")
+    top = commits[0]
+    assert top.closing == [77]
+    assert top.trailers["Change-Id"] == ["Iabc123"]
+    assert top.as_row()["trailers"]["Change-Id"] == ["Iabc123"]
+
+
+def test_trailer_pull_request_is_stored_on_the_commit_row(tmp_path: Path) -> None:
+    clone = build_clone(tmp_path) / "acme__netclient"
+    (clone / "pkg" / "config.py").write_text("MAX_RETRIES = 9\n", encoding="utf-8")
+    git(clone, "commit", "-qam", "Raise the cap\n\nPull-request: https://github.com/acme/netclient/pull/314")
+    commits = collect_file_commits(clone, "pkg/config.py", "main", repo="acme/netclient")
+    assert commits[0].pull_requests == [314]
+
+
+def test_an_existing_cache_file_gains_the_new_columns(tmp_path: Path) -> None:
+    import sqlite3
+
+    path = tmp_path / "old.sqlite3"
+    connection = sqlite3.connect(path)
+    connection.executescript(
+        "CREATE TABLE commits ("
+        "sha TEXT PRIMARY KEY, repo TEXT NOT NULL, authored_at TEXT, committed_at TEXT,"
+        "author_name TEXT, subject TEXT, message TEXT, parent_shas TEXT, pull_requests TEXT);"
+"CREATE TABLE skips ("
+        "id INTEGER PRIMARY KEY, run_id TEXT NOT NULL, repo TEXT NOT NULL, kind TEXT NOT NULL,"
+        "reason TEXT NOT NULL, count INTEGER NOT NULL, created_at TEXT NOT NULL);"
+    )
+    connection.commit()
+    connection.close()
+
+    with SqliteCache(path) as cache:
+        columns = {
+            row["name"]
+            for row in cache._connection.execute("PRAGMA table_info(commits)")
+        }
+        assert {"closing", "mentions", "trailers"} <= columns
+        skip_columns = {row["name"] for row in cache._connection.execute("PRAGMA table_info(skips)")}
+        assert "bound" in skip_columns
+        cache.record_skip("run1", "acme/netclient", "pull_request", "max_ingestion_prs", 3, 4)
+        stored = cache.skips("acme/netclient")[0]
+        assert stored["bound"] == 4
