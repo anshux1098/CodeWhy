@@ -333,6 +333,12 @@ class SqliteCache:
             )
         return True
 
+    def fetch_raw_objects(self, repo: str, limit: int = 50) -> list[dict[str, Any]]:
+        """Rows of raw_objects for a repo, shaped for the extraction step."""
+        query = "SELECT id, kind, json FROM raw_objects WHERE repo = ? ORDER BY id LIMIT ?"
+        rows = self._connection.execute(query, (repo, limit)).fetchall()
+        return [{"id": r[0], "kind": r[1], "payload": r[2]} for r in rows]
+
     def get_raw(self, kind: str, repo: str, key: str) -> Optional[Any]:
         object_id = stable_id(kind, repo, key)
         row = self._connection.execute(
@@ -376,9 +382,19 @@ class SqliteCache:
 
     def put_commit(self, repo: str, record: dict[str, Any]) -> bool:
         row = self._connection.execute(
-            "SELECT sha FROM commits WHERE sha = ?", (record["sha"],)
+            "SELECT sha, message FROM commits WHERE sha = ?", (record["sha"],)
         ).fetchone()
         if row is not None:
+            # A re-run that now carries a commit body should not leave the
+            # previously stored empty one behind (body collection came after the
+            # first ingest); repairing it keeps --refresh useful.
+            new_message = redact_emails(record.get("message"))
+            if (not row[1] or not str(row[1]).strip()) and new_message and new_message.strip():
+                with self.transaction() as connection:
+                    connection.execute(
+                        "UPDATE commits SET message = ? WHERE sha = ?",
+                        (new_message, record["sha"]),
+                    )
             return False
         with self.transaction() as connection:
             connection.execute(
@@ -567,7 +583,7 @@ class SqliteCache:
         where = " WHERE repo = ?" if repo else ""
         params: tuple[Any, ...] = (repo,) if repo else ()
         return [dict(row) for row in self._connection.execute(
-            f"SELECT sha, repo, subject, message, pull_requests, closing, mentions {where}"
+            f"SELECT sha, repo, subject, message, pull_requests, closing, mentions FROM commits {where}"
             " ORDER BY committed_at DESC",
             params,
         )]

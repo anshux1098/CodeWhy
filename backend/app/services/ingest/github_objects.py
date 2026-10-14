@@ -18,13 +18,16 @@ def chunked(values: Sequence[int], size: int = BATCH_LIMIT) -> Iterable[Sequence
         yield values[start : start + size]
 
 
-def build_recent_merged_query(count: int) -> str:
+def build_recent_merged_query(first: int, after: Optional[str] = None) -> str:
     return (
-        "query CodeWhyRecent($owner: String!, $name: String!, $count: Int!) {\n"
+        "query CodeWhyRecent($owner: String!, $name: String!, $first: Int!, $after: String) {\n"
         "  rateLimit { cost remaining resetAt }\n"
         "  repository(owner: $owner, name: $name) {\n"
-        "    pullRequests(states: MERGED, first: $count, "
-        "orderBy: {field: CREATED_AT, direction: DESC}) { nodes { number } }\n"
+        "    pullRequests(states: MERGED, first: $first, after: $after, "
+        "orderBy: {field: CREATED_AT, direction: DESC}) {\n"
+        "      pageInfo { hasNextPage endCursor }\n"
+        "      nodes { number }\n"
+        "    }\n"
         "  }\n"
         "}\n"
     )

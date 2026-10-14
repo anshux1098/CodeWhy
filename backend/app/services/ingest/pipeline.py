@@ -201,13 +201,28 @@ def _guard_rate_limit(client: Any) -> None:
 
 
 def recent_merged_numbers(client: Any, owner: str, name: str, count: int) -> list[int]:
-    payload = client.query(
-        build_recent_merged_query(count),
-        {"owner": owner, "name": name, "count": count},
-    )
-    repository = ((payload.get("data") or {}).get("repository") or {})
-    connection = repository.get("pullRequests") or {}
-    return [node.get("number") for node in (connection.get("nodes") or []) if node.get("number")]
+    numbers: list[int] = []
+    cursor: Optional[str] = None
+    while len(numbers) < count:
+        first = min(100, count - len(numbers))
+        variables: dict[str, Any] = {"owner": owner, "name": name, "first": first, "after": cursor}
+        payload = client.query(
+            build_recent_merged_query(first, cursor),
+            variables,
+        )
+        repository = ((payload.get("data") or {}).get("repository") or {})
+        connection = repository.get("pullRequests") or {}
+        page_numbers = [node.get("number") for node in (connection.get("nodes") or []) if node.get("number")]
+        numbers.extend(page_numbers)
+        page_info = connection.get("pageInfo")
+        # A server that does not paginate (or a test mock) replies with a
+        # single page and no pageInfo; take what it gave and stop.
+        if not isinstance(page_info, dict) or not page_info.get("hasNextPage"):
+            break
+        cursor = page_info.get("endCursor")
+        if not cursor:
+            break
+    return numbers
 
 
 def issue_numbers_from_cache(cache: SqliteCache, repo: str, pull_request_numbers: Sequence[int]) -> set[int]:

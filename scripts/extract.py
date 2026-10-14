@@ -48,6 +48,13 @@ def parse_args() -> argparse.Namespace:
         help="Maximum candidate records to extract",
     )
     parser.add_argument(
+        "--token-budget",
+        dest="token_budget",
+        type=int,
+        default=None,
+        help="Stop extraction once this many tokens have been used.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Plan extraction without invoking the LLM or updating the cache",
@@ -72,7 +79,9 @@ def main() -> int:
     noisy_ids = cache.noisy_record_ids(args.repo)
     logger.info("Found %d noisy records to exclude from extraction", len(noisy_ids))
 
-    budget = TokenBudget(settings.max_llm_tokens_per_run)
+    budget = TokenBudget(
+        args.token_budget if args.token_budget is not None else settings.max_llm_tokens_per_run
+    )
     provider = get_llm_provider(budget=budget)
 
     # Fetch candidate PRs and docs from raw_objects
@@ -190,9 +199,10 @@ def main() -> int:
     logger.info("Linking finished: %d links written.", links_written)
 
     logger.info(
-        "Extraction finished: %d decisions, %d verified evidence quotes written.",
+        "Extraction finished: %d decisions, %d verified evidence quotes written. Tokens used: %d.",
         extracted_decisions_count,
         extracted_evidence_count,
+        budget.total_tokens,
     )
 
     if sample_records and args.sample_review_file:
