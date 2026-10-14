@@ -38,6 +38,19 @@ def test_graph_source_refuses_to_run_on_mocks_without_opt_in() -> None:
     assert "ALLOW_MOCK_PROVIDERS" in str(excinfo.value)
 
 
+def seeded_store():
+    """An in-memory store holding one repository and one entity."""
+    from app.stores.graph_store import InMemoryGraphStore
+
+    store = InMemoryGraphStore()
+    store.merge_node("Repository", {"id": "acme/netclient", "name": "netclient",
+                                    "repo": "acme/netclient"})
+    store.merge_node("CodeEntity", {"id": "e1", "repo": "acme/netclient",
+                                    "name": "MAX_RETRIES", "path": "pkg/config.py",
+                                    "entity_type": "ConfigKey"})
+    return store
+
+
 def test_graph_source_is_wired_up_when_mock_mode_is_opted_into() -> None:
     from app.services.data_source import GraphDataSource
 
@@ -46,7 +59,13 @@ def test_graph_source_is_wired_up_when_mock_mode_is_opted_into() -> None:
     )
     assert isinstance(source, GraphDataSource)
     # No Neo4j credentials and no LLM provider must not stop it constructing.
-    repository = source.get_repository("acme/netclient")
+    # The repository has to be one the store knows about: an unknown repository is
+    # a 404 now, which is a different test.
+    store = seeded_store()
+    seeded = GraphDataSource(
+        Settings(_env_file=None, data_source="graph", allow_mock_providers=True), store=store
+    )
+    repository = seeded.get_repository("acme/netclient")
     assert repository.fixture is True, "a mock-backed source must declare itself"
 
 

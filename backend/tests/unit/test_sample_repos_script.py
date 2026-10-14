@@ -177,6 +177,10 @@ def test_dry_run_makes_no_api_call(capsys: pytest.CaptureFixture[str], monkeypat
     def explode(*args: object, **kwargs: object) -> None:
         raise AssertionError("dry run must not touch the network")
 
+    # A dummy token, supplied here rather than inherited from `.env`: the dry run
+    # refuses to start without one, so depending on the developer's file would make
+    # this test fail on a machine that has none. It is never sent anywhere.
+    monkeypatch.setenv("GITHUB_TOKEN", "test-token-not-a-real-secret")
     monkeypatch.setattr("scripts.sample_repos.GitHubGraphQLClient", explode)
     exit_code = main(["--dry-run"])
     assert exit_code == 0

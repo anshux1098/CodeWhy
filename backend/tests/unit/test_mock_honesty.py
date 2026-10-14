@@ -132,7 +132,9 @@ def test_graph_data_source_allows_explicit_mock_mode() -> None:
     )
     source = get_data_source(cfg)
     assert isinstance(source, GraphDataSource)
-    # Even in sanctioned mock mode the response must still declare itself.
+    # The repository must exist in the store: an unknown one is now a 404, which
+    # this test is not about. What it is about is the `fixture` flag.
+    source.store = seeded_store()
     response = source.ask(REPO, AskRequest(question="Why is MAX_RETRIES 3?"))
     assert response.fixture is True
 

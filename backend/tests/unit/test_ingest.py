@@ -539,10 +539,17 @@ def test_dry_run_plan_makes_no_network_call(tmp_path: Path) -> None:
     del explode
 
 
-def test_dry_run_cli_makes_no_network_call(tmp_path: Path) -> None:
+def test_dry_run_cli_makes_no_network_call(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import sys
 
     from scripts import ingest as ingest_cli
+
+    # The dry run refuses to start without a token, so supply a dummy one here
+    # rather than inheriting whatever the developer has in `.env`. It is never
+    # sent anywhere, because a dry run makes no request.
+    monkeypatch.setenv("GITHUB_TOKEN", "test-token-not-a-real-secret")
 
     targets_path = tmp_path / "t.json"
     targets_path.write_text(json.dumps(TARGETS.model_dump()), encoding="utf-8")
