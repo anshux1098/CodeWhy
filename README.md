@@ -297,6 +297,18 @@ codewhy/
    - Evaluation runner in `scripts/evaluate.py`.
    - React + Vite + TypeScript frontend interface.
 
+## Attribution and quotes
+
+An author is read from the ingested record, never from the model. `RawEvidenceItem` has no
+`author` field, so a model response that invents one is ignored by the schema, and the value
+stored is always the author parsed from the pull request or comment. An author that looks like
+an email address is dropped rather than stored, in either the decision or the evidence row.
+
+**Quotes are not redacted.** A quote must remain a verbatim, character-for-character substring
+of its source or it is not a quote. Email-shaped text inside a quotation is therefore left
+exactly as written, because altering it would break verification at answer time and make the
+citation unverifiable. Author identity is the field that is held to the stricter rule.
+
 ## Real versus mock
 
 Every response carries a `fixture` boolean. It is **derived**, never asserted: a response is

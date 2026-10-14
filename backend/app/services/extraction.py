@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import hashlib
 import json
 import logging
@@ -8,6 +10,8 @@ from enum import StrEnum
 from typing import Any, Final, Literal, Optional, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
+
+EMAIL_SHAPED = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
 from app.prompts.extract_decision import build_extraction_prompt, detect_injection_attempt
 from app.providers.llm_provider import BaseLLMProvider, LLMResponse, LLMSchemaValidationError
@@ -50,7 +54,6 @@ class RawEvidenceItem(BaseModel):
 
     quote: str = Field(description="Exact verbatim quote from the source text")
     claim: str = Field(default="", description="The specific claim or rationale supported by this quote")
-    author: Optional[str] = None
     timestamp: Optional[str] = None
 
 
@@ -151,6 +154,22 @@ def compute_content_hash(text: str) -> str:
 # Extraction Engine
 # ---------------------------------------------------------------------------
 
+def attribution_for(author: Optional[str]) -> Optional[str]:
+    """Normalise an author taken from the ingested record.
+
+    Author identity is a factual claim, so it is read from the source payload and
+    never from model output. A value that looks like an email address is dropped
+    rather than stored or returned, because a login is the only identifier the
+    system is prepared to hold.
+    """
+    if not author:
+        return None
+    cleaned = author.strip()
+    if not cleaned or EMAIL_SHAPED.search(cleaned):
+        return None
+    return cleaned
+
+
 def extract_decisions_from_source(
     provider: BaseLLMProvider,
     source_id: str,
@@ -241,7 +260,7 @@ def extract_decisions_from_source(
                         source_type=source_type,
                         source_url=source_url,
                         quote=q_res.quote,
-                        author=raw_ev.author or author,
+                        author=attribution_for(author),
                         timestamp=raw_ev.timestamp or created_at,
                         classification="explicit",
                         claim=raw_ev.claim,
@@ -282,7 +301,7 @@ def extract_decisions_from_source(
                 affected_entities=affected_entities,
                 source_references=list(source_references),
                 decision_date=created_at,
-                source_author=author,
+                source_author=attribution_for(author),
                 explicit_reversal_language=raw_dec.explicit_reversal_language,
                 unknown_fields=raw_dec.unknown_fields,
                 evidence=verified_evidence,
