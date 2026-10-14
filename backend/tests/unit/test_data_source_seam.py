@@ -3,9 +3,10 @@ from __future__ import annotations
 import inspect
 
 import pytest
+from pydantic import ValidationError
 
 from app.config import Settings
-from app.services.data_source import DataSource, DataSourceError, get_data_source
+from app.services.data_source import DataSource, get_data_source
 
 REQUIRED_METHODS = {
     "get_repository": ["repository_id"],
@@ -29,7 +30,20 @@ def test_fixture_is_the_default_implementation() -> None:
     assert isinstance(get_data_source(Settings(_env_file=None)), FixtureDataSource)
 
 
-def test_graph_source_is_not_implemented_yet() -> None:
-    with pytest.raises(DataSourceError) as excinfo:
-        get_data_source(Settings(_env_file=None, data_source="graph"))
-    assert "graph" in str(excinfo.value)
+def test_graph_source_is_wired_up_and_is_not_the_fixture() -> None:
+    """Phase 3 implemented the graph source; it must be selectable and never claim to be a fixture."""
+    from app.services.data_source import GraphDataSource
+
+    source = get_data_source(Settings(_env_file=None, data_source="graph"))
+    assert isinstance(source, GraphDataSource)
+
+    # No Neo4j credentials and no LLM provider must not stop it constructing.
+    repository = source.get_repository("acme/netclient")
+    assert repository.fixture is False
+
+
+def test_an_unsupported_data_source_is_rejected_by_settings() -> None:
+    """The allowed values are closed at the config layer, before a source is built."""
+    with pytest.raises(ValidationError) as excinfo:
+        Settings(_env_file=None, data_source="postgres")
+    assert "postgres" in str(excinfo.value)
