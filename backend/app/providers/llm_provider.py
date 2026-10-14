@@ -130,6 +130,10 @@ class LLMResponse:
 # ---------------------------------------------------------------------------
 
 class BaseLLMProvider(ABC):
+    #: True only for a provider that calls a real model. A mock must keep this
+    #: False so any response built with it can declare itself a fixture.
+    is_real: bool = True
+
     """Abstract interface for LLM providers."""
 
     def __init__(
@@ -200,6 +204,8 @@ class BaseLLMProvider(ABC):
 # ---------------------------------------------------------------------------
 
 class MockLLMProvider(BaseLLMProvider):
+    is_real: bool = False
+
     """Mock provider with canned responses, customizable completion handler, and token tracking."""
 
     def __init__(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
 from app.config import Settings, settings
@@ -35,8 +36,63 @@ class DataSource(Protocol):
     def ask(self, repository_id: str, request: AskRequest) -> AskResponse: ...
 
     def get_decision(self, decision_id: str) -> DecisionDetail: ...
-
     def get_graph(self, repository_id: str, entity_id: str | None) -> GraphResponse: ...
+
+
+def node_repo_hint(store: object) -> str:
+    nodes = getattr(store, "nodes", None)
+    if isinstance(nodes, dict):
+        for props in nodes.values():
+            repo = (props or {}).get("repo")
+            if repo:
+                return str(repo)
+    return "unknown"
+
+
+def source_ref_for(node: dict) -> SourceRef:
+    """Build a SourceRef from the stored node.
+
+    Values that are genuinely absent stay absent; a placeholder would misattribute
+    the decision, so a decision with no usable source is refused instead.
+    """
+    source_url = node.get("source_url") or ""
+    raw_number = node.get("source_number")
+    number = raw_number if isinstance(raw_number, int) and raw_number >= 0 else None
+
+    if not source_url or number is None:
+        derived_url, derived_number, derived_type = from_source_id(node.get("source_id"))
+        source_url = source_url or derived_url
+        if number is None:
+            number = derived_number
+
+    raw_type = (node.get("source_type") or "").strip().lower()
+    try:
+        source_type = SourceType(raw_type)
+    except ValueError:
+        source_type = derived_type or SourceType.PULL_REQUEST
+
+    if number is None or not source_url:
+        raise DataSourceError(
+            "decision carries no usable source reference; refusing to invent one"
+        )
+    return SourceRef(type=source_type, number=number, url=source_url)
+
+
+def from_source_id(source_id: Any) -> tuple[str, Optional[int], SourceType]:
+    """Derive provenance from a stable source id such as ``pr:owner/repo#123``.
+
+    Returns empty values when the id does not carry enough information, so the
+    caller refuses rather than guessing.
+    """
+    text = str(source_id or "")
+    match = re.match(r"^(pr|pull_request|issue):(?P<owner>[^/]+)/(?P<repo>[^#]+)#(?P<number>\d+)$", text)
+    if not match:
+        return "", None, SourceType.PULL_REQUEST
+    number = int(match.group("number"))
+    kind = SourceType.ISSUE if text.startswith("issue") else SourceType.PULL_REQUEST
+    segment = "issues" if kind is SourceType.ISSUE else "pull"
+    url = f"https://github.com/{match.group('owner')}/{match.group('repo')}/{segment}/{number}"
+    return url, number, kind
 
 
 class GraphDataSource:
@@ -46,6 +102,17 @@ class GraphDataSource:
         self.settings = cfg or settings
         self.store = store or get_graph_store(self.settings)
         self.provider = get_llm_provider()
+
+    @property
+    def is_real(self) -> bool:
+        """True only when both the store and the provider are real.
+
+        Derived rather than declared, so swapping in a mock for a test or a
+        misconfigured deployment can never leave the flag claiming otherwise.
+        """
+        return bool(getattr(self.store, "is_real", False)) and bool(
+            getattr(self.provider, "is_real", False)
+        )
 
     def get_repository(self, repository_id: str) -> RepositoryResponse:
         entities = self.store.search_entities(repository_id, "")
@@ -59,7 +126,7 @@ class GraphDataSource:
                 pull_requests=0,
                 commits=0,
             ),
-            fixture=False,
+            fixture=not self.is_real,
         )
 
     def search_entities(self, repository_id: str, query: str) -> EntityListResponse:
@@ -82,7 +149,7 @@ class GraphDataSource:
         return EntityListResponse(
             entities=entities_list,
             query=query,
-            fixture=False,
+            fixture=not self.is_real,
         )
 
     def ask(self, repository_id: str, request: AskRequest) -> AskResponse:
@@ -102,40 +169,30 @@ class GraphDataSource:
             resolution=resolution,
             bundle=bundle,
             provider=self.provider,
+            is_real=self.is_real,
         )
 
     def get_decision(self, decision_id: str) -> DecisionDetail:
+        """Return one decision, or refuse. Nothing is invented for a missing id.
+
+        An earlier implementation returned placeholder text with a synthetic
+        pull/1 URL, which presented invented content as real history.
+        """
         node = self.store.nodes.get(decision_id) if hasattr(self.store, "nodes") else None
         if not node:
-            # Fallback or synthetic detail
-            source_ref = SourceRef(
-                type=SourceType.PULL_REQUEST,
-                number=1,
-                url="https://github.com/repo/pull/1",
-            )
-            return DecisionDetail(
-                id=decision_id,
-                summary="Decision summary",
-                rationale="Rationale",
-                state=DecisionState.ACTIVE,
-                source=source_ref,
-                fixture=False,
+            raise DataSourceError(
+                f"decision {decision_id!r} not found in the graph for "
+                f"repository {node_repo_hint(self.store)!r}"
             )
 
-        source_ref = SourceRef(
-            type=SourceType.PULL_REQUEST,
-            number=1,
-            url=node.get("source_url", "https://github.com/repo"),
-        )
         return DecisionDetail(
             id=decision_id,
             summary=node.get("summary", ""),
             rationale=node.get("rationale"),
             state=DecisionState(node.get("state", "ACTIVE")),
-            source=source_ref,
-            fixture=False,
+            source=source_ref_for(node),
+            fixture=not self.is_real,
         )
-
     def get_graph(self, repository_id: str, entity_id: str | None) -> GraphResponse:
         subgraph = self.store.get_subgraph(
             repo=repository_id,
@@ -172,7 +229,7 @@ class GraphDataSource:
             nodes=nodes,
             edges=edges,
             truncated=False,
-            fixture=False,
+            fixture=not self.is_real,
         )
 
 
@@ -182,7 +239,23 @@ def get_data_source(cfg: Settings) -> DataSource:
 
         return FixtureDataSource(cfg)
     if cfg.data_source == "graph":
-        return GraphDataSource(cfg)
+        source = GraphDataSource(cfg)
+        # Without a real store and a real provider this source can only invent
+        # answers, so refuse rather than serve fabricated history. Mock mode is
+        # available deliberately, and still reports fixture=true on every response.
+        if not source.is_real and not cfg.allow_mock_providers:
+            missing = []
+            if not getattr(source.store, "is_real", False):
+                missing.append("a real Neo4j store (NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD)")
+            if not getattr(source.provider, "is_real", False):
+                missing.append("a real LLM provider (LLM_PROVIDER with credentials)")
+            raise DataSourceError(
+                "DATA_SOURCE=graph needs "
+                + " and ".join(missing)
+                + ". Set ALLOW_MOCK_PROVIDERS=true to run against the in-memory store "
+                "and a mock LLM; every response then carries \"fixture\": true."
+            )
+        return source
 
     raise DataSourceError(
         f"DATA_SOURCE={cfg.data_source!r} is not supported. Must be 'fixture' or 'graph'."

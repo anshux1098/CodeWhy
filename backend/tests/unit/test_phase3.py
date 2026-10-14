@@ -376,7 +376,8 @@ def test_graph_data_source_full_flow() -> None:
     ents = source.search_entities("hynek/structlog", "NAME_TO_LEVEL")
     assert len(ents.entities) >= 1
     assert ents.entities[0].label == "NAME_TO_LEVEL"
-    assert ents.fixture is False
+    # An in-memory store and a mock LLM are not real history.
+    assert ents.fixture is True
 
     # Ask endpoint
     canned = json.dumps({
@@ -387,11 +388,11 @@ def test_graph_data_source_full_flow() -> None:
 
     resp = source.ask("hynek/structlog", AskRequest(question="Why is NAME_TO_LEVEL defined?"))
     assert resp.outcome == Outcome.FULL
-    assert resp.fixture is False
+    assert resp.fixture is True
     assert len(resp.citations) >= 1
 
     # Get graph
     graph_resp = source.get_graph("hynek/structlog", entity_id="entity:hynek/structlog:NAME_TO_LEVEL")
-    assert graph_resp.fixture is False
+    assert graph_resp.fixture is True
     assert len(graph_resp.nodes) >= 1
 

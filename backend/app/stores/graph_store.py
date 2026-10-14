@@ -24,6 +24,10 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class BaseGraphStore(ABC):
+    #: True only for a store backed by a real database. An in-memory store holds
+    #: nothing that came from a repository, so it must never imply otherwise.
+    is_real: bool = True
+
     """Abstract interface for knowledge graph operations."""
 
     @abstractmethod
@@ -84,6 +88,8 @@ class BaseGraphStore(ABC):
 
 class InMemoryGraphStore(BaseGraphStore):
     """Thread-safe in-memory graph store for testing and local development."""
+
+    is_real: bool = False
 
     def __init__(self) -> None:
         self.nodes: dict[str, dict[str, Any]] = {}

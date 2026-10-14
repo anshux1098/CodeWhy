@@ -296,3 +296,26 @@ codewhy/
    - 50 hand-labeled benchmark questions in `benchmark/questions.jsonl` (38 tuning, 12 holdout).
    - Evaluation runner in `scripts/evaluate.py`.
    - React + Vite + TypeScript frontend interface.
+
+## Real versus mock
+
+Every response carries a `fixture` boolean. It is **derived**, never asserted: a response is
+`fixture: false` only when the graph store is a real Neo4j instance **and** the language model
+provider is a real one. Anything else is `fixture: true`, including refusals and error bodies.
+
+A response is real (`fixture: false`) exactly when all of these hold:
+
+| condition | how to check |
+|---|---|
+| `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD` are set | `.env` |
+| `LLM_PROVIDER` names a real provider and its credentials resolve | `.env` |
+
+With `DATA_SOURCE=graph` and either one missing, the application refuses to start the graph
+source and raises a `DataSourceError` naming what is absent. It will not serve invented answers.
+
+To run deliberately against mocks, set `ALLOW_MOCK_PROVIDERS=true`. Every response then carries
+`"fixture": true`, so a mock run cannot be mistaken for real history.
+
+`MockLLMProvider` and `InMemoryGraphStore` both declare `is_real = False`. Any response built with
+them is marked as a fixture regardless of how it is configured.
+

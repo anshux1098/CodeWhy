@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     min_score: float = 0.55
 
     data_source: str = "fixture"
+    # Opt in to running the graph data source on mock providers and an in-memory
+    # store. Off by default so a misconfigured deployment cannot serve fabricated
+    # answers that claim to be real.
+    allow_mock_providers: bool = False
     max_graph_nodes: int = Field(
         default=80,
         gt=0,

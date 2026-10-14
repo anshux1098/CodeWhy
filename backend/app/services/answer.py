@@ -122,7 +122,7 @@ def _no_verified_quote_response(
         citations=[],
         evidence_gaps=[gap],
         confidence=conf,
-        fixture=is_real,
+        fixture=not is_real,
     )
 
 
@@ -183,7 +183,7 @@ def generate_answer(
                 candidates=candidates,
                 answer=None,
                 evidence_gaps=["User clarification required between multiple matching entities"],
-                fixture=False,
+                fixture=not is_real,
             )
 
         if gate_res.reason_code == ReasonCode.ENTITY_NOT_FOUND:
@@ -192,7 +192,7 @@ def generate_answer(
                 reason_code=ReasonCode.ENTITY_NOT_FOUND,
                 answer="I could not find a matching code entity in the repository history for this question.",
                 evidence_gaps=["No matching file, module, or configuration key found"],
-                fixture=False,
+                fixture=not is_real,
             )
 
         if gate_res.reason_code == ReasonCode.OUT_OF_SCOPE:
@@ -204,7 +204,7 @@ def generate_answer(
                     "architectural decisions governing code entities, configuration, and modules."
                 ),
                 evidence_gaps=["Question does not ask about code or engineering rationale"],
-                fixture=False,
+                fixture=not is_real,
             )
 
         if gate_res.reason_code == ReasonCode.NO_DECISION_PATH:
@@ -230,7 +230,7 @@ def generate_answer(
                     ),
                 ),
                 evidence_gaps=["No decision path connected via GOVERNS in the knowledge graph"],
-                fixture=False,
+                fixture=not is_real,
             )
 
         if gate_res.reason_code == ReasonCode.LOW_SCORE:
@@ -257,7 +257,7 @@ def generate_answer(
                     ),
                 ),
                 evidence_gaps=["Evidence relevance score below MIN_SCORE threshold"],
-                fixture=False,
+                fixture=not is_real,
             )
 
     assert bundle is not None
@@ -309,7 +309,7 @@ def generate_answer(
             citations=[],  # no_verified_quote forbids citations
             evidence_gaps=["No verbatim verified quote explaining the original rationale exists"],
             confidence=conf,
-            fixture=False,
+            fixture=not is_real,
         )
 
     # ------------------------------------------------------------------
@@ -385,7 +385,7 @@ def generate_answer(
             citations=[],
             evidence_gaps=["LLM generation failure"],
             confidence=conf,
-            fixture=is_real,
+            fixture=not is_real,
         )
 
 
@@ -429,5 +429,5 @@ def generate_answer(
         citations=valid_citations,
         evidence_gaps=[] if outcome == Outcome.FULL else ["Partial evidence coverage"],
         confidence=conf,
-        fixture=False,
+        fixture=not is_real,
     )
