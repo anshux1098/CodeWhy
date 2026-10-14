@@ -203,6 +203,25 @@ class BaseLLMProvider(ABC):
 # Mock / Local LLM Provider (for tests and offline local runs)
 # ---------------------------------------------------------------------------
 
+def _redact(value: object) -> str:
+    """Never let a credential reach an error message."""
+    text = str(value)
+    for secret in (settings.llm_api_key, settings.github_token, settings.neo4j_password):
+        if secret and len(secret) >= 8 and secret in text:
+            text = text.replace(secret, "<redacted>")
+    return text
+
+
+def _safe_error_body(response: httpx.Response, limit: int = 400) -> str:
+    """A short excerpt of an error body, with anything that looks like a key removed."""
+    try:
+        body = response.text
+    except Exception:  # noqa: BLE001
+        return "<no body>"
+    body = " ".join(body.split())[:limit]
+    return _redact(body) or "<empty body>"
+
+
 class MockLLMProvider(BaseLLMProvider):
     is_real: bool = False
 
@@ -307,16 +326,28 @@ class OpenAICompatibleProvider(BaseLLMProvider):
 
         url = f"{self.base_url}/chat/completions"
         last_error: Optional[Exception] = None
+        last_status: Optional[int] = None
 
         for attempt in range(self.max_retries):
             try:
                 with httpx.Client(timeout=float(self.timeout_s)) as client:
                     resp = client.post(url, json=payload, headers=headers)
 
+                last_status = resp.status_code
                 if resp.status_code == 429 or resp.status_code >= 500:
+                    # Remember why, so a retry loop that never succeeds can still say
+                    # what the service actually answered.
+                    last_error = LLMProviderError(
+                        f"HTTP {resp.status_code}: {_safe_error_body(resp)}"
+                    )
                     wait_time = min(2.0 ** attempt, 8.0)
                     time.sleep(wait_time)
                     continue
+
+                if resp.status_code >= 400:
+                    raise LLMProviderError(
+                        f"HTTP {resp.status_code}: {_safe_error_body(resp)}"
+                    )
 
                 resp.raise_for_status()
                 data = resp.json()
@@ -346,7 +377,11 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             except Exception as exc:
                 last_error = exc
 
-        raise LLMProviderError(f"LLM request failed after {self.max_retries} attempts: {last_error}")
+        status_note = f" (last HTTP status {last_status})" if last_status else ""
+        raise LLMProviderError(
+            f"LLM request failed after {self.max_retries} attempts{status_note}: "
+            f"{_redact(last_error)}"
+        )
 
 
 # ---------------------------------------------------------------------------
