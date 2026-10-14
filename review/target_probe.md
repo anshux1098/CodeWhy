@@ -11,6 +11,26 @@ Sort key: `reverted + reverts_touching` descending, then `pr_linked` descending.
 
 | repo | file | commits | pr_linked | reverted | reverts_touching | authors | long_msgs | first | last |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| urllib3/urllib3 | src/urllib3/connection.py | 255 | 59 | 3 | 0 | 70 | 27 | 2013-08-22 | 2026-10-01 |
+| urllib3/urllib3 | src/urllib3/connectionpool.py | 474 | 59 | 3 | 0 | 126 | 50 | 2009-12-10 | 2026-09-25 |
+| urllib3/urllib3 | src/urllib3/util/ssl_.py | 147 | 42 | 1 | 1 | 49 | 22 | 2014-03-10 | 2026-09-10 |
+| urllib3/urllib3 | src/urllib3/poolmanager.py | 177 | 30 | 2 | 0 | 63 | 18 | 2011-09-18 | 2026-09-25 |
+| urllib3/urllib3 | src/urllib3/contrib/pyopenssl.py | 140 | 26 | 2 | 0 | 52 | 16 | 2013-03-20 | 2026-09-15 |
+| urllib3/urllib3 | src/urllib3/response.py | 252 | 57 | 1 | 0 | 91 | 33 | 2011-09-19 | 2026-10-09 |
+| urllib3/urllib3 | src/urllib3/contrib/socks.py | 38 | 13 | 0 | 1 | 19 | 6 | 2015-12-15 | 2026-06-30 |
+| urllib3/urllib3 | src/urllib3/_collections.py | 107 | 12 | 1 | 0 | 33 | 9 | 2011-09-18 | 2026-09-09 |
+| urllib3/urllib3 | src/urllib3/util/__init__.py | 31 | 6 | 1 | 0 | 18 | 5 | 2014-01-18 | 2023-10-06 |
+| urllib3/urllib3 | src/urllib3/util/ssl_match_hostname.py | 27 | 4 | 1 | 0 | 16 | 4 | 2011-12-22 | 2026-02-21 |
+| urllib3/urllib3 | src/urllib3/util/url.py | 65 | 24 | 0 | 0 | 30 | 9 | 2014-01-18 | 2026-09-25 |
+| urllib3/urllib3 | src/urllib3/exceptions.py | 106 | 18 | 0 | 0 | 35 | 12 | 2011-09-19 | 2026-02-11 |
+| urllib3/urllib3 | src/urllib3/util/request.py | 46 | 18 | 0 | 0 | 25 | 9 | 2014-01-18 | 2026-09-05 |
+| urllib3/urllib3 | src/urllib3/util/retry.py | 105 | 16 | 0 | 0 | 42 | 9 | 2014-01-18 | 2026-10-01 |
+| urllib3/urllib3 | src/urllib3/__init__.py | 96 | 15 | 0 | 0 | 31 | 5 | 2009-12-10 | 2024-02-13 |
+| urllib3/urllib3 | src/urllib3/http2/connection.py | 15 | 12 | 0 | 0 | 10 | 2 | 2024-01-22 | 2026-08-03 |
+| urllib3/urllib3 | src/urllib3/util/timeout.py | 36 | 9 | 0 | 0 | 19 | 5 | 2014-01-18 | 2024-01-10 |
+| urllib3/urllib3 | src/urllib3/fields.py | 37 | 8 | 0 | 0 | 21 | 5 | 2013-07-26 | 2026-02-11 |
+| urllib3/urllib3 | src/urllib3/util/connection.py | 50 | 8 | 0 | 0 | 25 | 6 | 2014-03-10 | 2024-10-27 |
+| urllib3/urllib3 | src/urllib3/util/ssltransport.py | 23 | 7 | 0 | 0 | 13 | 6 | 2020-08-19 | 2026-10-03 |
 
 ### File column definitions
 
@@ -26,6 +46,10 @@ Sort key: `reverted + reverts_touching` descending, then `pr_linked` descending.
 
 | repo | class constant | file | current value | commits touching line | with PR ref | first | last |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| urllib3/urllib3 | BaseHTTPResponse.CONTENT_DECODERS | src/urllib3/response.py | ['gzip', 'x-gzip', 'deflate'] | 4 | 0 | 2018-07-02 | 2023-11-03 |
+| urllib3/urllib3 | BaseHTTPResponse.REDIRECT_STATUSES | src/urllib3/response.py | [301, 302, 303, 307, 308] | 2 | 0 | 2018-07-02 | 2020-11-22 |
+| urllib3/urllib3 | ResponseError.GENERIC_ERROR | src/urllib3/exceptions.py | 'too many error responses' | 2 | 0 | 2018-07-02 | 2019-05-25 |
+| urllib3/urllib3 | ResponseError.SPECIFIC_ERROR | src/urllib3/exceptions.py | 'too many {status_code} error responses' | 2 | 0 | 2018-07-02 | 2019-05-25 |
 
 ### Class constant column definitions
 
@@ -39,9 +63,21 @@ revert that undid it.
 
 | repo | file | reverted commit date | short sha | reverted subject | PR | revert date | revert short sha | revert subject |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| urllib3/urllib3 | src/urllib3/connection.py | 2015-12-15 | fd4c7d7 | Better explanation. | no | 2016-02-10 | 9689f40 | Revert "Better explanation." |
+| urllib3/urllib3 | src/urllib3/connection.py | 2015-12-15 | 16f0bd2 | Explain what the fix for #760 is doing. | no | 2016-02-10 | becbfa5 | Revert "Explain what the fix for #760 is doing." |
+| urllib3/urllib3 | src/urllib3/connection.py | 2015-12-15 | cc2d86f | Strip square brackets from hostnames before verifying | no | 2016-02-10 | 9527568 | Revert "Strip square brackets from hostnames before verifyin |
+| urllib3/urllib3 | src/urllib3/connectionpool.py | 2015-09-16 | 019dbae | We do not require square brackets for httplib. | no | 2016-02-10 | a3b9a34 | Revert "We do not require square brackets for httplib." |
+| urllib3/urllib3 | src/urllib3/connectionpool.py | 2013-12-03 | 1922dda | Ensure connections are properly closed on object destruction | no | 2013-12-03 | 50b2836 | Revert "Ensure connections are properly closed on object des |
+| urllib3/urllib3 | src/urllib3/connectionpool.py | 2013-10-28 | fa73693 | Fix cut and paste error | no | 2013-10-29 | 1b620c1 | Revert "Fix cut and paste error" |
+| urllib3/urllib3 | src/urllib3/util/ssl_.py | 2024-08-22 | d480615 | Add TLS settings for HTTP/2 (#3456) | yes | 2024-09-03 | 1e94feb | Revert "Add TLS settings for HTTP/2 (#3456)" (#3466) |
+| urllib3/urllib3 | src/urllib3/poolmanager.py | 2013-12-03 | 1922dda | Ensure connections are properly closed on object destruction | no | 2013-12-03 | 50b2836 | Revert "Ensure connections are properly closed on object des |
+| urllib3/urllib3 | src/urllib3/poolmanager.py | 2013-10-27 | 09d03c9 | Stop applying special headers to proxies. | no | 2013-10-28 | 3316f5b | Revert "Stop applying special headers to proxies." |
+| urllib3/urllib3 | src/urllib3/contrib/pyopenssl.py | 2016-12-23 | 6e43d33 | lazy load idna | no | 2016-12-23 | 6bded33 | Revert "lazy load idna" and import idna on demand basis |
+| urllib3/urllib3 | src/urllib3/contrib/pyopenssl.py | 2014-08-24 | 7b6438b | don't cover some lines in pyopenssl | no | 2014-08-25 | 53335cf | Revert "don't cover some lines in pyopenssl" |
 
 ## Notes
 
-- targets/urllib3__urllib3.json: no local clone or package directory found
+- urllib3/urllib3: 4461 commits, 33 reverts
+- urllib3/urllib3: 9 class-level constants found, 4 shown with at least 2 commits
 
 No recommendation is produced here; the targets are chosen by hand.

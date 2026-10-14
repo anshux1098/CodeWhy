@@ -2,7 +2,7 @@
 
 > **Every line has a history. Find the reasoning, not just the code.**
 
-CodeWhy answers *"why is this code like this?"* for a software repository by reconstructing engineering decisions from GitHub commits, pull requests, review discussions, issues, and design documents. It links decisions to code entities in a knowledge graph, tracks how decisions change over time (supersession, reversals, reaffirmations), and answers natural-language questions with traceable verbatim citations—or refuses honestly when the history does not say.
+CodeWhy answers *"why is this code like this?"* for a software repository by reconstructing engineering decisions from GitHub commits, pull requests, review discussions, issues, and design documents. It links decisions to code entities in a knowledge graph and answers natural-language questions with traceable verbatim citations—or refuses honestly when the history does not say.
 
 ---
 
@@ -10,7 +10,16 @@ CodeWhy answers *"why is this code like this?"* for a software repository by rec
 
 The project has advanced through **Phase 0, Phase 1, Phase 2, and Phase 3**. All backend contracts, data ingestion, deterministic linking, AST constant history, noise filtering, decision extraction with verbatim quote checks, Neo4j graph stores, and the 4-gate grounded `/ask` pipeline are fully implemented and verified with **98 passing unit and integration tests**.
 
-Target repository: [`hynek/structlog`](https://github.com/hynek/structlog) (with target definition at [`targets/hynek__structlog.json`](targets/hynek__structlog.json)).
+The running example is the fixture repository `acme-netclient`, which does not exist on GitHub.
+Its people, pull request numbers and quotes are fictional, and every response carries
+`"fixture": true`.
+
+Real-repository targets are defined under [`targets/`](targets/):
+
+| file | repository | status |
+|---|---|---|
+| `urllib3__urllib3.json` | `urllib3/urllib3` | test bed, ingested on this machine |
+| `sqlalchemy__alembic.json` | `sqlalchemy/alembic` | draft, never ingested |
 
 ### Build Phases at a Glance
 
@@ -102,7 +111,8 @@ Phase 3 builds the connected graph view and grounded retrieval pipeline:
    - If multiple candidates score within `0.05` of each other, returns `Outcome: refusal, reason_code: ambiguous_entity` with candidate picker choices.
    - Non-code questions return `out_of_scope`. Unmatched terms return `entity_not_found`.
 7. **Hybrid GraphRAG Retrieval** ([`backend/app/services/retrieval.py`](backend/app/services/retrieval.py)):
-   - Traverses `GOVERNS`, `SUPERSEDES`, and `REVERTS` up to `MAX_CHAIN_LENGTH` (6 hops).
+   - Performs a single `GOVERNS` hop from the resolved entity. It does **not** traverse
+     `SUPERSEDES` or `REVERTS`; see "Not implemented yet" below.
    - Bounded evidence bundle capped at `MAX_EVIDENCE_ITEMS` (12 items).
    - Semantic similarity scored only on candidate decisions in the entity's neighborhood.
    - Contradiction detection across opposing evidence and unresolved links.
@@ -154,12 +164,14 @@ pip install -e ".[dev]"
 
 The test suite runs with **zero credentials and no required `.env` file**.
 
-### Run All Phase 2 & Phase 3 Tests (98 tests)
+### Run the Phase 2 and Phase 3 tests
+
+The full suite collects **655 tests**. It needs no credentials and no `.env` file.
 ```powershell
 .\.venv\Scripts\pytest.exe backend/tests/unit/test_phase3.py backend/tests/unit/test_extraction.py backend/tests/unit/test_linking.py backend/tests/unit/test_config_keys.py backend/tests/unit/test_noise.py -v
 ```
 
-### Run Full Unit Test Suite
+### Run the full suite
 ```powershell
 .\.venv\Scripts\pytest.exe backend/tests/unit/
 ```
@@ -169,25 +181,25 @@ The test suite runs with **zero credentials and no required `.env` file**.
 ## How to Run & Verify the Pipeline
 
 ### 1. Ingestion (`scripts/ingest.py`)
-Plan ingestion for `hynek/structlog` without network or database writes:
+Plan ingestion for `urllib3/urllib3` without network or database writes:
 ```powershell
-.\.venv\Scripts\python.exe scripts\ingest.py --repo hynek/structlog --targets targets\hynek__structlog.json --dry-run
+.\.venv\Scripts\python.exe scripts\ingest.py --repo urllib3/urllib3 --targets targets\urllib3__urllib3.json --dry-run
 ```
 Run live ingestion (requires `GITHUB_TOKEN` in `.env`):
 ```powershell
-.\.venv\Scripts\python.exe scripts\ingest.py --repo hynek/structlog --targets targets\hynek__structlog.json --max-prs 50 --max-issues 50
+.\.venv\Scripts\python.exe scripts\ingest.py --repo urllib3/urllib3 --targets targets\urllib3__urllib3.json --max-prs 50 --max-issues 50
 ```
 
 ### 2. Decision Extraction (`scripts/extract.py`)
 Run decision extraction on cached repository data:
 ```powershell
-.\.venv\Scripts\python.exe scripts\extract.py --repo hynek/structlog --dry-run
+.\.venv\Scripts\python.exe scripts\extract.py --repo urllib3/urllib3 --dry-run
 ```
 
 ### 3. Rebuild Knowledge Graph (`scripts/rebuild_graph.py`)
 Rebuild all Neo4j nodes, relationships, and vector embeddings from the SQLite cache:
 ```powershell
-.\.venv\Scripts\python.exe scripts\rebuild_graph.py --repo hynek/structlog
+.\.venv\Scripts\python.exe scripts\rebuild_graph.py --repo urllib3/urllib3
 ```
 
 ### 4. Start the FastAPI API Server
@@ -202,7 +214,7 @@ Start the backend server on port 8000:
 Ask a question about a code entity:
 ```powershell
 $body = @{ question = "Why is NAME_TO_LEVEL defined?" } | ConvertTo-Json
-Invoke-RestMethod "http://127.0.0.1:8000/api/v1/repositories/hynek-structlog/ask" -Method Post -Body $body -ContentType "application/json"
+Invoke-RestMethod "http://127.0.0.1:8000/api/v1/repositories/acme-netclient/ask" -Method Post -Body $body -ContentType "application/json"
 ```
 
 ---
@@ -233,54 +245,64 @@ Copy `.env.example` to `.env` to configure settings. Defaults work out of the bo
 
 ```
 codewhy/
-├── backend/
-│   ├── app/
-│   │   ├── main.py                    # FastAPI application & CORS config
-│   │   ├── config.py                  # Pydantic BaseSettings & validators
-│   │   ├── api/                       # HTTP route handlers (/ask, /graph, /decisions, /health)
-│   │   ├── schemas/                   # Pydantic v2 schemas for contract, graph, and decisions
-│   │   ├── services/                  # Business logic
-│   │   │   ├── linking.py             # Phase 2: Deterministic linking (REVERTS, PART_OF, REFERENCES)
-│   │   │   ├── config_keys.py         # Phase 2: AST constants & config value history
-│   │   │   ├── noise.py               # Phase 2: Noise filtering with revert protection
-│   │   │   ├── extraction.py          # Phase 2: Pydantic decision extraction
-│   │   │   ├── quote_check.py         # Phase 2: Verbatim quote substring verification
-│   │   │   ├── entity_resolution.py   # Phase 3: Rule-based entity resolution & ambiguity margin
-│   │   │   ├── retrieval.py           # Phase 3: Hybrid GraphRAG bounded traversal
-│   │   │   ├── gate.py                # Phase 3: 4-gate refusal pipeline (G1–G4)
-│   │   │   ├── answer.py              # Phase 3: Grounded answering & citation validation
-│   │   │   ├── confidence.py          # Phase 3: Evidence confidence scoring formula
-│   │   │   ├── response_rules.py      # Contract response validators
-│   │   │   └── data_source.py         # DataSource protocol, FixtureDataSource & GraphDataSource
-│   │   ├── stores/
-│   │   │   ├── sqlite_cache.py        # SQLite cache for raw objects, links, decisions, evidence
-│   │   │   └── graph_store.py         # Neo4jGraphStore & InMemoryGraphStore
-│   │   ├── graph/
-│   │   │   ├── schema.py              # Neo4j constraints, indexes & 384-dim vector index
-│   │   │   └── queries.py             # Parameterized Cypher queries
-│   │   ├── providers/
-│   │   │   ├── llm_provider.py        # Configurable LLM provider & TokenBudget guard
-│   │   │   └── embeddings.py          # 384-dim embeddings provider & cosine similarity
-│   │   └── prompts/
-│   │       ├── extract_decision.md    # Extraction prompt with security boundaries
-│   │       ├── extract_decision.py    # Injection detection & untrusted data delimiters
-│   │       └── answer.md              # Grounded answering prompt
-│   └── tests/
-│       ├── unit/                      # 98+ unit tests covering all components
-│       └── conftest.py
-├── scripts/
-│   ├── ingest.py                      # Phase 1: Ingestion CLI runner
-│   ├── extract.py                     # Phase 2: Decision extraction CLI runner
-│   ├── rebuild_graph.py               # Phase 3: Rebuild Neo4j graph from SQLite cache
-│   ├── inspect_cache.py               # Read-only cache inspection CLI
-│   └── export_contract.py             # Regenerates contract JSON files
-├── targets/
-│   ├── hynek__structlog.json          # Target definitions for hynek/structlog
-│   └── urllib3__urllib3.json          # Test bed targets for urllib3
-├── review/
-│   └── decisions_sample.md            # 20 hand-audited decisions for manual verification
-├── contract/                          # Frozen API payloads and openapi.json
-└── pyproject.toml                     # Python dependencies and pytest configuration
+|- backend/
+|   |- app/
+|   |   |- main.py                    # FastAPI application, CORS, error handlers
+|   |   |- config.py                  # Pydantic BaseSettings and validators
+|   |   |- api/                       # HTTP routes (/ask, /graph, /decisions, /health)
+|   |   |- schemas/                   # Frozen contract models and validators
+|   |   |- fixtures/                  # Synthetic dataset and the fixture data source
+|   |   |- graph/
+|   |   |   |- schema.py              # Neo4j constraints, indexes, 384-dim vector index
+|   |   |   `- queries.py             # The Cypher the store actually executes
+|   |   |- prompts/
+|   |   |   |- extract_decision.md    # Extraction prompt with security boundaries
+|   |   |   |- extract_decision.py    # Injection detection, untrusted-data delimiters
+|   |   |   `- answer.md              # Grounded answering prompt
+|   |   |- providers/
+|   |   |   |- llm_provider.py        # LLM providers, mock provider, token budget
+|   |   |   `- embeddings.py          # 384-dim embeddings and cosine similarity
+|   |   |- services/
+|   |   |   |- data_source.py         # DataSource protocol, get_data_source, GraphDataSource
+|   |   |   |- errors.py              # DataSourceError shared across the data layer
+|   |   |   |- ingest/                # Phase 1: git collection, GitHub GraphQL, pipeline
+|   |   |   |- linking.py             # Deterministic links: REVERTS, PART_OF, REFERENCES,
+|   |   |   |                          #   SUPERSEDES (document only), CONTAINS
+|   |   |   |- config_keys.py         # AST constants and config value history
+|   |   |   |- noise.py               # Noise filtering with revert protection
+|   |   |   |- extraction.py          # Pydantic decision extraction
+|   |   |   |- quote_check.py         # Verbatim quote verification
+|   |   |   |- entity_resolution.py   # Rule-based resolution and the ambiguity margin
+|   |   |   |- retrieval.py           # Single-hop GOVERNS retrieval, loads source text
+|   |   |   |- gate.py                # The four-gate refusal pipeline
+|   |   |   |- answer.py              # Grounded answering and citation validation
+|   |   |   |- confidence.py          # Confidence formula, labels, contradiction cap
+|   |   |   `- response_rules.py      # Contract response validators
+|   |   `- stores/
+|   |       |- sqlite_cache.py        # SQLite cache: raw objects, links, decisions, evidence
+|   |       `- graph_store.py         # Neo4jGraphStore and InMemoryGraphStore
+|   `- tests/
+|       |- unit/                      # Unit tests, including the remediation regressions
+|       |- integration/               # API contract tests over the fixture source
+|       `- conftest.py
+|- scripts/
+|   |- ingest.py                      # Phase 1 ingestion CLI
+|   |- extract.py                     # Phase 2 extraction and linking CLI
+|   |- rebuild_graph.py               # Phase 3 graph build from the SQLite cache
+|   |- inspect_cache.py               # Read-only cache inspection CLI
+|   |- probe_targets.py               # Per-file and constant history probe
+|   |- probe_history.py               # Full-history reverts and constant value changes
+|   |- sample_repos.py                # Recent pull request sampling across candidates
+|   `- export_contract.py             # Regenerates contract JSON files
+|- targets/
+|   |- urllib3__urllib3.json          # Test bed targets for urllib3/urllib3
+|   `- sqlalchemy__alembic.json       # Draft targets, never ingested
+|- review/                            # Generated probe output, each naming its command
+|   |- repo_sampling.md
+|   |- history_probe.md
+|   `- target_probe.md
+|- contract/                          # Frozen API payloads and openapi.json
+`- pyproject.toml                     # Dependencies and pytest configuration
 ```
 
 ---
@@ -353,3 +375,6 @@ To run deliberately against mocks, set `ALLOW_MOCK_PROVIDERS=true`. Every respon
 `MockLLMProvider` and `InMemoryGraphStore` both declare `is_real = False`. Any response built with
 them is marked as a fixture regardless of how it is configured.
 
+## License
+
+MIT. See [LICENSE](LICENSE).
