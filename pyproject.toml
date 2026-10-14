@@ -19,6 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3",
+    "pytest-timeout>=2.3",
 ]
 
 [tool.setuptools.packages.find]
@@ -28,7 +29,11 @@ include = ["app*"]
 [tool.pytest.ini_options]
 pythonpath = ["backend", "."]
 testpaths = ["backend/tests"]
-addopts = "-q"
+addopts = "-q --durations=15"
+# A test that reaches the network will hang rather than fail, because the timeout
+# only fires once the call gives up. Sixty seconds is far longer than any
+# in-process test needs and short enough that a hang is reported, not waited out.
+timeout = 60
 markers = [
     "live: hits the real GitHub API. Skipped unless RUN_LIVE=1.",
 ]
