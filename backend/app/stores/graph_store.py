@@ -104,6 +104,15 @@ class BaseGraphStore(ABC):
         ...
 
     @abstractmethod
+    def get_node(self, node_id: str) -> Optional[dict[str, Any]]:
+        """Find any node by its id, whatever its label. None when it does not exist.
+
+        Needed to answer "is this decision real?" without knowing in advance which
+        label to look under.
+        """
+        ...
+
+    @abstractmethod
     def search_entities(self, repo: str, query: str) -> list[dict[str, Any]]:
         """Search code entities matching a substring or pattern."""
         ...
@@ -180,6 +189,9 @@ class InMemoryGraphStore(BaseGraphStore):
             self.edges[key] = {}
         if properties:
             self.edges[key].update(properties)
+
+    def get_node(self, node_id: str) -> Optional[dict[str, Any]]:
+        return self.nodes.get(node_id)
 
     def get_entity(self, repo: str, identifier: str) -> Optional[dict[str, Any]]:
         clean_ident = identifier.strip().lower()
@@ -341,6 +353,17 @@ class Neo4jGraphStore(BaseGraphStore):
         props = properties or {}
         with self.driver.session(database=self.database) as session:
             session.run(query, from_id=from_id, to_id=to_id, props=props)
+
+    def get_node(self, node_id: str) -> Optional[dict[str, Any]]:
+        """Fetch any node by id across labels.
+
+        The label is not part of the lookup: a caller asking whether a decision
+        exists should not have to know that decisions are stored as `Decision`.
+        """
+        query = "MATCH (n) WHERE n.id = $node_id OR n.login = $node_id RETURN n LIMIT 1"
+        with self.driver.session(database=self.database) as session:
+            rows = list(session.run(query, node_id=node_id))
+        return dict(rows[0]["n"]) if rows else None
 
     def get_entity(self, repo: str, identifier: str) -> Optional[dict[str, Any]]:
         query = (

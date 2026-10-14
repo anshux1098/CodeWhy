@@ -59,8 +59,11 @@ def source_ref_for(node: dict) -> SourceRef:
     raw_number = node.get("source_number")
     number = raw_number if isinstance(raw_number, int) and raw_number >= 0 else None
 
+    # Derived unconditionally: the branch below reads derived_type even when the
+    # node already carried a url and number, so binding it only inside the `if`
+    # raised UnboundLocalError for any decision that did have a source.
+    derived_url, derived_number, derived_type = from_source_id(node.get("source_id"))
     if not source_url or number is None:
-        derived_url, derived_number, derived_type = from_source_id(node.get("source_id"))
         source_url = source_url or derived_url
         if number is None:
             number = derived_number
@@ -114,8 +117,41 @@ class GraphDataSource:
             getattr(self.provider, "is_real", False)
         )
 
-    def get_repository(self, repository_id: str) -> RepositoryResponse:
+    def _require_repository(self, repository_id: str) -> list[dict[str, Any]]:
+        """Refuse a repository the graph has never seen.
+
+        A repository with nothing in it is a different statement from a repository
+        that cannot be reached. Only the latter is an infrastructure failure and
+        only that one is allowed to surface as a 503.
+        """
         entities = self.store.search_entities(repository_id, "")
+        if not entities and not self._has_repository_node(repository_id):
+            raise NotFoundError(f"repository {repository_id!r} not found")
+        return entities
+
+    def _has_repository_node(self, repository_id: str) -> bool:
+        nodes = getattr(self.store, "nodes", None)
+        labels = getattr(self.store, "labels", None)
+        if not isinstance(nodes, dict) or not isinstance(labels, dict):
+            return False
+        return any(
+            "Repository" in labels.get(node_id, set())
+            and props.get("repo") == repository_id
+            for node_id, props in nodes.items()
+        )
+
+    def _find_node(self, node_id: str) -> Optional[dict[str, Any]]:
+        """Look a node up by id in whichever store is in use."""
+        getter = getattr(self.store, "get_node", None)
+        if callable(getter):
+            return getter(node_id)
+        nodes = getattr(self.store, "nodes", None)
+        if isinstance(nodes, dict):
+            return nodes.get(node_id)
+        return None
+
+    def get_repository(self, repository_id: str) -> RepositoryResponse:
+        entities = self._require_repository(repository_id)
         return RepositoryResponse(
             id=repository_id,
             name=repository_id.split("/")[-1],
@@ -130,7 +166,9 @@ class GraphDataSource:
         )
 
     def search_entities(self, repository_id: str, query: str) -> EntityListResponse:
-        raw_ents = self.store.search_entities(repository_id, query)
+        raw_ents = self._require_repository(repository_id)
+        if query.strip():
+            raw_ents = self.store.search_entities(repository_id, query)
         entities_list: list[Entity] = []
         for e in raw_ents:
             try:
@@ -153,7 +191,7 @@ class GraphDataSource:
         )
 
     def ask(self, repository_id: str, request: AskRequest) -> AskResponse:
-        all_entities = self.store.search_entities(repository_id, "")
+        all_entities = self._require_repository(repository_id)
         resolution = resolve_entity(request.question, all_entities)
 
         bundle = None
@@ -179,14 +217,13 @@ class GraphDataSource:
         """Return one decision, or refuse. Nothing is invented for a missing id.
 
         An earlier implementation returned placeholder text with a synthetic
-        pull/1 URL, which presented invented content as real history.
+        pull/1 URL, which presented invented content as real history. A second one
+        raised a plain DataSourceError, which the API reports as 503 and so claimed
+        the database was broken when in fact the id simply does not exist.
         """
-        node = self.store.nodes.get(decision_id) if hasattr(self.store, "nodes") else None
+        node = self._find_node(decision_id)
         if not node:
-            raise DataSourceError(
-                f"decision {decision_id!r} not found in the graph for "
-                f"repository {node_repo_hint(self.store)!r}"
-            )
+            raise NotFoundError(f"decision {decision_id!r} not found")
 
         return DecisionDetail(
             id=decision_id,
@@ -196,7 +233,14 @@ class GraphDataSource:
             source=source_ref_for(node),
             fixture=not self.is_real,
         )
+
     def get_graph(self, repository_id: str, entity_id: str | None) -> GraphResponse:
+        self._require_repository(repository_id)
+        if entity_id is not None and self.store.get_entity(repository_id, entity_id) is None:
+            # An unknown entity is a 404. Returning an empty graph with 200 would
+            # tell the caller the entity has no history when it is not in the graph.
+            raise NotFoundError(f"entity {entity_id!r} not found")
+
         subgraph = self.store.get_subgraph(
             repo=repository_id,
             entity_id=entity_id,
