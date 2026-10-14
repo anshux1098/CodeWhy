@@ -363,6 +363,10 @@ PROVIDER_BASE_URLS: Final[dict[str, str]] = {
 }
 
 
+#: Names that resolve to the offline mock. Listed in errors so the message is complete.
+MOCK_PROVIDER_NAMES: Final[frozenset[str]] = frozenset({"mock", "fixture", "test"})
+
+
 # Factory
 # ---------------------------------------------------------------------------
 
@@ -382,7 +386,7 @@ def get_llm_provider(
     config = cfg or settings
     name = (provider_name or config.llm_provider or "mock").strip().lower()
 
-    if name in ("mock", "fixture", "test"):
+    if name in MOCK_PROVIDER_NAMES:
         return MockLLMProvider(canned_response=mock_canned_response, budget=budget)
 
     if name in PROVIDER_BASE_URLS:
@@ -395,7 +399,7 @@ def get_llm_provider(
             budget=budget,
         )
 
+    supported = sorted(set(PROVIDER_BASE_URLS) | MOCK_PROVIDER_NAMES)
     raise ValueError(
-        f"Unsupported LLM provider: {name!r}. "
-        f"Supported: {', '.join(sorted(PROVIDER_BASE_URLS))}"
+        f"Unsupported LLM provider: {name!r}. Supported: {', '.join(supported)}"
     )
