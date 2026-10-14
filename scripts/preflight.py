@@ -147,15 +147,34 @@ def connect_llm() -> bool:
 
     try:
         provider = get_llm_provider(cfg=settings)
-        response, _ = provider.complete_structured(
+        _, response = provider.complete_structured(
             schema=Ping, prompt='Reply with exactly {"ok": true}.', system="You are a test.",
-        )
-        return report(
-            "LLM provider", True,
-            f"model={settings.llm_model!r} tokens={response.total_tokens} content={response.content[:60]!r}",
         )
     except Exception as exc:
         return report("LLM provider", False, f"{type(exc).__name__}: {exc}")
+
+    # The provider only returns on a successful HTTP response, but accept success
+    # specifically on HTTP 200 with a non-empty reply. A missing usage field is
+    # acceptable: some providers do not report tokens.
+    if getattr(response, "status_code", 0) != 200:
+        return report(
+            "LLM provider", False,
+            f"status={getattr(response, 'status_code', '?')} model={settings.llm_model!r}",
+        )
+    if not (response.content or "").strip():
+        return report(
+            "LLM provider", False,
+            f"status={response.status_code} model={settings.llm_model!r} empty reply",
+        )
+    if getattr(response, "usage_reported", False):
+        tokens_detail = f"tokens={response.total_tokens}"
+    else:
+        tokens_detail = "usage not reported"
+    return report(
+        "LLM provider", True,
+        f"status={response.status_code} model={settings.llm_model!r} "
+        f"reply_chars={len(response.content)} {tokens_detail}",
+    )
 
 
 def connect_neo4j() -> bool:
@@ -171,18 +190,56 @@ def connect_neo4j() -> bool:
         )
         try:
             with driver.session(database=settings.neo4j_database) as session:
-                record = session.run("RETURN 1 AS ok").single()
-                versions = session.run(
+                rows = list(session.run("RETURN 1 AS ok"))
+                record = rows[0] if rows else None
+                version_rows = list(session.run(
                     "CALL dbms.components() YIELD versions RETURN versions[0] AS v"
-                ).single()
+                ))
+                versions = version_rows[0] if version_rows else None
         finally:
             driver.close()
         if record is None or record["ok"] != 1:
             return report("Neo4j", False, "RETURN 1 did not return 1")
-        version = versions["v"] if versions else "unknown"
+        version = versions["v"] if versions is not None else "unknown"
         return report("Neo4j", True, f"server version {version}, database {settings.neo4j_database!r}")
     except Exception as exc:
         return report("Neo4j", False, f"{type(exc).__name__}: {exc}")
+
+
+def connect_embeddings() -> bool:
+    """Load the configured embedding model, embed one sentence, report backend."""
+    import time
+
+    from app.providers.embeddings import get_embedding_provider
+
+    from app.providers.embeddings import (
+        DeterministicFallbackEmbeddingProvider,
+        SentenceTransformersProvider,
+    )
+
+    start = time.monotonic()
+    try:
+        provider = get_embedding_provider(cfg=settings)
+        vector = provider.embed_text("preflight embedding probe sentence")
+    except Exception as exc:
+        return report("Embeddings", False, f"{type(exc).__name__}: {exc}")
+    elapsed = time.monotonic() - start
+    if isinstance(provider, DeterministicFallbackEmbeddingProvider):
+        backend = "hash (deterministic fallback)"
+        semantic = False
+    elif isinstance(provider, SentenceTransformersProvider):
+        backend = "sentence-transformers all-MiniLM-L6-v2"
+        semantic = True
+    else:
+        backend = type(provider).__name__
+        semantic = True
+    dim = len(vector)
+    detail = f"backend={backend!r} dim={dim} load_time={elapsed:.2f}s"
+    if dim != 384:
+        return report("Embeddings", False, f"{detail} (expected 384)")
+    if settings.data_source == "graph" and not semantic:
+        return report("Embeddings", False, f"{detail} (real embeddings required for DATA_SOURCE=graph)")
+    return report("Embeddings", True, detail)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -203,7 +260,7 @@ def main(argv: list[str] | None = None) -> int:
         print()
         print("Live services (one minimal call each)")
         print("-" * 60)
-        results += [connect_github(), connect_llm(), connect_neo4j()]
+        results += [connect_github(), connect_llm(), connect_neo4j(), connect_embeddings()]
 
     print()
     print("-" * 60)

@@ -122,6 +122,10 @@ class LLMResponse:
     completion_tokens: int
     total_tokens: int
     model: str
+    status_code: int = 200
+    #: True only when the server actually reported usage. Estimated fallback values
+    #: never count as reported.
+    usage_reported: bool = False
     raw_response: dict[str, Any] = field(default_factory=dict)
 
 
@@ -267,6 +271,8 @@ class MockLLMProvider(BaseLLMProvider):
             completion_tokens=completion_toks,
             total_tokens=prompt_toks + completion_toks,
             model="mock-model",
+            status_code=200,
+            usage_reported=True,
             raw_response={"mock": True},
         )
 
@@ -357,9 +363,16 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                     raise LLMProviderError("Empty choices received from OpenAI API")
 
                 content = choices[0].get("message", {}).get("content", "")
-                usage = data.get("usage", {})
-                prompt_toks = int(usage.get("prompt_tokens", len(prompt) // 4))
-                comp_toks = int(usage.get("completion_tokens", len(content) // 4))
+
+                usage = data.get("usage")
+                usage_reported = isinstance(usage, dict)
+                if usage_reported:
+                    prompt_toks = int(usage.get("prompt_tokens", len(prompt) // 4))
+                    comp_toks = int(usage.get("completion_tokens", len(content) // 4))
+                else:
+                    # The server gave no usage; keep an estimate for budget tracking only.
+                    prompt_toks = max(1, len(prompt) // 4)
+                    comp_toks = max(1, len(content) // 4)
 
                 # Track budget
                 self.budget.consume(prompt_toks, comp_toks)
@@ -370,6 +383,8 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                     completion_tokens=comp_toks,
                     total_tokens=prompt_toks + comp_toks,
                     model=self.model,
+                    status_code=resp.status_code,
+                    usage_reported=usage_reported,
                     raw_response=data,
                 )
             except httpx.TimeoutException as exc:
