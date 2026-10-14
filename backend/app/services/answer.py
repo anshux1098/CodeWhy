@@ -94,11 +94,68 @@ def build_schema_entity(ent_dict: dict[str, Any], decision_count: int = 1) -> En
     )
 
 
+def _no_verified_quote_response(
+    *,
+    entity: Entity,
+    decisions: list[Decision],
+    similarity: float,
+    contradiction: float,
+    gap: str,
+    wording: str,
+    is_real: bool,
+) -> AskResponse:
+    """The shared G3-failure answer: a change is known, its rationale is not verifiable."""
+    conf = calculate_confidence(
+        directness=0.0,
+        provenance=0.6,
+        agreement=0.4,
+        relevance=similarity,
+        temporal_consistency=1.0,
+        contradiction=contradiction,
+    )
+    return AskResponse(
+        outcome=Outcome.PARTIAL,
+        reason_code=ReasonCode.NO_VERIFIED_QUOTE,
+        answer=wording,
+        entity=entity,
+        decisions=decisions,
+        citations=[],
+        evidence_gaps=[gap],
+        confidence=conf,
+        fixture=is_real,
+    )
+
+
+def _quote_still_matches_source(
+    item: RetrievedEvidenceItem, bundle: EvidenceBundle
+) -> bool:
+    """Re-verify a quote against the source text carried in the bundle.
+
+    Absent source text means the quote cannot be substantiated, so it is dropped.
+    """
+    if not item.quote or not item.quote.strip():
+        return False
+    source_text = bundle.source_texts.get(item.source_id, "")
+    if not source_text or not source_text.strip():
+        return False
+    return verify_quote(item.quote, source_text).is_verified
+
+
+def _source_type_for(item: RetrievedEvidenceItem) -> SourceType:
+    raw = (item.source_type or "").strip().lower()
+    try:
+        return SourceType(raw)
+    except ValueError:
+        return SourceType.PULL_REQUEST
+
+
 def generate_answer(
     question: str,
     resolution: ResolutionResult,
     bundle: Optional[EvidenceBundle],
     provider: BaseLLMProvider,
+    *,
+    is_real: bool = True,
 ) -> AskResponse:
     """End-to-end question answering pipeline enforcing the 4-gate refusal system and citation verification."""
 
@@ -256,7 +313,50 @@ def generate_answer(
         )
 
     # ------------------------------------------------------------------
-    # G4 Passed: Invoke LLM to Generate Grounded Answer
+    # Citation Post-Validation
+    #
+    # Every quote is re-verified against the source text loaded for this bundle
+    # BEFORE the LLM is consulted. The stored quote_verified flag records what was
+    # true at extraction time and is deliberately NOT used as authorisation: a
+    # stale or edited flag must never allow a quote that is no longer present in
+    # its source to be cited.
+    # ------------------------------------------------------------------
+    bundle_evidence_map = {ev.id: ev for ev in bundle.evidence_items}
+    verified_items = [item for item in bundle.evidence_items if _quote_still_matches_source(item, bundle)]
+
+    if not verified_items:
+        logger.warning(
+            "no answer for %s: no evidence quote could be re-verified against its stored source",
+            resolution.entity.name,
+        )
+        return _no_verified_quote_response(
+            entity=entity_obj,
+            decisions=decisions_list,
+            similarity=bundle.best_similarity_score,
+            contradiction=1.0 if bundle.has_contradiction else 0.0,
+            gap="No evidence quote could be re-verified against its stored source",
+            wording=(
+                f"The repository history confirms that {resolution.entity.name} was changed, "
+                "but no quotation from the original discussion could be verified against "
+                "the stored source."
+            ),
+            is_real=is_real,
+        )
+
+    def cite(item: RetrievedEvidenceItem) -> Citation:
+        return Citation(
+            id=f"cit_{item.id}",
+            decision_id=item.decision_id,
+            kind=CitationKind.SOURCE,
+            quote=item.quote,
+            source_url=item.source_url,
+            source_type=_source_type_for(item),
+            author=item.author,
+            timestamp=item.timestamp,
+        )
+
+    # ------------------------------------------------------------------
+    # G4 Passed: invoke the LLM, now that at least one quote is verified.
     # ------------------------------------------------------------------
     system_prompt = get_answer_system_prompt()
     user_prompt = format_evidence_bundle_for_llm(bundle)
@@ -269,7 +369,6 @@ def generate_answer(
         )
     except Exception as exc:
         logger.error("LLM answering failure: %s", exc)
-        # Fall back to partial answer
         conf = calculate_confidence(
             directness=0.5,
             provenance=0.6,
@@ -286,49 +385,20 @@ def generate_answer(
             citations=[],
             evidence_gaps=["LLM generation failure"],
             confidence=conf,
-            fixture=False,
+            fixture=is_real,
         )
 
-    # ------------------------------------------------------------------
-    # Citation Post-Validation
-    # ------------------------------------------------------------------
-    bundle_evidence_map = {ev.id: ev for ev in bundle.evidence_items}
+
     valid_citations: list[Citation] = []
-
     for ev_id in output.cited_evidence_ids:
-        if ev_id in bundle_evidence_map:
-            ev_item = bundle_evidence_map[ev_id]
-            if ev_item.quote_verified and ev_item.quote:
-                valid_citations.append(
-                    Citation(
-                        id=f"cit_{ev_item.id}",
-                        decision_id=ev_item.decision_id,
-                        kind=CitationKind.SOURCE,
-                        quote=ev_item.quote,
-                        source_url=ev_item.source_url,
-                        source_type=SourceType.PULL_REQUEST,
-                        author=ev_item.author or "unknown",
-                        timestamp=ev_item.timestamp or "2026-01-01T00:00:00Z",
-                    )
-                )
+        ev_item = bundle_evidence_map.get(ev_id)
+        if ev_item is not None and ev_item in verified_items:
+            valid_citations.append(cite(ev_item))
 
-    # If LLM cited no valid items from the bundle, fallback to available verified evidence in bundle
+    # If the LLM cited nothing that survived, fall back to the first verified
+    # quote so a real answer stays grounded in real evidence.
     if not valid_citations:
-        for ev_item in bundle.evidence_items:
-            if ev_item.quote_verified and ev_item.quote:
-                valid_citations.append(
-                    Citation(
-                        id=f"cit_{ev_item.id}",
-                        decision_id=ev_item.decision_id,
-                        kind=CitationKind.SOURCE,
-                        quote=ev_item.quote,
-                        source_url=ev_item.source_url,
-                        source_type=SourceType.PULL_REQUEST,
-                        author=ev_item.author or "unknown",
-                        timestamp=ev_item.timestamp or "2026-01-01T00:00:00Z",
-                    )
-                )
-                break
+        valid_citations.append(cite(verified_items[0]))
 
     # Determine final outcome and confidence
     contradiction_val = 1.0 if bundle.has_contradiction else 0.0

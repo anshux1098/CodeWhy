@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 from app.config import settings
 from app.providers.embeddings import BaseEmbeddingProvider, get_embedding_provider
@@ -22,7 +22,10 @@ class RetrievedEvidenceItem:
     claim: str
     author: Optional[str] = None
     timestamp: Optional[str] = None
-    quote_verified: bool = True
+    # A record of what was true when the quote was extracted. It is NOT
+    # authorisation to cite the quote: the answer path re-verifies against
+    # the source text before any citation is built.
+    quote_verified: bool = False
     similarity_score: float = 0.0
 
 
@@ -41,6 +44,8 @@ class EvidenceBundle:
     chain_truncated: bool = False
     best_similarity_score: float = 0.0
     current_value_differs: bool = False
+    # source_id -> full stored source text, used to re-verify quotes at answer time.
+    source_texts: dict[str, str] = field(default_factory=dict)
 
 
 def retrieve_evidence(
@@ -50,6 +55,7 @@ def retrieve_evidence(
     embedder: Optional[BaseEmbeddingProvider] = None,
     max_evidence_items: Optional[int] = None,
     max_chain_length: Optional[int] = None,
+    source_text_provider: Optional[Callable[[str], str]] = None,
 ) -> EvidenceBundle:
     """Retrieves decisions, evidence, sources, and supersession chains for a resolved entity.
 
@@ -115,5 +121,22 @@ def retrieve_evidence(
     # Sort evidence items by similarity descending and cap at max_evidence_items
     all_evidence.sort(key=lambda x: x.similarity_score, reverse=True)
     bundle.evidence_items = all_evidence[:cap_evidence]
+
+    # Load the stored text behind every retained source so the answer path can
+    # re-verify quotes instead of trusting the extraction-time flag.
+    if source_text_provider is None:
+        store_method = getattr(store, "source_text_for", None)
+        source_text_provider = store_method if callable(store_method) else None
+    if source_text_provider is not None:
+        for item in bundle.evidence_items:
+            if item.source_id not in bundle.source_texts:
+                try:
+                    bundle.source_texts[item.source_id] = source_text_provider(item.source_id) or ""
+                except Exception:  # noqa: BLE001 - an unreadable source is not fatal here
+                    logger.warning(
+                        "could not load source text for %s; its quotes cannot be verified",
+                        item.source_id,
+                    )
+                    bundle.source_texts[item.source_id] = ""
 
     return bundle

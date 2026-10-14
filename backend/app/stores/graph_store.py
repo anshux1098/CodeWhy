@@ -90,6 +90,11 @@ class InMemoryGraphStore(BaseGraphStore):
         self.labels: dict[str, set[str]] = {}  # id -> set of labels
         # (from_id, rel_type, to_id) -> properties dict
         self.edges: dict[tuple[str, str, str], dict[str, Any]] = {}
+        # source_id -> full stored text, so quotes can be verified at answer time
+        self.source_texts: dict[str, str] = {}
+
+    def source_text_for(self, source_id: str) -> str:
+        return self.source_texts.get(source_id, "")
 
     def init_schema(self) -> None:
         # In-memory stores have implicit constraints

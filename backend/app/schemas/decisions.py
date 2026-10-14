@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.common import CitationKind, DecisionState, SourceType, WhoToAskReason
@@ -22,8 +24,10 @@ class Citation(BaseModel):
     quote: str
     source_url: str
     source_type: SourceType
-    author: str
-    timestamp: str
+    # Null when the ingested record genuinely does not carry the value. Inventing
+    # a placeholder here would misattribute the quote, so the field is honest instead.
+    author: Optional[str] = None
+    timestamp: Optional[str] = None
 
 
 class Decision(BaseModel):

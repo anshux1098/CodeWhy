@@ -159,8 +159,15 @@
         "additionalProperties": false,
         "properties": {
           "author": {
-            "title": "Author",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
           },
           "decision_id": {
             "title": "Decision Id",
@@ -185,8 +192,15 @@
             "type": "string"
           },
           "timestamp": {
-            "title": "Timestamp",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
           }
         },
         "required": [
@@ -195,9 +209,7 @@
           "kind",
           "quote",
           "source_url",
-          "source_type",
-          "author",
-          "timestamp"
+          "source_type"
         ],
         "title": "Citation",
         "type": "object"

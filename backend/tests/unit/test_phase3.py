@@ -261,6 +261,9 @@ def test_generate_answer_full_success() -> None:
             )
         ],
         best_similarity_score=0.92,
+        source_texts={
+            "pr:10": "NAME_TO_LEVEL provides O(1) level integer mapping for stdlib parity.",
+        },
     )
 
     canned_llm = json.dumps({
@@ -363,6 +366,9 @@ def test_graph_data_source_full_flow() -> None:
     })
     store.merge_relationship("GOVERNS", "dec_1", "entity:hynek/structlog:NAME_TO_LEVEL")
     store.merge_relationship("SUPPORTED_BY", "dec_1", "ev_1")
+    # The quote is only citable if its source text is available for re-verification.
+    store.source_texts["pr:1"] = "Map names to levels so stdlib consumers see integers."
+    assert store.source_text_for("pr:1")
 
     source = GraphDataSource(store=store)
 
