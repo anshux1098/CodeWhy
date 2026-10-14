@@ -163,12 +163,20 @@ def test_connect_embeddings_fails_in_graph_mode_with_hash_fallback(capsys, monke
 
 
 def test_connect_embeddings_passes_in_fixture_mode(capsys, monkeypatch):
+    import app.providers.embeddings as embmod
     import scripts.preflight as preflight
 
     monkeypatch.setattr(
         preflight,
         "settings",
         _make_settings(data_source="fixture", offline=True),
+    )
+    # The provider is stubbed because the real one loads a 100MB model from
+    # huggingface.co on first use. A unit test has no business doing that, and the
+    # suite's network guard now fails such a test outright.
+    monkeypatch.setattr(
+        embmod, "get_embedding_provider",
+        lambda cfg=None: embmod.DeterministicFallbackEmbeddingProvider(),
     )
 
     assert preflight.connect_embeddings() is True

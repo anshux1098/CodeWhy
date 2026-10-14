@@ -67,6 +67,53 @@ class LLMNonRetryableError(LLMProviderError):
         self.status_code = status_code
 
 
+class LLMEmptyReplyError(LLMProviderError):
+    """Raised when the model returned no text at all.
+
+    A 200 with empty content is not a success and not a transient outage, so it is
+    reported as its own failure rather than retried through the backoff schedule.
+    """
+
+    def __init__(
+        self,
+        finish_reason: str,
+        *,
+        prompt_tokens: int,
+        completion_tokens: int,
+        reasoning_present: bool,
+        reasoning_tokens: int,
+        retried: bool,
+    ) -> None:
+        self.finish_reason = finish_reason
+        self.reasoning_present = reasoning_present
+        self.reasoning_tokens = reasoning_tokens
+        self.retried = retried
+
+        detail = (
+            f"finish_reason={finish_reason or 'unknown'} "
+            f"prompt_tokens={prompt_tokens} completion_tokens={completion_tokens}"
+        )
+        if reasoning_present or reasoning_tokens:
+            detail += f" reasoning_tokens={reasoning_tokens}"
+
+        # The two cases below are worded so the phrase a reader greps for is
+        # identical either way: this is always an output-limit problem.
+        if finish_reason == "length":
+            reason = (
+                "output limit consumed by reasoning: the model spent the budget "
+                "without producing visible text"
+            )
+        else:
+            reason = "output limit consumed with no visible text produced"
+
+        super().__init__(
+            f"LLM returned no text ({detail}); retried={retried}; {reason}. "
+            "Raise LLM_MAX_OUTPUT_TOKENS if the model is reasoning at length."
+        )
+        self.prompt_tokens = prompt_tokens
+        self.completion_tokens = completion_tokens
+
+
 # ---------------------------------------------------------------------------
 # Token Budget Guard
 # ---------------------------------------------------------------------------
@@ -139,6 +186,11 @@ class LLMResponse:
     #: True only when the server actually reported usage. Estimated fallback values
     #: never count as reported.
     usage_reported: bool = False
+    #: Why the model stopped: "stop", "length", "tool_calls", or "" when absent.
+    finish_reason: str = ""
+    #: True when the reply carried a reasoning field, which means tokens were spent
+    #: thinking even though the visible reply is what matters.
+    reasoning_present: bool = False
     raw_response: dict[str, Any] = field(default_factory=dict)
 
 
@@ -343,18 +395,106 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         budget: Optional[TokenBudget] = None,
         timeout_s: Optional[int] = None,
         max_retries: int = MAX_ATTEMPTS,
+        max_output_tokens: Optional[int] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> None:
         super().__init__(budget=budget, timeout_s=timeout_s, max_retries=max_retries)
         self.api_key = api_key
         self.model = model
         self.base_url = base_url.rstrip("/")
+        #: Ceiling for one reply, and the cap the empty-reply retry doubles up to.
+        self.max_output_tokens = max_output_tokens or settings.llm_max_output_tokens
+        #: Only sent to providers documented to understand it. See reasoning_payload.
+        self.reasoning_effort = reasoning_effort
+
+    def reasoning_payload(self) -> dict[str, Any]:
+        """The request body fragment that keeps reasoning small, if configured.
+
+        OpenRouter documents a unified `reasoning` object accepting `effort`
+        (max|xhigh|high|medium|low|minimal|none), `max_tokens`, `exclude` and
+        `enabled`; `include_reasoning` is a deprecated alias and is not used.
+        `exclude: true` keeps the reasoning text out of the response while the
+        tokens are still billed, which is what we want: the caller reads the
+        visible answer, not the chain of thought.
+
+        Other OpenAI-compatible endpoints are not documented to accept this key,
+        so the fragment is omitted entirely for them rather than sent and ignored.
+        """
+        if not self.reasoning_effort:
+            return {}
+        return {"reasoning": {"effort": self.reasoning_effort, "exclude": True}}
 
     def complete(
         self,
         prompt: str,
         system: Optional[str] = None,
         temperature: float = 0.0,
-        max_tokens: int = 2048,
+        max_tokens: Optional[int] = None,
+    ) -> LLMResponse:
+        """Complete, retrying an empty reply at most once.
+
+        A 200 with no text is not a transient outage, so it must not enter the
+        backoff schedule: seven attempts against a model that is answering
+        successfully but saying nothing costs minutes and changes nothing. One
+        retry with a larger output budget handles the documented case where
+        reasoning consumed the limit; anything else is reported immediately.
+        """
+        limit = max_tokens if max_tokens is not None else self.max_output_tokens
+        try:
+            return self._complete_once(prompt, system, temperature, limit)
+        except LLMEmptyReplyError as first:
+            if first.finish_reason != "length":
+                # Some other reason produced no text; a second identical call is
+                # the only thing worth trying, and then the failure is reported.
+                logger.info("Retrying once after an empty reply with finish_reason=%s",
+                            first.finish_reason or "unknown")
+                try:
+                    return self._complete_once(prompt, system, temperature, limit)
+                except LLMEmptyReplyError as second:
+                    raise LLMEmptyReplyError(
+                        second.finish_reason,
+                        prompt_tokens=second.prompt_tokens,
+                        completion_tokens=second.completion_tokens,
+                        reasoning_present=second.reasoning_present,
+                        reasoning_tokens=second.reasoning_tokens,
+                        retried=True,
+                    ) from first
+
+            # finish_reason="length": the model spent the whole budget thinking.
+            # Give it a larger allowance once, up to the configured ceiling.
+            if limit >= self.max_output_tokens:
+                raise LLMEmptyReplyError(
+                    first.finish_reason,
+                    prompt_tokens=first.prompt_tokens,
+                    completion_tokens=first.completion_tokens,
+                    reasoning_present=first.reasoning_present,
+                    reasoning_tokens=first.reasoning_tokens,
+                    retried=False,
+                ) from first
+
+            raised = min(limit * 2, self.max_output_tokens)
+            logger.info(
+                "Empty reply with finish_reason=length; retrying once with "
+                "max_tokens %d -> %d", limit, raised,
+            )
+            try:
+                return self._complete_once(prompt, system, temperature, raised)
+            except LLMEmptyReplyError as second:
+                raise LLMEmptyReplyError(
+                    second.finish_reason,
+                    prompt_tokens=second.prompt_tokens,
+                    completion_tokens=second.completion_tokens,
+                    reasoning_present=second.reasoning_present,
+                    reasoning_tokens=second.reasoning_tokens,
+                    retried=True,
+                ) from first
+
+    def _complete_once(
+        self,
+        prompt: str,
+        system: Optional[str] = None,
+        temperature: float = 0.0,
+        max_tokens: Optional[int] = None,
     ) -> LLMResponse:
         # Check budget before dispatching call
         if not self.budget.can_afford():
@@ -375,6 +515,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             "max_tokens": max_tokens,
             "response_format": {"type": "json_object"},
         }
+        payload.update(self.reasoning_payload())
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -442,17 +583,62 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                 if not choices:
                     raise LLMProviderError("Empty choices received from OpenAI API")
 
-                content = choices[0].get("message", {}).get("content", "")
+                choice = choices[0]
+                message = choice.get("message") or {}
+                finish_reason = choice.get("finish_reason") or ""
+                # content is null, not "", when a model spends the whole output
+                # budget reasoning. Anything non-string is unusable as text.
+                raw_content = message.get("content")
+                content = raw_content if isinstance(raw_content, str) else ""
+                # OpenRouter documents `reasoning`; `reasoning_content` is a
+                # documented alias. Only the presence matters here, never the text.
+                reasoning_present = bool(
+                    message.get("reasoning") or message.get("reasoning_content")
+                )
 
                 usage = data.get("usage")
                 usage_reported = isinstance(usage, dict)
                 if usage_reported:
                     prompt_toks = int(usage.get("prompt_tokens", len(prompt) // 4))
-                    comp_toks = int(usage.get("completion_tokens", len(content) // 4))
+                    comp_toks = int(usage.get("completion_tokens", 0))
                 else:
                     # The server gave no usage; keep an estimate for budget tracking only.
                     prompt_toks = max(1, len(prompt) // 4)
-                    comp_toks = max(1, len(content) // 4)
+                    comp_toks = 0
+
+                # Reasoning tokens are billed as output tokens, so they explain a
+                # completion count with no visible text behind it.
+                completion_details = usage.get("completion_tokens_details") if usage_reported else None
+                reasoning_tokens = (
+                    int((completion_details or {}).get("reasoning_tokens", 0) or 0)
+                    if isinstance(completion_details, dict)
+                    else 0
+                )
+
+                if not content.strip():
+                    self.budget.consume(prompt_toks, comp_toks)
+                    logger.warning(
+                        "LLM attempt %d/%d returned no text: finish_reason=%s "
+                        "reasoning_present=%s reasoning_tokens=%d "
+                        "prompt_tokens=%d completion_tokens=%d max_tokens=%d",
+                        attempt + 1, self.max_retries, finish_reason or "unknown",
+                        reasoning_present, reasoning_tokens,
+                        prompt_toks, comp_toks, max_tokens,
+                    )
+                    raise LLMEmptyReplyError(
+                        finish_reason,
+                        prompt_tokens=prompt_toks,
+                        completion_tokens=comp_toks,
+                        reasoning_present=reasoning_present,
+                        reasoning_tokens=reasoning_tokens,
+                        retried=False,
+                    )
+
+                logger.info(
+                    "LLM attempt %d/%d got HTTP %d finish_reason=%s completion_tokens=%d",
+                    attempt + 1, self.max_retries, resp.status_code,
+                    finish_reason or "unknown", comp_toks,
+                )
 
                 # Track budget
                 self.budget.consume(prompt_toks, comp_toks)
@@ -465,10 +651,16 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                     model=self.model,
                     status_code=resp.status_code,
                     usage_reported=usage_reported,
+                    finish_reason=finish_reason,
+                    reasoning_present=reasoning_present,
                     raw_response=data,
                 )
             except LLMNonRetryableError:
                 # A status that must not be retried: leave the loop immediately.
+                raise
+            except LLMEmptyReplyError:
+                # Handled by complete(), which decides whether one more attempt
+                # with a bigger budget is worth making.
                 raise
             except httpx.TimeoutException as exc:
                 last_error = LLMTimeoutError(f"OpenAI call timed out after {self.timeout_s}s: {exc}")
@@ -498,6 +690,16 @@ PROVIDER_BASE_URLS: Final[dict[str, str]] = {
 
 #: Names that resolve to the offline mock. Listed in errors so the message is complete.
 MOCK_PROVIDER_NAMES: Final[frozenset[str]] = frozenset({"mock", "fixture", "test"})
+
+#: Reasoning effort per provider, and only for providers whose API documents it.
+#: OpenRouter documents the unified `reasoning` object with `effort` and `exclude`;
+#: the other OpenAI-compatible endpoints here are not documented to accept it, so
+#: nothing is sent to them rather than sending a key the endpoint may reject.
+#: `low` is chosen because these calls ask for a structured extraction, not for
+#: reasoning; the budget belongs in the visible answer.
+REASONING_EFFORT_BY_PROVIDER: Final[dict[str, str]] = {
+    "openrouter": "low",
+}
 
 
 # Factory
@@ -530,6 +732,8 @@ def get_llm_provider(
             model=config.llm_model,
             base_url=base_url,
             budget=budget,
+            max_output_tokens=config.llm_max_output_tokens,
+            reasoning_effort=REASONING_EFFORT_BY_PROVIDER.get(name),
         )
 
     supported = sorted(set(PROVIDER_BASE_URLS) | MOCK_PROVIDER_NAMES)

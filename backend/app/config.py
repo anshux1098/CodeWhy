@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     llm_base_url: str = ""
     llm_api_key: str = ""
     llm_timeout_s: int = 60
+    #: Ceiling for a single reply. Reasoning tokens are billed as output tokens and
+    #: count against this same limit, so a model that thinks at length can return
+    #: finish_reason="length" with no visible text at all. This value is both the
+    #: default max_tokens and the ceiling the empty-reply retry may double up to.
+    llm_max_output_tokens: int = 4096
     max_llm_tokens_per_run: int = 500_000
     embedding_provider: str = "local"
     embedding_model: str = "all-MiniLM-L6-v2"
@@ -69,6 +74,11 @@ class Settings(BaseSettings):
     # store. Off by default so a misconfigured deployment cannot serve fabricated
     # answers that claim to be real.
     allow_mock_providers: bool = False
+    # When true, no model weights are ever downloaded and the deterministic
+    # embedding provider is used instead. The test suite sets this, because a unit
+    # test that pulls a 100MB model from Hugging Face needs the network, takes
+    # fifteen seconds, and scores differently on a warm cache than on a cold one.
+    offline: bool = False
     max_graph_nodes: int = Field(
         default=80,
         gt=0,
@@ -111,6 +121,7 @@ class Settings(BaseSettings):
         "max_evidence_items",
         "embedding_dimensions",
         "max_llm_tokens_per_run",
+        "llm_max_output_tokens",
     )
     @classmethod
     def _check_positive_limit(cls, value: int) -> int:

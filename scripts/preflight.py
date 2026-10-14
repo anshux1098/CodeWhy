@@ -164,7 +164,10 @@ def connect_llm() -> bool:
     if not (response.content or "").strip():
         return report(
             "LLM provider", False,
-            f"status={response.status_code} model={settings.llm_model!r} empty reply",
+            f"status={response.status_code} model={settings.llm_model!r} "
+            f"finish_reason={getattr(response, 'finish_reason', '') or 'unknown'} "
+            f"reasoning_present={getattr(response, 'reasoning_present', False)} "
+            "empty reply",
         )
     if getattr(response, "usage_reported", False):
         tokens_detail = f"tokens={response.total_tokens}"
@@ -173,7 +176,10 @@ def connect_llm() -> bool:
     return report(
         "LLM provider", True,
         f"status={response.status_code} model={settings.llm_model!r} "
-        f"reply_chars={len(response.content)} {tokens_detail}",
+        f"reply_chars={len(response.content)} "
+        f"finish_reason={getattr(response, 'finish_reason', '') or 'unknown'} "
+        f"reasoning_present={getattr(response, 'reasoning_present', False)} "
+        f"{tokens_detail}",
     )
 
 
