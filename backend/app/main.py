@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api import routes_decisions, routes_health, routes_repositories
+from app.api.deps import get_settings
+from app.config import Settings
 from app.services.data_source import NotFoundError
 from app.services.errors import DataSourceError
 from app.services.health import APP_VERSION
@@ -52,7 +56,13 @@ Every response produced by the fixture data source carries `fixture: true`.
 """.strip()
 
 
-def create_app() -> FastAPI:
+def create_app(config: Optional[Settings] = None) -> FastAPI:
+    """Build the application.
+
+    `config` overrides the process-wide settings for this application only. A test
+    passes `Settings(_env_file=None)` here so the app under test cannot pick up the
+    developer's `.env` and start talking to a real provider or a real database.
+    """
     application = FastAPI(
         title="CodeWhy",
         version=APP_VERSION,
@@ -62,6 +72,8 @@ def create_app() -> FastAPI:
             + CONTRACT_NOTES
         ),
     )
+    if config is not None:
+        application.dependency_overrides[get_settings] = lambda: config
     application.add_middleware(
         CORSMiddleware,
         allow_origins=[FRONTEND_ORIGIN],

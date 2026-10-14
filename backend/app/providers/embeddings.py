@@ -125,6 +125,11 @@ def get_embedding_provider(
     name = (provider_name or config.embedding_provider or "local").lower()
 
     if name in ("local", "all-minilm-l6-v2"):
+        # Offline short-circuits before any import so nothing is downloaded. The
+        # deterministic provider is not semantic, so callers must be able to see
+        # that; they can, because the class is named for what it is.
+        if config.offline:
+            return DeterministicFallbackEmbeddingProvider(dimensions=size)
         try:
             import sentence_transformers  # noqa: F401
 

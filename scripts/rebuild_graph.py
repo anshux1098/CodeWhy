@@ -8,12 +8,13 @@ import logging
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 # Add backend to sys.path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "backend"))
 
-from app.config import settings
+from app.config import Settings, settings
 from app.providers.embeddings import get_embedding_provider
 from app.stores.graph_store import BaseGraphStore, get_graph_store
 from app.stores.sqlite_cache import SqliteCache
@@ -58,7 +59,11 @@ def missing_endpoints(store: BaseGraphStore, link_rows: list) -> list[tuple[str,
     return sorted(grouped.items())
 
 
-def build_from_cache(cache_path: Path, repo: str) -> "InMemoryBuildResult":
+def build_from_cache(
+    cache_path: Path,
+    repo: str,
+    cfg: Optional[Settings] = None,
+) -> "InMemoryBuildResult":
     """Build the graph into an in-memory store and report measured state.
 
     Used by tests and for a dry preview. Neo4j is not required.
@@ -66,7 +71,7 @@ def build_from_cache(cache_path: Path, repo: str) -> "InMemoryBuildResult":
     from app.stores.graph_store import InMemoryGraphStore
 
     store = InMemoryGraphStore()
-    counts = rebuild_graph(repo, cache_path, store)
+    counts = rebuild_graph(repo, cache_path, store, cfg=cfg)
     return InMemoryBuildResult(store, counts)
 
 
@@ -118,7 +123,12 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def rebuild_graph(repo: str, cache_path: Path, store: BaseGraphStore) -> dict[str, int]:
+def rebuild_graph(
+    repo: str,
+    cache_path: Path,
+    store: BaseGraphStore,
+    cfg: Optional[Settings] = None,
+) -> dict[str, int]:
     t0 = time.perf_counter()
     logger.info("Initializing graph schema (constraints and indexes)...")
     store.init_schema()
@@ -128,7 +138,12 @@ def rebuild_graph(repo: str, cache_path: Path, store: BaseGraphStore) -> dict[st
         return {"nodes": 0, "relationships": 0}
 
     cache = SqliteCache(cache_path)
-    embedder = get_embedding_provider()
+    # The caller's settings rather than the module-level one. `settings` is built
+    # from `.env`, so relying on it here would make a test inherit whatever the
+    # developer has configured, and make a run download model weights even when it
+    # was told to stay offline. Passing `cfg` explicitly is what makes this
+    # reproducible; a caller with no cfg gets the deterministic provider.
+    embedder = get_embedding_provider(cfg=cfg or Settings(_env_file=None, offline=True))
 
     # A count of iterated cache rows is not graph state: a link whose endpoints were
     # never created is dropped silently by MATCH, which would overstate the result.

@@ -14,6 +14,7 @@ the test itself.
 from __future__ import annotations
 
 import os
+import socket
 from typing import Iterator
 
 import pytest
@@ -28,6 +29,84 @@ CLEARED_EXACT: tuple[str, ...] = (
     "APP_ENV",
     "LOG_LEVEL",
 )
+
+#: Hosts a test may legitimately reach. The TestClient runs in-process, so it needs
+#: no socket at all; only loopback is allowed for anything that does.
+LOOPBACK_PREFIXES = ("127.", "::1", "localhost")
+
+
+class RealNetworkAccess(AssertionError):
+    """Raised when a test tries to open a socket to something outside the machine."""
+
+
+#: Set at import time, not in a fixture. `app.config` builds its module-level
+#: `settings` while test modules are imported, which happens before any fixture
+#: runs, so a fixture would be too late to influence it.
+os.environ.setdefault("OFFLINE", "1")
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _offline_session() -> Iterator[None]:
+    """No test may download model weights.
+
+    `sentence_transformers` fetches a ~100MB model from Hugging Face on first use.
+    That makes a unit test depend on the network, take fifteen seconds, and return
+    different similarity scores depending on whether the cache is warm. The
+    deterministic provider is deterministic, so the suite is reproducible.
+    """
+    yield
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _forbid_real_network() -> Iterator[None]:
+    """Fail the whole session if any test opens a connection off this machine.
+
+    Integration tests were silently reading the developer's `.env` and querying the
+    real AuraDB, which made a green run depend on a live database and printed
+    `neo4j.notifications` warnings nobody could explain. Clearing environment
+    variables is not enough on its own, because the settings object reads the `.env`
+    file directly; this makes an accidental connection impossible rather than
+    merely unlikely.
+    """
+    original_connect = socket.socket.connect
+    original_connect_ex = socket.socket.connect_ex
+    original_create_connection = socket.create_connection
+
+    def host_of(address: object) -> str:
+        if isinstance(address, tuple) and address:
+            return str(address[0])
+        return str(address)
+
+    def check(address: object) -> None:
+        host = host_of(address)
+        if not host.startswith(LOOPBACK_PREFIXES):
+            raise RealNetworkAccess(
+                f"a test tried to connect to {host!r}. Tests must not reach a real "
+                "service: a unit or integration test that needs one must be marked "
+                "and skipped instead."
+            )
+
+    def guarded_connect(self: socket.socket, address: object) -> object:
+        check(address)
+        return original_connect(self, address)
+
+    def guarded_connect_ex(self: socket.socket, address: object) -> object:
+        check(address)
+        return original_connect_ex(self, address)
+
+    def guarded_create_connection(address: object, *args: object, **kwargs: object) -> object:
+        check(address)
+        return original_create_connection(address, *args, **kwargs)
+
+    socket.socket.connect = guarded_connect  # type: ignore[method-assign]
+    socket.socket.connect_ex = guarded_connect_ex  # type: ignore[method-assign]
+    socket.create_connection = guarded_create_connection  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        socket.socket.connect = original_connect  # type: ignore[method-assign]
+        socket.socket.connect_ex = original_connect_ex  # type: ignore[method-assign]
+        socket.create_connection = original_create_connection  # type: ignore[assignment]
 
 
 @pytest.fixture(autouse=True)

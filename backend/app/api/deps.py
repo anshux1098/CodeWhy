@@ -14,6 +14,17 @@ def get_settings() -> Settings:
     return settings
 
 
+def reset_data_source_cache() -> None:
+    """Forget the cached data source.
+
+    The cache exists so one process builds one store instead of per request. A
+    test that builds a second application must not be handed the first one's
+    source, so it clears this in between.
+    """
+    global _DATA_SOURCE
+    _DATA_SOURCE = None
+
+
 def get_source(config: Settings = Depends(get_settings)) -> DataSource:
     global _DATA_SOURCE
     if _DATA_SOURCE is None:
