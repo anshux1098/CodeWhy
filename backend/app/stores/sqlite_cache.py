@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
+from app.prompts.extract_decision import mark_injection_flag
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS raw_objects (
     id TEXT PRIMARY KEY,
@@ -307,7 +309,14 @@ class SqliteCache:
         self.close()
 
     def put_raw(self, kind: str, repo: str, key: str, payload: Any) -> bool:
+        """Cache one raw object.
+
+        Ingested repository text is scanned on the way in so a source that looks
+        like a prompt injection is flagged at rest. Only the boolean is stored.
+        """
         object_id = stable_id(kind, repo, key)
+        if kind in ("pr", "issue", "doc", "commit") and isinstance(payload, dict):
+            payload = mark_injection_flag(payload)
         digest = content_hash(payload)
         row = self._connection.execute(
             "SELECT content_hash FROM raw_objects WHERE id = ?", (object_id,)

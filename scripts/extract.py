@@ -14,7 +14,11 @@ sys.path.insert(0, str(REPO_ROOT / "backend"))
 
 from app.config import settings
 from app.providers.llm_provider import TokenBudget, TokenBudgetExhaustedError, get_llm_provider
-from app.services.extraction import EXTRACTION_VERSION, extract_decisions_from_source
+from app.services.extraction import (
+    EXTRACTION_VERSION,
+    extract_decisions_from_source,
+    summarise_injection_flags,
+)
 from app.stores.sqlite_cache import SqliteCache
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -73,6 +77,15 @@ def main() -> int:
 
     # Fetch candidate PRs and docs from raw_objects
     rows = cache.fetch_raw_objects(args.repo, limit=args.limit)
+    # Counts only. The flagged text itself never reaches a log line.
+    injection_counts = summarise_injection_flags(
+        [{"source_id": row.get("id"), "injection_detected": row.get("injection_detected")}
+         for row in rows]
+    )
+    logger.info(
+        "prompt-injection scan: %d of %d sources flagged",
+        injection_counts["sources_flagged"], injection_counts["sources_total"],
+    )
     logger.info("Fetched %d raw candidate objects for repo %s", len(rows), args.repo)
 
     extracted_decisions_count = 0

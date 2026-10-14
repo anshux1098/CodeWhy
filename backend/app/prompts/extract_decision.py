@@ -25,6 +25,18 @@ def detect_injection_attempt(text: str) -> bool:
     return any(p.search(text) for p in INJECTION_PATTERNS)
 
 
+def mark_injection_flag(payload: dict) -> dict:
+    """Stamp an ingested source record with whether it looks like an injection.
+
+    Applied on the write path so the flag exists at rest, rather than only when a
+    test happens to compute it. Only the boolean is stored; the matched text is
+    never kept and never logged.
+    """
+    text = "\n".join(str(payload.get(field) or "") for field in ("title", "body", "claim"))
+    payload["injection_detected"] = detect_injection_attempt(text)
+    return payload
+
+
 def sanitize_untrusted_text(text: str) -> str:
     """Sanitizes text by neutralizing delimiter collisions and stripping null bytes."""
     clean = text.replace("\x00", "")

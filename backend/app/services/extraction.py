@@ -154,6 +154,18 @@ def compute_content_hash(text: str) -> str:
 # Extraction Engine
 # ---------------------------------------------------------------------------
 
+def summarise_injection_flags(rows: list[dict[str, Any]]) -> dict[str, int]:
+    """Count flagged sources for logging.
+
+    Only counts are returned. The offending text never enters a log line, so an
+    attack payload cannot smuggle itself into the audit trail.
+    """
+    return {
+        "sources_total": len(rows),
+        "sources_flagged": sum(1 for row in rows if row.get("injection_detected")),
+    }
+
+
 def attribution_for(author: Optional[str]) -> Optional[str]:
     """Normalise an author taken from the ingested record.
 

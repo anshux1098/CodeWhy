@@ -409,7 +409,10 @@ def test_put_raw_rewrites_when_content_changes(tmp_path: Path) -> None:
     with SqliteCache(tmp_path / "c.sqlite3") as cache:
         cache.put_raw("pr", "a/b", "7", {"x": 1})
         assert cache.put_raw("pr", "a/b", "7", {"x": 2}) is True
-        assert cache.get_raw("pr", "a/b", "7") == {"x": 2}
+        stored = cache.get_raw("pr", "a/b", "7")
+        # Ingested text is flagged on the way in; the original fields are untouched.
+        assert stored["x"] == 2
+        assert stored["injection_detected"] is False
         assert cache.count_kind("pr", "a/b") == 1
 
 
