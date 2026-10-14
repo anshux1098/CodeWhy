@@ -6,12 +6,12 @@ import re
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Final, Optional, TypeVar
 
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from app.config import settings
+from app.config import Settings, settings
 
 logger = logging.getLogger(__name__)
 
@@ -350,6 +350,19 @@ class OpenAICompatibleProvider(BaseLLMProvider):
 
 
 # ---------------------------------------------------------------------------
+#: Default endpoint per provider. An explicit LLM_BASE_URL always wins, so a key
+#: is only ever sent to the host an operator configured. Google exposes an
+#: OpenAI-compatible surface for Gemini, which is why it uses this client.
+PROVIDER_BASE_URLS: Final[dict[str, str]] = {
+    "openai": "https://api.openai.com/v1",
+    "ollama": "http://localhost:11434/v1",
+    "google": "https://generativelanguage.googleapis.com/v1beta/openai/",
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
+    "vllm": "http://localhost:8000/v1",
+    "openrouter": "https://openrouter.ai/api/v1",
+}
+
+
 # Factory
 # ---------------------------------------------------------------------------
 
@@ -357,23 +370,32 @@ def get_llm_provider(
     provider_name: Optional[str] = None,
     budget: Optional[TokenBudget] = None,
     mock_canned_response: Optional[str] = None,
+    cfg: Optional[Settings] = None,
 ) -> BaseLLMProvider:
-    """Factory selecting the provider implementation based on settings or explicit name."""
-    name = (provider_name or settings.llm_provider or "mock").strip().lower()
+    """Factory selecting the provider implementation.
+
+    `cfg` is the caller's Settings. It is required for anything but the mock
+    provider, because reading the module-level global would make every caller
+    depend on whatever the operator happens to have in their .env, and would make
+    unit tests impossible to isolate.
+    """
+    config = cfg or settings
+    name = (provider_name or config.llm_provider or "mock").strip().lower()
 
     if name in ("mock", "fixture", "test"):
         return MockLLMProvider(canned_response=mock_canned_response, budget=budget)
 
-    if name in ("openai", "ollama", "azure", "vllm", "openrouter"):
-        settings.require_llm()
-        base_url = "https://api.openai.com/v1"
-        if name == "ollama":
-            base_url = "http://localhost:11434/v1"
+    if name in PROVIDER_BASE_URLS:
+        config.require_llm()
+        base_url = (config.llm_base_url or "").strip() or PROVIDER_BASE_URLS[name]
         return OpenAICompatibleProvider(
-            api_key=settings.llm_api_key,
-            model=settings.llm_model,
+            api_key=config.llm_api_key,
+            model=config.llm_model,
             base_url=base_url,
             budget=budget,
         )
 
-    raise ValueError(f"Unsupported LLM provider: {name!r}. Supported: mock, openai, ollama")
+    raise ValueError(
+        f"Unsupported LLM provider: {name!r}. "
+        f"Supported: {', '.join(sorted(PROVIDER_BASE_URLS))}"
+    )

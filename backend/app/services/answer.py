@@ -8,7 +8,7 @@ from typing import Any, Optional, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.config import settings
+from app.config import Settings, settings
 from app.providers.llm_provider import BaseLLMProvider, LLMResponse, LLMSchemaValidationError
 from app.schemas.ask import AskResponse
 from app.schemas.common import (
@@ -235,6 +235,7 @@ def generate_answer(
     *,
     is_real: bool = True,
     min_score: Optional[float] = None,
+    cfg: Optional[Settings] = None,
 ) -> AskResponse:
     """End-to-end question answering pipeline enforcing the 4-gate refusal system and citation verification."""
 
@@ -244,6 +245,7 @@ def generate_answer(
         bundle=bundle,
         min_score=min_score,
         question=question,
+        cfg=cfg,
     )
 
     # Handle Gate: REFUSAL

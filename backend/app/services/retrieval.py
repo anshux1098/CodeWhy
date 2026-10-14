@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional, Sequence
 
-from app.config import settings
+from app.config import Settings, settings
 from app.providers.embeddings import BaseEmbeddingProvider, get_embedding_provider
 from app.stores.graph_store import BaseGraphStore
 
@@ -56,6 +56,7 @@ def retrieve_evidence(
     max_evidence_items: Optional[int] = None,
     max_chain_length: Optional[int] = None,
     source_text_provider: Optional[Callable[[str], str]] = None,
+    cfg: Optional[Settings] = None,
 ) -> EvidenceBundle:
     """Retrieves decisions, evidence, sources, and supersession chains for a resolved entity.
 
@@ -65,9 +66,10 @@ def retrieve_evidence(
     - Semantic similarity scored only on candidate decisions in the entity's neighborhood.
     - Contradiction detection (OPPOSES, CONFLICTS_WITH, or UNRESOLVED supersession edges).
     """
-    cap_evidence = max_evidence_items or settings.max_evidence_items
-    chain_limit = max_chain_length or settings.max_chain_length
-    emb = embedder or get_embedding_provider()
+    config = cfg or settings
+    cap_evidence = max_evidence_items or config.max_evidence_items
+    chain_limit = max_chain_length or config.max_chain_length
+    emb = embedder or get_embedding_provider(cfg=config)
 
     entity_id = entity.get("id", "")
     decisions = store.get_decisions_for_entity(entity_id)

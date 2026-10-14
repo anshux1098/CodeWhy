@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from typing import Final
 
 from pydantic import Field, field_validator
@@ -26,7 +28,9 @@ def _require(values: dict[str, str]) -> None:
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # The env file location is resolved at construction so a test can point it
+        # nowhere instead of having to unset every individual variable.
+        env_file=os.environ.get("ENV_FILE") or ".env",
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
@@ -39,6 +43,9 @@ class Settings(BaseSettings):
     neo4j_database: str = "neo4j"
     llm_provider: str = ""
     llm_model: str = ""
+    #: Endpoint the key is sent to. Empty means the provider default. A key is
+    #: never sent anywhere else, so a Gemini key cannot reach api.openai.com.
+    llm_base_url: str = ""
     llm_api_key: str = ""
     llm_timeout_s: int = 60
     max_llm_tokens_per_run: int = 500_000

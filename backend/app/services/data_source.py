@@ -101,7 +101,7 @@ class GraphDataSource:
     def __init__(self, cfg: Optional[Settings] = None, store: Optional[BaseGraphStore] = None) -> None:
         self.settings = cfg or settings
         self.store = store or get_graph_store(self.settings)
-        self.provider = get_llm_provider()
+        self.provider = get_llm_provider(cfg=self.settings)
 
     @property
     def is_real(self) -> bool:
@@ -162,6 +162,7 @@ class GraphDataSource:
                 question=request.question,
                 entity=resolution.entity.__dict__,
                 store=self.store,
+                cfg=self.settings,
             )
 
         return generate_answer(
@@ -171,6 +172,7 @@ class GraphDataSource:
             provider=self.provider,
             is_real=self.is_real,
             min_score=self.settings.min_score,
+            cfg=self.settings,
         )
 
     def get_decision(self, decision_id: str) -> DecisionDetail:

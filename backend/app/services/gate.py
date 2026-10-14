@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Optional
 
-from app.config import settings
+from app.config import Settings, settings
 from app.services.entity_resolution import ResolutionOutcome, ResolutionResult
 from app.services.retrieval import EvidenceBundle
 
@@ -28,6 +28,7 @@ def evaluate_refusal_gate(
     bundle: Optional[EvidenceBundle] = None,
     min_score: Optional[float] = None,
     question: str = "",
+    cfg: Optional[Settings] = None,
 ) -> GateCheckResult:
     """Enforces the 4-check refusal gate from Layer 6 of the specification.
 
@@ -40,7 +41,8 @@ def evaluate_refusal_gate(
     G4 Relevance: Best similarity between question and decisions >= MIN_SCORE.
        Otherwise -> refuse (low_score).
     """
-    threshold = min_score if min_score is not None else settings.min_score
+    config = cfg or settings
+    threshold = min_score if min_score is not None else config.min_score
 
     # ------------------------------------------------------------------
     # G1: Entity Resolution Check
