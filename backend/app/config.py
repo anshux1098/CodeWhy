@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     max_llm_tokens_per_run: int = 500_000
     embedding_provider: str = "local"
     embedding_model: str = "all-MiniLM-L6-v2"
+    #: Must agree with the vector index declared in app.graph.schema.
     embedding_dimensions: int = 384
     backend_host: str = "127.0.0.1"
     backend_port: int = 8000

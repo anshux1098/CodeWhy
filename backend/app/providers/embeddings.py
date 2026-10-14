@@ -9,6 +9,8 @@ from typing import Final, Optional, Sequence
 from app.config import settings
 
 EMBEDDING_DIMENSIONS: Final[int] = 384
+#: Must agree with the vector index declared in app.graph.schema.
+INDEX_VECTOR_DIMENSIONS: Final[int] = 384
 
 
 def compute_cosine_similarity(v1: Sequence[float], v2: Sequence[float]) -> float:
@@ -103,8 +105,21 @@ class SentenceTransformersProvider(BaseEmbeddingProvider):
 
 def get_embedding_provider(
     provider_name: Optional[str] = None,
+    dimensions: Optional[int] = None,
 ) -> BaseEmbeddingProvider:
-    """Factory selecting the embedding provider."""
+    """Factory selecting the embedding provider.
+
+    `dimensions` comes from configuration so a change actually takes effect. It must
+    agree with the vector index in app.graph.schema, which is declared at 384; a
+    mismatch is rejected here rather than surfacing as a write failure later.
+    """
+    size = dimensions or settings.embedding_dimensions or EMBEDDING_DIMENSIONS
+    if size != INDEX_VECTOR_DIMENSIONS:
+        raise ValueError(
+            f"embedding dimension {size} does not match the graph vector index "
+            f"({INDEX_VECTOR_DIMENSIONS}); change both together or neither"
+        )
+
     name = (provider_name or settings.embedding_provider or "local").lower()
 
     if name in ("local", "all-minilm-l6-v2"):
@@ -114,6 +129,6 @@ def get_embedding_provider(
             return SentenceTransformersProvider()
         except ImportError:
             # Fall back to deterministic hashing provider
-            return DeterministicFallbackEmbeddingProvider()
+            return DeterministicFallbackEmbeddingProvider(dimensions=size)
 
-    return DeterministicFallbackEmbeddingProvider()
+    return DeterministicFallbackEmbeddingProvider(dimensions=size)

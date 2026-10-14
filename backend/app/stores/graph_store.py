@@ -23,6 +23,53 @@ logger = logging.getLogger(__name__)
 # Base Graph Store Interface
 # ---------------------------------------------------------------------------
 
+# Cypher cannot parameterise a label or a relationship type, so both are interpolated
+# into the query text. These are the only values the store will ever interpolate, and
+# anything else is refused rather than escaped: a query fragment arriving through
+# either position would otherwise be executable Cypher.
+ALLOWED_NODE_LABELS: frozenset[str] = frozenset({
+    "Repository",
+    "CodeEntity",
+    "Decision",
+    "Evidence",
+    "Source",
+    "PullRequest",
+    "Issue",
+    "Commit",
+    "Document",
+    "Discussion",
+    "Person",
+    "Incident",
+})
+
+ALLOWED_REL_TYPES: frozenset[str] = frozenset({
+    "GOVERNS",
+    "SUPPORTED_BY",
+    "DECIDED_IN",
+    "REVERTS",
+    "SUPERSEDES",
+    "REFERENCES",
+    "PART_OF",
+    "CONTAINS",
+    "MODIFIED_IN",
+    "AUTHORED",
+    "REVIEWED",
+    "OPPOSES",
+    "CONFLICTS_WITH",
+    "REAFFIRMS",
+    "MOTIVATED_BY",
+    "HAS_DISCUSSION",
+})
+
+
+def _require_allowed(value: str, allowed: frozenset[str], kind: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"{kind} must be a string, got {type(value).__name__}")
+    if value not in allowed:
+        raise ValueError(f"{kind} {value!r} is not permitted")
+    return value
+
+
 class BaseGraphStore(ABC):
     #: True only for a store backed by a real database. An in-memory store holds
     #: nothing that came from a repository, so it must never imply otherwise.
@@ -107,6 +154,7 @@ class InMemoryGraphStore(BaseGraphStore):
         pass
 
     def merge_node(self, label: str, properties: dict[str, Any]) -> None:
+        _require_allowed(label, ALLOWED_NODE_LABELS, "node label")
         node_id = properties.get("id") or properties.get("login")
         if not node_id:
             raise ValueError(f"Node must have an 'id' or 'login' property: {properties}")
@@ -124,7 +172,10 @@ class InMemoryGraphStore(BaseGraphStore):
         to_id: str,
         properties: Optional[dict[str, Any]] = None,
     ) -> None:
-        key = (str(from_id), str(rel_type), str(to_id))
+        _require_allowed(rel_type, ALLOWED_REL_TYPES, "relationship type")
+        if not isinstance(from_id, str) or not isinstance(to_id, str):
+            raise TypeError("relationship endpoints must be strings, not mappings")
+        key = (from_id, rel_type, to_id)
         if key not in self.edges:
             self.edges[key] = {}
         if properties:
@@ -240,16 +291,30 @@ class Neo4jGraphStore(BaseGraphStore):
                 session.run(constraint_q)
             for index_q in NODE_INDEXES:
                 session.run(index_q)
+            created = 0
             try:
                 session.run(VECTOR_INDEX_QUERY)
+                created += 1
             except Exception as exc:
-                logger.warning("Vector index creation skipped or unsupported: %s", exc)
+                # A missing vector index silently degrades retrieval, so it is raised.
+                raise RuntimeError(
+                    "the 384-dim cosine vector index could not be created; "
+                    "check that this Neo4j version supports vector indexes"
+                ) from exc
             try:
                 session.run(FULLTEXT_INDEX_QUERY)
+                created += 1
             except Exception as exc:
-                logger.warning("Full-text index creation skipped or unsupported: %s", exc)
+                raise RuntimeError(
+                    "the evidence quote full-text index could not be created"
+                ) from exc
+            logger.info(
+                "Schema applied: %d constraints, %d property indexes, %d specialised indexes.",
+                len(NODE_CONSTRAINTS), len(NODE_INDEXES), created,
+            )
 
     def merge_node(self, label: str, properties: dict[str, Any]) -> None:
+        _require_allowed(label, ALLOWED_NODE_LABELS, "node label")
         node_id_field = "login" if label == "Person" else "id"
         query = (
             f"MERGE (n:{label} {{{node_id_field}: $props.{node_id_field}}}) "
@@ -265,6 +330,9 @@ class Neo4jGraphStore(BaseGraphStore):
         to_id: str,
         properties: Optional[dict[str, Any]] = None,
     ) -> None:
+        _require_allowed(rel_type, ALLOWED_REL_TYPES, "relationship type")
+        if not isinstance(from_id, str) or not isinstance(to_id, str):
+            raise TypeError("relationship endpoints must be strings, not mappings")
         query = (
             f"MATCH (a {{id: $from_id}}), (b {{id: $to_id}}) "
             f"MERGE (a)-[r:{rel_type}]->(b) "
@@ -326,7 +394,19 @@ class Neo4jGraphStore(BaseGraphStore):
                     cap=node_cap,
                 )
             nodes = [dict(r["n"]) for r in result]
-            return {"nodes": nodes, "relationships": []}
+            # Edges between the returned nodes. Without this the /graph endpoint
+            # rendered an empty relationship list even when the graph had them.
+            relationships: list[dict[str, Any]] = []
+            ids = [n.get("id") for n in nodes if n.get("id") is not None]
+            if ids:
+                edge_result = session.run(
+                    "MATCH (a)-[r]->(b) WHERE a.id IN $ids AND b.id IN $ids "
+                    "RETURN a.id AS from_id, type(r) AS rel_type, b.id AS to_id, r AS props",
+                    ids=ids,
+                )
+                for record in edge_result:
+                    relationships.append(dict(record))
+            return {"nodes": nodes, "relationships": relationships}
 
     def close(self) -> None:
         self.driver.close()
