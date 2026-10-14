@@ -54,6 +54,19 @@ class LLMSchemaValidationError(LLMProviderError):
         self.validation_errors = errors
 
 
+class LLMNonRetryableError(LLMProviderError):
+    """Raised for a status that must not be retried.
+
+    The retry loop catches every other exception to try again, so this type exists
+    purely to escape that loop: a 400, 401, 403 or 404 fails the same way every
+    time, and repeating the call only turns a clear error into a slow one.
+    """
+
+    def __init__(self, message: str, status_code: int) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
 # ---------------------------------------------------------------------------
 # Token Budget Guard
 # ---------------------------------------------------------------------------
@@ -130,6 +143,44 @@ class LLMResponse:
 
 
 # ---------------------------------------------------------------------------
+# Retry policy
+# ---------------------------------------------------------------------------
+
+#: Transient upstream conditions. A provider overloaded or briefly down answers with
+#: one of these, and the same request usually succeeds later, so they are retried.
+RETRYABLE_STATUSES: Final[frozenset[int]] = frozenset({429, 500, 502, 503, 504})
+
+#: Client-side mistakes. Retrying cannot change the answer: the request, the
+#: credentials or the model name is wrong, so the call fails immediately and the
+#: message is surfaced instead of being buried under minutes of waiting.
+NON_RETRYABLE_STATUSES: Final[frozenset[int]] = frozenset({400, 401, 403, 404})
+
+#: One wait after each retry, so six retries use six different pauses. The last two
+#: are equal on purpose: a long outage needs patience, not a growing delay.
+RETRY_BACKOFF_SECONDS: Final[tuple[int, ...]] = (5, 15, 30, 60, 120, 120)
+
+#: Attempts allowed per call: the first try plus one per backoff step.
+MAX_ATTEMPTS: Final[int] = len(RETRY_BACKOFF_SECONDS) + 1
+
+
+def _retry_after_seconds(response: httpx.Response) -> Optional[float]:
+    """Seconds the server asked us to wait, from its Retry-After header.
+
+    Only the delta-seconds form is honoured; an HTTP-date is ignored rather than
+    guessed at, because the request is about to be sent anyway and a wrong delay
+    is worse than the default schedule.
+    """
+    raw = response.headers.get("Retry-After")
+    if not raw:
+        return None
+    try:
+        value = float(raw.strip())
+    except ValueError:
+        return None
+    return value if value >= 0 else None
+
+
+# ---------------------------------------------------------------------------
 # Abstract LLM Provider
 # ---------------------------------------------------------------------------
 
@@ -144,7 +195,7 @@ class BaseLLMProvider(ABC):
         self,
         budget: Optional[TokenBudget] = None,
         timeout_s: Optional[int] = None,
-        max_retries: int = 3,
+        max_retries: int = MAX_ATTEMPTS,
     ) -> None:
         self.budget = budget or TokenBudget()
         self.timeout_s = timeout_s if timeout_s is not None else settings.llm_timeout_s
@@ -291,7 +342,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         base_url: str = "https://api.openai.com/v1",
         budget: Optional[TokenBudget] = None,
         timeout_s: Optional[int] = None,
-        max_retries: int = 3,
+        max_retries: int = MAX_ATTEMPTS,
     ) -> None:
         super().__init__(budget=budget, timeout_s=timeout_s, max_retries=max_retries)
         self.api_key = api_key
@@ -340,21 +391,50 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                     resp = client.post(url, json=payload, headers=headers)
 
                 last_status = resp.status_code
-                if resp.status_code == 429 or resp.status_code >= 500:
+                if resp.status_code in RETRYABLE_STATUSES:
                     # Remember why, so a retry loop that never succeeds can still say
                     # what the service actually answered.
                     last_error = LLMProviderError(
                         f"HTTP {resp.status_code}: {_safe_error_body(resp)}"
                     )
-                    wait_time = min(2.0 ** attempt, 8.0)
-                    time.sleep(wait_time)
+                    # The last attempt has nothing left to wait for.
+                    if attempt < self.max_retries - 1:
+                        scheduled = (
+                            RETRY_BACKOFF_SECONDS[attempt]
+                            if attempt < len(RETRY_BACKOFF_SECONDS)
+                            else RETRY_BACKOFF_SECONDS[-1]
+                        )
+                        wait_time = _retry_after_seconds(resp)
+                        source = "Retry-After"
+                        if wait_time is None:
+                            wait_time = float(scheduled)
+                            source = "schedule"
+                        logger.info(
+                            "LLM attempt %d/%d got HTTP %d; retrying in %ss (%s)",
+                            attempt + 1, self.max_retries, resp.status_code, wait_time, source,
+                        )
+                        time.sleep(wait_time)
                     continue
 
-                if resp.status_code >= 400:
-                    raise LLMProviderError(
-                        f"HTTP {resp.status_code}: {_safe_error_body(resp)}"
+                if resp.status_code in NON_RETRYABLE_STATUSES:
+                    logger.info(
+                        "LLM attempt %d/%d got HTTP %d; not retrying",
+                        attempt + 1, self.max_retries, resp.status_code,
+                    )
+                    raise LLMNonRetryableError(
+                        f"HTTP {resp.status_code}: {_safe_error_body(resp)}",
+                        status_code=resp.status_code,
                     )
 
+                if resp.status_code >= 400:
+                    raise LLMNonRetryableError(
+                        f"HTTP {resp.status_code}: {_safe_error_body(resp)}",
+                        status_code=resp.status_code,
+                    )
+
+                logger.info(
+                    "LLM attempt %d/%d got HTTP %d", attempt + 1, self.max_retries, resp.status_code
+                )
                 resp.raise_for_status()
                 data = resp.json()
 
@@ -387,6 +467,9 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                     usage_reported=usage_reported,
                     raw_response=data,
                 )
+            except LLMNonRetryableError:
+                # A status that must not be retried: leave the loop immediately.
+                raise
             except httpx.TimeoutException as exc:
                 last_error = LLMTimeoutError(f"OpenAI call timed out after {self.timeout_s}s: {exc}")
             except Exception as exc:
