@@ -934,22 +934,34 @@
         "additionalProperties": false,
         "properties": {
           "number": {
-            "minimum": 0.0,
-            "title": "Number",
-            "type": "integer"
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
           },
           "type": {
             "$ref": "#/components/schemas/SourceType"
           },
           "url": {
-            "title": "Url",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
           }
         },
         "required": [
-          "type",
-          "number",
-          "url"
+          "type"
         ],
         "title": "SourceRef",
         "type": "object"

@@ -11,8 +11,10 @@ class SourceRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: SourceType
-    number: int = Field(ge=0)
-    url: str
+    # Null when the ingested record does not carry the value. A placeholder would
+    # attribute the decision to something that never happened.
+    number: Optional[int] = Field(default=None, ge=0)
+    url: Optional[str] = None
 
 
 class Citation(BaseModel):

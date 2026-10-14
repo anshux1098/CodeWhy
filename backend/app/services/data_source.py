@@ -170,6 +170,7 @@ class GraphDataSource:
             bundle=bundle,
             provider=self.provider,
             is_real=self.is_real,
+            min_score=self.settings.min_score,
         )
 
     def get_decision(self, decision_id: str) -> DecisionDetail:

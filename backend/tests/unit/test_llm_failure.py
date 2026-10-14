@@ -120,10 +120,8 @@ def test_the_api_maps_the_failure_to_a_server_error_not_a_partial(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """End to end through the data source: a provider outage is an error."""
-    # Let the gates pass so the provider is actually reached; a refusal is not a failure.
-    from app.services import answer as answer_module
-
-    monkeypatch.setattr(answer_module.settings, "min_score", 0.0)
+    # The threshold comes from the Settings handed to the source, so it is set there.
+    del monkeypatch
     store = InMemoryGraphStore()
     store.merge_node("Repository", {"id": REPO, "name": "netclient", "repo": REPO})
     store.merge_node("CodeEntity", {"id": "e1", "repo": REPO, "name": "MAX_RETRIES",
@@ -140,7 +138,9 @@ def test_the_api_maps_the_failure_to_a_server_error_not_a_partial(
     store.merge_relationship("SUPPORTED_BY", "d1", "ev1", {})
     store.source_texts[f"pr:{REPO}#7"] = BODY
 
-    source = GraphDataSource(Settings(_env_file=None, allow_mock_providers=True), store=store)
+    source = GraphDataSource(
+        Settings(_env_file=None, allow_mock_providers=True, min_score=0.0), store=store
+    )
     source.provider = ExplodingProvider()
 
     with pytest.raises(DataSourceError):

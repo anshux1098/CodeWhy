@@ -118,6 +118,53 @@ def build_schema_entity(ent_dict: dict[str, Any], decision_count: int = 1) -> En
     )
 
 
+def agreement_from_citations(citations: Sequence[Any]) -> float:
+    """Agreement measures independent corroboration, not the number of citations.
+
+    Two quotes lifted from one document by one author are the same claim twice and
+    must not raise agreement. Each distinct (document, author) pair counts once:
+    one pair scores 0.4, two score 0.7, three or more score 1.0.
+    """
+    pairs = {
+        (getattr(c, "source_url", "") or "", getattr(c, "author", "") or "")
+        for c in citations
+    }
+    count = len(pairs)
+    if count <= 1:
+        return 0.4
+    if count == 2:
+        return 0.7
+    return 1.0
+
+
+def _decision_source_ref(decision: dict[str, Any]) -> SourceRef:
+    """Provenance for a decision, taken from its own stored source.
+
+    The previous implementation always returned pull/1, which misattributed every
+    decision in the response to the same pull request.
+    """
+    from app.services.data_source import from_source_id
+
+    url = decision.get("source_url") or ""
+    number = decision.get("source_number")
+    if not isinstance(number, int) or number < 0:
+        number = None
+    kind: Optional[SourceType] = None
+    if not url or number is None:
+        derived_url, derived_number, kind = from_source_id(decision.get("source_id"))
+        url = url or derived_url
+        if number is None:
+            number = derived_number
+    if kind is None:
+        raw = str(decision.get("source_type") or "").strip().lower()
+        try:
+            kind = SourceType(raw)
+        except ValueError:
+            kind = SourceType.PULL_REQUEST
+    # Unknown provenance stays unknown. It is never filled with a placeholder.
+    return SourceRef(type=kind, number=number, url=url or None)
+
+
 def _no_verified_quote_response(
     *,
     entity: Entity,
@@ -166,11 +213,18 @@ def _quote_still_matches_source(
 
 
 def _source_type_for(item: RetrievedEvidenceItem) -> SourceType:
-    raw = (item.source_type or "").strip().lower()
-    try:
-        return SourceType(raw)
-    except ValueError:
+    """Map the stored source type onto the contract enum, case-insensitively.
+
+    Falls back to a pull request only when the value is genuinely unrecognised;
+    a stored issue must not be reported as a pull request.
+    """
+    raw = (item.source_type or "").strip()
+    if not raw:
         return SourceType.PULL_REQUEST
+    for member in SourceType:
+        if raw.lower() in (member.value.lower(), member.name.lower()):
+            return member
+    return SourceType.PULL_REQUEST
 
 
 def generate_answer(
@@ -180,6 +234,7 @@ def generate_answer(
     provider: BaseLLMProvider,
     *,
     is_real: bool = True,
+    min_score: Optional[float] = None,
 ) -> AskResponse:
     """End-to-end question answering pipeline enforcing the 4-gate refusal system and citation verification."""
 
@@ -187,7 +242,7 @@ def generate_answer(
     gate_res = evaluate_refusal_gate(
         resolution=resolution,
         bundle=bundle,
-        min_score=settings.min_score,
+        min_score=min_score,
         question=question,
     )
 
@@ -296,11 +351,15 @@ def generate_answer(
     decisions_list: list[Decision] = []
     for d in bundle.decisions:
         state_val = DecisionState(d.get("state", "ACTIVE"))
-        source_ref = SourceRef(
-            type=SourceType.PULL_REQUEST,
-            number=1,
-            url=f"https://github.com/{d.get('repo', 'repo')}/pull/1",
-        )
+        source_ref = _decision_source_ref(d)
+        if source_ref.number is None or not source_ref.url:
+            # Reported as unknown rather than guessed at. The decision still appears,
+            # because a real decision with unknown provenance is more useful to a
+            # reader than a silently dropped one.
+            logger.info(
+                "decision %s has no usable source reference; reporting it as unknown",
+                d.get("id"),
+            )
         decisions_list.append(
             Decision(
                 id=d.get("id", "dec_1"),
@@ -422,7 +481,7 @@ def generate_answer(
     conf = calculate_confidence(
         directness=directness_val,
         provenance=0.8,
-        agreement=0.7 if len(valid_citations) >= 2 else 0.4,
+        agreement=agreement_from_citations(valid_citations),
         relevance=bundle.best_similarity_score,
         temporal_consistency=1.0,
         contradiction=contradiction_val,
