@@ -181,6 +181,14 @@ def main() -> int:
                         "verified": "yes" if ev.quote_verified else "no",
                     })
 
+    # ------------------------------------------------------------------
+    # Linking pass. Without this the links table stayed empty, so the graph
+    # build had nothing to replay and every REVERTS/PART_OF/REFERENCES edge was
+    # silently lost.
+    # ------------------------------------------------------------------
+    links_written = build_links(cache, args.repo, rows)
+    logger.info("Linking finished: %d links written.", links_written)
+
     logger.info(
         "Extraction finished: %d decisions, %d verified evidence quotes written.",
         extracted_decisions_count,
@@ -191,6 +199,48 @@ def main() -> int:
         generate_sample_review_file(args.sample_review_file, sample_records)
 
     return 0
+
+
+def build_links(cache: SqliteCache, repo: str, source_rows: list[Any]) -> int:
+    """Run every deterministic link extractor over the cached history.
+
+    All of these are pure functions over already-ingested text, so they need no
+    model call and are safe to re-run: put_links upserts on a stable id.
+    """
+    from app.services import linking
+
+    collected: list[Any] = []
+
+    for commit in cache.iter_commits(repo):
+        message = commit.get("message") or ""
+        collected.extend(linking.extract_revert_links(commit["sha"], message, repo))
+        collected.extend(
+            linking.extract_commit_pr_links(
+                commit["sha"],
+                commit.get("subject") or "",
+                message,
+                repo,
+                explicit_prs=json.loads(commit.get("pull_requests") or "[]"),
+            )
+        )
+        for number in json.loads(commit.get("closing") or "[]"):
+            collected.extend(
+                linking.extract_issue_links(
+                    source_id=f"pr:{repo}#{number}", source_type="pull_request",
+                    text=f"#{number}", repo=repo,
+                )
+            )
+
+    for doc in cache.iter_documents(repo):
+        path = doc.get("path") or ""
+        collected.extend(linking.extract_document_supersession(path, doc.get("content") or "", repo))
+
+    file_paths = sorted({commit.get("path") for commit in cache.iter_commit_files(repo)
+                         if commit.get("path")})
+    collected.extend(linking.extract_containment_links(repo, file_paths))
+
+    rows = [record.as_row() for record in collected]
+    return cache.put_links(rows) if rows else 0
 
 
 def generate_sample_review_file(output_path: Path, samples: list[dict[str, Any]]) -> None:

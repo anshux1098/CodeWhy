@@ -89,7 +89,6 @@ Phase 3 builds the connected graph view and grounded retrieval pipeline:
    - 384-dimensional cosine vector index (`decision_vector_index`) on `Decision.embedding`.
    - Full-text index on `Evidence.quote`.
 2. **Parameterized Cypher Queries** ([`backend/app/graph/queries.py`](backend/app/graph/queries.py)):
-   - Idempotent `MERGE` queries for all nodes and all 15 relationships with strictly controlled directions.
 3. **Graph Stores** ([`backend/app/stores/graph_store.py`](backend/app/stores/graph_store.py)):
    - `Neo4jGraphStore`: connects to Neo4j AuraDB with the official `neo4j` Python driver.
    - `InMemoryGraphStore`: provides in-memory graph operations so unit tests run with **zero credentials**.
@@ -308,6 +307,29 @@ an email address is dropped rather than stored, in either the decision or the ev
 of its source or it is not a quote. Email-shaped text inside a quotation is therefore left
 exactly as written, because altering it would break verification at answer time and make the
 citation unverifiable. Author identity is the field that is held to the stricter rule.
+
+## Not implemented yet
+
+**Supersession is not implemented.** Rules 1, 2, 3 and 3b are not computed. Every decision is
+written with `state = ACTIVE`, and nothing in the code derives a state from edges. There is no
+revert-of-revert chain, so the case where B replaced A and C reverts B is not handled.
+
+The linking layer *does* parse and store the evidence that supersession would later need:
+`Commit -[REVERTS]-> Commit` edges from revert subjects and messages, `COMMIT -> PR`,
+`REFERENCES` for closing issues, `SUPERSEDES` between documents from an ADR status line, and
+`CONTAINS` for file containment. Those edges are written to the `links` table by
+`scripts/extract.py` and replayed into the graph by `scripts/rebuild_graph.py`. Nothing reads
+them to compute a state yet.
+
+Retrieval does **not** traverse `SUPERSEDES` or `REVERTS`. It performs a single `GOVERNS` hop
+from the resolved entity. `EvidenceBundle.supersession_chains` exists but is never populated.
+
+The three decision fields `probable_superseded_by`, `conflicts_with` and `reaffirms` are declared
+in the frozen contract and are **always empty**, because no code computes them. They are dead
+schema surface until the supersession work lands.
+
+Contradiction detection checks only whether a decision's stored state is `UNRESOLVED`. There is
+no detection across opposing evidence.
 
 ## Real versus mock
 

@@ -268,6 +268,20 @@ def extract_issue_links(
     return links
 
 
+def normalise_document_reference(reference: str) -> str:
+    """Turn a status-line reference into the path a document is stored under.
+
+    Stripping every non-word character destroyed the directory separators, so
+    'docs/adr/0003.md' became 'docsadr0003.md' and the edge pointed at a document
+    that could never exist. Bare references such as 'ADR-7' are left as written,
+    because those name a document that is matched elsewhere rather than by path.
+    """
+    text = (reference or "").strip().strip("`").strip()
+    if "/" in text or text.endswith((".md", ".rst", ".txt")):
+        return text.lstrip("./")
+    return text
+
+
 def extract_document_supersession(
     doc_path: str,
     content: str,
@@ -286,9 +300,9 @@ def extract_document_supersession(
         return links
 
     target_ref = match.group("target").strip()
-    target_clean = re.sub(r"[^\w.-]", "", target_ref)
+    target_path = normalise_document_reference(target_ref)
     older_doc_id = stable_id("doc", repo, doc_path)
-    newer_doc_id = stable_id("doc", repo, target_clean)
+    newer_doc_id = stable_id("doc", repo, target_path)
 
     links.append(
         LinkRecord(

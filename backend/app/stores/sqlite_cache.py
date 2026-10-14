@@ -562,6 +562,36 @@ class SqliteCache:
                 count += 1
         return count
 
+    def iter_commits(self, repo: Optional[str] = None) -> list[dict[str, Any]]:
+        """Every stored commit, newest first. Used by the deterministic link pass."""
+        where = " WHERE repo = ?" if repo else ""
+        params: tuple[Any, ...] = (repo,) if repo else ()
+        return [dict(row) for row in self._connection.execute(
+            f"SELECT sha, repo, subject, message, pull_requests, closing, mentions {where}"
+            " ORDER BY committed_at DESC",
+            params,
+        )]
+
+    def iter_documents(self, repo: Optional[str] = None) -> list[dict[str, Any]]:
+        """Every stored document, keyed by path."""
+        where = " AND repo = ?" if repo else ""
+        params: tuple[Any, ...] = (repo,) if repo else ()
+        return [dict(row) for row in self._connection.execute(
+            "SELECT json FROM raw_objects WHERE kind = 'doc'" + where, params,
+        )]
+
+    def iter_commit_files(self, repo: Optional[str] = None) -> list[dict[str, Any]]:
+        """Every stored commit/path pair, used for containment links."""
+        if repo:
+            rows = self._connection.execute(
+                "SELECT DISTINCT cf.path AS path FROM commit_files cf"
+                " JOIN commits c ON c.sha = cf.sha WHERE c.repo = ?",
+                (repo,),
+            )
+        else:
+            rows = self._connection.execute("SELECT DISTINCT path FROM commit_files")
+        return [dict(row) for row in rows]
+
     def links_for(
         self,
         repo: Optional[str] = None,

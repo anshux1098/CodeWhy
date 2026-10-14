@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import json
 import logging
 import sys
@@ -19,6 +20,83 @@ from app.stores.sqlite_cache import SqliteCache
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("codewhy.rebuild_graph")
+
+
+class RebuildGraphError(RuntimeError):
+    """The graph could not be built faithfully from the cache."""
+
+
+def graph_state(store: BaseGraphStore) -> dict[str, int]:
+    """Count what is actually in the graph after a build."""
+    nodes = getattr(store, "node_count", None)
+    rels = getattr(store, "relationship_count", None)
+    if callable(nodes):
+        return {"nodes": int(nodes()), "relationships": int(rels())}
+    return {
+        "nodes": len(getattr(store, "nodes", {})),
+        "relationships": len(getattr(store, "edges", {})),
+    }
+
+
+def missing_endpoints(store: BaseGraphStore, link_rows: list) -> list[tuple[str, list[str]]]:
+    """Links whose endpoints do not exist, grouped by relationship type."""
+    known = set(getattr(store, "nodes", {}))
+    if not known:
+        return []
+    grouped: dict[str, list[str]] = {}
+    for link in link_rows:
+        absent = [
+            ident
+            for ident in (link["source_id"], link["target_id"])
+            if ident not in known
+        ]
+        if absent:
+            grouped.setdefault(link["rel_type"], [])
+            for ident in absent:
+                if ident not in grouped[link["rel_type"]]:
+                    grouped[link["rel_type"]].append(ident)
+    return sorted(grouped.items())
+
+
+def build_from_cache(cache_path: Path, repo: str) -> "InMemoryBuildResult":
+    """Build the graph into an in-memory store and report measured state.
+
+    Used by tests and for a dry preview. Neo4j is not required.
+    """
+    from app.stores.graph_store import InMemoryGraphStore
+
+    store = InMemoryGraphStore()
+    counts = rebuild_graph(repo, cache_path, store)
+    return InMemoryBuildResult(store, counts)
+
+
+@dataclass
+class InMemoryBuildResult:
+    store: object
+    counts: dict[str, int]
+
+    @property
+    def nodes(self) -> int:
+        return self.counts["nodes"]
+
+    @property
+    def relationships(self) -> int:
+        return self.counts["relationships"]
+
+
+def ensure_endpoints(cache_path: Path, repo: str) -> tuple[str, list[str]] | None:
+    """First group of link endpoints missing from the graph, for diagnostics."""
+    from app.stores.graph_store import InMemoryGraphStore
+
+    store = InMemoryGraphStore()
+    try:
+        rebuild_graph(repo, cache_path, store)
+    except RebuildGraphError:
+        with SqliteCache(cache_path) as cache:
+            rows = cache.links_for(repo)
+        groups = missing_endpoints(store, rows)
+        return groups[0] if groups else None
+    return None
 
 
 def parse_args() -> argparse.Namespace:
@@ -52,7 +130,9 @@ def rebuild_graph(repo: str, cache_path: Path, store: BaseGraphStore) -> dict[st
     cache = SqliteCache(cache_path)
     embedder = get_embedding_provider()
 
-    counts = {"nodes": 0, "relationships": 0}
+    # A count of iterated cache rows is not graph state: a link whose endpoints were
+    # never created is dropped silently by MATCH, which would overstate the result.
+    counts: dict[str, int] = {"nodes": 0, "relationships": 0}
 
     # 1. Repository node
     parts = repo.split("/")
@@ -148,6 +228,13 @@ def rebuild_graph(repo: str, cache_path: Path, store: BaseGraphStore) -> dict[st
     # 4. Links table (REVERTS, SUPERSEDES, PART_OF, REFERENCES)
     link_rows = cache.links_for(repo)
     logger.info("Loading %d links into graph...", len(link_rows))
+    dangling = missing_endpoints(store, link_rows)
+    if dangling:
+        raise RebuildGraphError(
+            f"{sum(len(ids) for _rel, ids in dangling)} link endpoints are not in the graph; "
+            "the build would silently drop those edges. "
+            f"examples: {[(rel, ids[:3]) for rel, ids in dangling[:3]]}"
+        )
     for link in link_rows:
         store.merge_relationship(
             rel_type=link["rel_type"],
@@ -160,9 +247,12 @@ def rebuild_graph(repo: str, cache_path: Path, store: BaseGraphStore) -> dict[st
         )
         counts["relationships"] += 1
 
+    # Measured, not accumulated.
+    counts = graph_state(store)
+
     dt = time.perf_counter() - t0
     logger.info(
-        "Rebuild complete in %.2fs: %d nodes, %d relationships loaded.",
+        "Rebuild complete in %.2fs: %d nodes, %d relationships present in the graph.",
         dt,
         counts["nodes"],
         counts["relationships"],
