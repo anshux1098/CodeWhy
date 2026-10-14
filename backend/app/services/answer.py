@@ -30,6 +30,7 @@ from app.prompts.extract_decision import (
     sanitize_untrusted_text,
 )
 from app.services.confidence import calculate_confidence
+from app.services.errors import DataSourceError
 from app.services.entity_resolution import ResolutionOutcome, ResolutionResult
 from app.services.gate import GateOutcome, evaluate_refusal_gate
 from app.services.quote_check import verify_quote
@@ -391,25 +392,16 @@ def generate_answer(
             system=system_prompt,
         )
     except Exception as exc:
-        logger.error("LLM answering failure: %s", exc)
-        conf = calculate_confidence(
-            directness=0.5,
-            provenance=0.6,
-            agreement=0.4,
-            relevance=bundle.best_similarity_score,
-            temporal_consistency=1.0,
-        )
-        return AskResponse(
-            outcome=Outcome.PARTIAL,
-            reason_code=ReasonCode.NO_VERIFIED_QUOTE,
-            answer=f"The change for {resolution.entity.name} was recorded, but generation failed.",
-            entity=entity_obj,
-            decisions=decisions_list,
-            citations=[],
-            evidence_gaps=["LLM generation failure"],
-            confidence=conf,
-            fixture=not is_real,
-        )
+        # A provider outage says nothing about the repository's history. Reporting it
+        # as no_verified_quote would claim the team never wrote down a rationale,
+        # which is a different and false claim, so it becomes a server error instead.
+        # Only the exception type and message reach the log; no credentials are
+        # included because the client already redacts before raising.
+        logger.error("LLM answering failed: %s: %s", type(exc).__name__, exc)
+        raise DataSourceError(
+            "the language model provider failed while composing an answer; "
+            "no answer could be produced"
+        ) from exc
 
 
     valid_citations: list[Citation] = []

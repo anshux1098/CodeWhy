@@ -4,6 +4,7 @@ import re
 from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
 from app.config import Settings, settings
+from app.services.errors import DataSourceError
 from app.providers.llm_provider import get_llm_provider
 from app.schemas.common import DecisionState, EntityType, SourceType
 from app.schemas.decisions import Citation, DecisionDetail, SourceRef
@@ -19,8 +20,7 @@ if TYPE_CHECKING:
     from app.schemas.ask import AskRequest, AskResponse
 
 
-class DataSourceError(RuntimeError):
-    pass
+
 
 
 class NotFoundError(DataSourceError):

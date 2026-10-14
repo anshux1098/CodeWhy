@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.api import routes_decisions, routes_health, routes_repositories
 from app.services.data_source import NotFoundError
+from app.services.errors import DataSourceError
 from app.services.health import APP_VERSION
 
 API_PREFIX = "/api/v1"
@@ -75,6 +76,13 @@ def create_app() -> FastAPI:
     @application.exception_handler(NotFoundError)
     async def _not_found(request: Request, exc: NotFoundError) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @application.exception_handler(DataSourceError)
+    async def _data_source_error(request: Request, exc: DataSourceError) -> JSONResponse:
+        # A data source that cannot answer is a server-side failure, not a statement
+        # that the repository lacks the decision. Reporting it as a refusal would
+        # tell the caller the history is missing when the request simply failed.
+        return JSONResponse(status_code=503, content={"detail": str(exc)})
 
     return application
 
