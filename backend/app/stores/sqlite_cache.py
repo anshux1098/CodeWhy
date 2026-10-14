@@ -198,6 +198,19 @@ CREATE TABLE IF NOT EXISTS extraction_failures (
     updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS extraction_failures_repo ON extraction_failures (repo);
+
+-- One row per extraction invocation, so the tokens a run spent stay visible
+-- after the process exits and the next run can report a cumulative figure.
+CREATE TABLE IF NOT EXISTS extraction_runs (
+    run_id TEXT PRIMARY KEY,
+    repo TEXT NOT NULL,
+    tokens INTEGER NOT NULL DEFAULT 0,
+    decisions INTEGER NOT NULL DEFAULT 0,
+    evidence INTEGER NOT NULL DEFAULT 0,
+    failures INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS extraction_runs_repo ON extraction_runs (repo);
 """
 
 
@@ -1022,6 +1035,39 @@ class SqliteCache:
                 (repo, extraction_version),
             )
         }
+
+    def record_extraction_run(
+        self,
+        repo: str,
+        run_id: str,
+        tokens: int,
+        decisions: int,
+        evidence: int,
+        failures: int,
+    ) -> None:
+        """Store what one extraction run spent and produced."""
+        with self.transaction() as connection:
+            connection.execute(
+                "INSERT INTO extraction_runs "
+                "(run_id, repo, tokens, decisions, evidence, failures, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(run_id) DO UPDATE SET tokens = excluded.tokens, "
+                "decisions = excluded.decisions, evidence = excluded.evidence, "
+                "failures = excluded.failures",
+                (run_id, repo, tokens, decisions, evidence, failures, utc_now()),
+            )
+
+    def total_extraction_tokens(self, repo: Optional[str] = None) -> int:
+        """Tokens spent by every recorded run for a repo."""
+        if repo is None:
+            row = self._connection.execute(
+                "SELECT COALESCE(SUM(tokens), 0) FROM extraction_runs"
+            ).fetchone()
+        else:
+            row = self._connection.execute(
+                "SELECT COALESCE(SUM(tokens), 0) FROM extraction_runs WHERE repo = ?", (repo,)
+            ).fetchone()
+        return int(row[0]) if row else 0
 
     def decisions_for_repo(self, repo: str) -> list[sqlite3.Row]:
         """Return all decisions for a repo ordered by creation date."""
