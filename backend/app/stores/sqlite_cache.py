@@ -183,6 +183,21 @@ CREATE TABLE IF NOT EXISTS evidence (
 );
 CREATE INDEX IF NOT EXISTS evidence_decision ON evidence (decision_id);
 CREATE INDEX IF NOT EXISTS evidence_source ON evidence (source_id);
+
+-- One row per source whose extraction did not finish. A source that produced no
+-- decisions is not a failure, so this table records only what actually broke,
+-- which is what --retry-failed replays.
+CREATE TABLE IF NOT EXISTS extraction_failures (
+    source_id TEXT PRIMARY KEY,
+    repo TEXT NOT NULL,
+    extraction_version TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 1,
+    final_status TEXT NOT NULL,
+    error TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS extraction_failures_repo ON extraction_failures (repo);
 """
 
 
@@ -190,6 +205,13 @@ EMAIL_WITH_NAME = re.compile(
     r"(?P<name>[A-Za-z][\w .'-]*?)\s*<\s*(?P<email>[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,24})\s*>"
 )
 BARE_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,24}")
+
+#: Provider keys that appear inside an error message when a request is rejected.
+#: The prefix is what identifies them; the shape is deliberately loose because the
+#: exact length differs per provider.
+API_KEY_SHAPED = re.compile(
+    r"\b(?:sk|pk|rk|ghp|gho|ghu|ghs|github_pat|xoxb|AKIA)[-_][A-Za-z0-9_-]{12,}\b"
+)
 
 
 def redact_emails(text: Optional[str]) -> Optional[str]:
@@ -203,6 +225,18 @@ def redact_emails(text: Optional[str]) -> Optional[str]:
         return text
     text = EMAIL_WITH_NAME.sub(lambda m: f"{m.group('name')} <redacted-email>", text)
     return BARE_EMAIL.sub("<redacted-email>", text)
+
+
+def redact_secrets(text: Optional[str]) -> Optional[str]:
+    """Remove anything shaped like an API key.
+
+    A rejected request is answered with an error that frequently quotes the
+    credential back. That text is stored so the failure can be diagnosed, so it
+    has to be scrubbed on the way in rather than on the way out.
+    """
+    if not text:
+        return text
+    return API_KEY_SHAPED.sub("<redacted-key>", text)
 
 
 def utc_now() -> str:
@@ -920,6 +954,74 @@ class SqliteCache:
             if self.put_evidence(r):
                 count += 1
         return count
+
+    # -- extraction bookkeeping ------------------------------------------------
+
+    def record_extraction_failure(
+        self,
+        source_id: str,
+        repo: str,
+        extraction_version: str,
+        final_status: str,
+        error: str,
+    ) -> None:
+        """Remember that one source could not be extracted.
+
+        `attempts` accumulates across runs so a source that keeps failing shows
+        how much trouble it has already caused. The message is scrubbed first: a
+        rejected request is the most likely error text to echo the key back.
+        """
+        now = utc_now()
+        safe_error = redact_secrets(redact_emails(error)) or ""
+        with self.transaction() as connection:
+            connection.execute(
+                "INSERT INTO extraction_failures "
+                "(source_id, repo, extraction_version, attempts, final_status, error, "
+                "created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?, ?) "
+                "ON CONFLICT(source_id) DO UPDATE SET attempts = attempts + 1, "
+                "final_status = excluded.final_status, error = excluded.error, "
+                "updated_at = excluded.updated_at",
+                (source_id, repo, extraction_version, final_status, safe_error[:2000], now, now),
+            )
+
+    def clear_extraction_failure(self, source_id: str) -> None:
+        """Drop a recorded failure once the source has been extracted."""
+        with self.transaction() as connection:
+            connection.execute(
+                "DELETE FROM extraction_failures WHERE source_id = ?", (source_id,)
+            )
+
+    def extraction_failures(self, repo: Optional[str] = None) -> list[sqlite3.Row]:
+        """Sources whose extraction failed, oldest first."""
+        if repo is None:
+            return list(
+                self._connection.execute(
+                    "SELECT * FROM extraction_failures ORDER BY created_at ASC, source_id"
+                )
+            )
+        return list(
+            self._connection.execute(
+                "SELECT * FROM extraction_failures WHERE repo = ? ORDER BY created_at ASC, source_id",
+                (repo,),
+            )
+        )
+
+    def failed_source_ids(self, repo: str) -> set[str]:
+        return {row["source_id"] for row in self.extraction_failures(repo)}
+
+    def extracted_source_ids(self, repo: str, extraction_version: str) -> set[str]:
+        """Sources that already produced a decision for this extraction version.
+
+        A rerun skips these, which is what makes the run resumable: only the work
+        that never finished is repeated.
+        """
+        return {
+            row["source_id"]
+            for row in self._connection.execute(
+                "SELECT DISTINCT source_id FROM decisions WHERE repo = ? AND extraction_version = ?",
+                (repo, extraction_version),
+            )
+        }
 
     def decisions_for_repo(self, repo: str) -> list[sqlite3.Row]:
         """Return all decisions for a repo ordered by creation date."""
