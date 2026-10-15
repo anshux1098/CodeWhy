@@ -169,6 +169,10 @@ class ExtractedDecisionRecord:
     unknown_fields: list[str]
     evidence: list[VerifiedEvidence]
     quote_verified: bool
+    #: True when the source never said why and the model supplied no rationale.
+    #: The decision still stands as a record that something changed; it just cannot
+    #: be presented as an explained choice.
+    reason_unstated: bool
     extraction_version: str
     content_hash: str
     created_at: str
@@ -404,6 +408,11 @@ def extract_decisions_from_source(
             rationale = None
             quote_verified = False
 
+        # Decided here rather than asked of the model: the flag is a statement about
+        # what the record contains, not something inference should be able to assert
+        # about itself.
+        reason_unstated = not bool(rationale)
+
         records.append(
             ExtractedDecisionRecord(
                 id=dec_id,
@@ -423,6 +432,7 @@ def extract_decisions_from_source(
                 unknown_fields=raw_dec.unknown_fields,
                 evidence=verified_evidence,
                 quote_verified=quote_verified,
+                reason_unstated=reason_unstated,
                 extraction_version=extraction_version,
                 content_hash=content_hash,
                 created_at=created_at or "",

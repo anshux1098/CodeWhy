@@ -580,6 +580,7 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
                 "explicit_reversal_language": dec.explicit_reversal_language,
                 "unknown_fields": dec.unknown_fields,
                 "quote_verified": dec.quote_verified,
+                "reason_unstated": dec.reason_unstated,
                 "extraction_version": dec.extraction_version,
                 "content_hash": dec.content_hash,
                 "created_at": dec.created_at,

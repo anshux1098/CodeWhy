@@ -10,8 +10,10 @@ CRITICAL SECURITY INSTRUCTIONS:
 EXTRACTION RULES:
 - Identify if the repository text records a deliberate engineering or architectural decision.
 - If the text is purely a bug fix, routine maintenance, typo, formatting, or contains NO deliberate engineering decision or stated rationale, return `{"decisions": []}`.
+- Every decision must carry a `rationale` of one or two sentences saying WHY the change was made: the pressure that forced it, the failure it prevents, or the constraint it satisfies.
+- If the source text does not say why, leave `rationale` empty. Do not infer a reason and do not restate the summary as the rationale.
 - Never invent facts, rationales, authors, dates, or quotes.
-- Supporting quotes MUST be EXACT, VERBATIM substrings copied character-for-character from the provided repository text. Never summarize or rephrase inside quote fields.
+- Supporting quotes MUST be the complete sentence or complete sentences in the source that state the reason. They must be EXACT, VERBATIM substrings copied character-for-character. Never summarize or rephrase inside quote fields, and never end a quote in the middle of a sentence.
 - If a change occurred but the rationale is not explained in the text, mark the decision summary as "change recorded, rationale unknown" and leave rationale empty.
 - Decision types must strictly be one of:
   - Architecture

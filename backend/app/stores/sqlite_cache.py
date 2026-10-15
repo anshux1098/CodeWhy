@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS decisions (
     explicit_reversal_language INTEGER NOT NULL DEFAULT 0,
     unknown_fields TEXT,
     quote_verified INTEGER NOT NULL DEFAULT 0,
+    reason_unstated INTEGER NOT NULL DEFAULT 0,
     extraction_version TEXT NOT NULL,
     content_hash TEXT NOT NULL,
     created_at TEXT NOT NULL
@@ -345,6 +346,9 @@ class SqliteCache:
             "trailers": "TEXT",
         },
         "skips": {"bound": "INTEGER"},
+        # Added after the first real run: a decision that records no reason must say so
+        # at rest, not only at the moment it is created.
+        "decisions": {"reason_unstated": "INTEGER NOT NULL DEFAULT 0"},
     }
 
     def _migrate(self) -> None:
@@ -907,8 +911,8 @@ class SqliteCache:
                 "alternatives_considered, constraints, affected_entities, "
                 "source_references, decision_date, source_author, "
                 "explicit_reversal_language, unknown_fields, quote_verified, "
-                "extraction_version, content_hash, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                "reason_unstated, extraction_version, content_hash, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(id) DO UPDATE SET "
                 "summary = excluded.summary, "
                 "decision_type = excluded.decision_type, "
@@ -921,6 +925,7 @@ class SqliteCache:
                 "explicit_reversal_language = excluded.explicit_reversal_language, "
                 "unknown_fields = excluded.unknown_fields, "
                 "quote_verified = excluded.quote_verified, "
+                "reason_unstated = excluded.reason_unstated, "
                 "content_hash = excluded.content_hash",
                 (
                     row["id"],
@@ -939,6 +944,7 @@ class SqliteCache:
                     1 if row.get("explicit_reversal_language") else 0,
                     json.dumps(row.get("unknown_fields") or []),
                     1 if row.get("quote_verified") else 0,
+                    1 if row.get("reason_unstated") else 0,
                     row["extraction_version"],
                     row["content_hash"],
                     row.get("created_at", utc_now()),
