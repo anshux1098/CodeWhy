@@ -202,11 +202,15 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
     failed_ids = cache.failed_source_ids(args.repo)
     already_done = cache.extracted_source_ids(args.repo, EXTRACTION_VERSION)
 
-    rows = select_sources(candidates, args.limit)
-
     if args.retry_failed:
-        rows = [row for row in rows if row["id"] in failed_ids]
-        logger.info("--retry-failed: %d sources to retry", len(rows))
+        # Filtered before ranking and limiting, not after. Truncating to the top N
+        # first meant a limit smaller than the failure count selected sources that
+        # had already succeeded, and then discarded them, so `--retry-failed --limit 3`
+        # found nothing to do however many failures were outstanding.
+        candidates = [row for row in candidates if row["id"] in failed_ids]
+        logger.info("--retry-failed: %d failed sources to choose from", len(candidates))
+
+    rows = select_sources(candidates, args.limit)
 
     pending = [
         row for row in rows

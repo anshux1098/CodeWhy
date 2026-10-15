@@ -270,6 +270,49 @@ def test_a_recovered_source_is_no_longer_recorded_as_failed(
     assert "pr:urllib3/urllib3#3456" not in cache_with_sources.failed_source_ids("urllib3/urllib3")
 
 
+def test_retry_failed_filters_before_applying_the_limit(
+    cache_with_sources: SqliteCache, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`--retry-failed --limit N` must choose N failures, not take N and discard.
+
+    Truncating by priority first meant the highest priority sources won, they had
+    usually already succeeded, and the filter removed them all: the run reported
+    zero sources to retry however many failures were outstanding.
+    """
+    # Three sources: two already stored, one outstanding failure.
+    cache_with_sources.put_raw(
+        "pr", "urllib3/urllib3", "3456",
+        {"number": 3456, "title": "PR 3456", "body": "b", "files": [],
+         "author": {"login": "a"}, "mergedAt": "2024-01-01T00:00:00Z"},
+    )
+    cache_with_sources.record_extraction_failure(
+        "pr:urllib3/urllib3#3466", "urllib3/urllib3", "v1", "503", "overloaded"
+    )
+    seen: list[str] = []
+    monkeypatch.setattr(
+        extract_module, "get_llm_provider", lambda **kw: RecordingProvider()
+    )
+    monkeypatch.setattr(extract_module, "build_links", lambda *a, **k: 0)
+    monkeypatch.setattr(extract_module, "summarise_injection_flags", lambda rows: {
+        "sources_total": len(rows), "sources_flagged": 0,
+    })
+
+    def fake_extract(**kwargs):
+        seen.append(kwargs["source_id"])
+        return []
+
+    monkeypatch.setattr(extract_module, "extract_decisions_from_source", fake_extract)
+    extract_module.main([
+        "--cache", str(cache_with_sources.path), "--repo", "urllib3/urllib3",
+        "--limit", "1", "--retry-failed",
+        "--sample-review-file", str(cache_with_sources.path) + ".md",
+    ])
+
+    assert seen == ["pr:urllib3/urllib3#3466"], (
+        "the limit must be applied to the failed sources, not before filtering them"
+    )
+
+
 def test_retry_failed_touches_only_the_recorded_failures(
     cache_with_sources: SqliteCache, monkeypatch: pytest.MonkeyPatch
 ) -> None:
