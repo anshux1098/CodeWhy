@@ -146,6 +146,38 @@ def test_only_one_fallback_attempt_is_made() -> None:
     assert transport.bodies[1]["response_format"] == {"type": "json_object"}
 
 
+def test_a_per_call_schema_is_sent_and_reported() -> None:
+    """A schema passed per call must appear in the body and in the reported mode."""
+    transport = FakeTransport([ok()])
+
+    import app.providers.llm_provider as module
+
+    real_client = module.httpx.Client
+
+    def factory(*args: Any, **kwargs: Any) -> httpx.Client:
+        return real_client(*args, transport=transport, **kwargs)
+
+    module.httpx.Client = factory  # type: ignore[assignment]
+    original_sleep = module.time.sleep
+    module.time.sleep = lambda _s: None  # type: ignore[assignment]
+    try:
+        # No schema at construction, as the extraction service does.
+        provider = OpenAICompatibleProvider(
+            api_key=KEY, model="test-model", base_url="https://example.invalid/v1"
+        )
+        response = provider.complete(
+            prompt="ping", max_tokens=32, response_json_schema=SCHEMA
+        )
+    finally:
+        module.httpx.Client = real_client  # type: ignore[assignment]
+        module.time.sleep = original_sleep  # type: ignore[assignment]
+
+    assert transport.bodies[0]["response_format"]["type"] == "json_schema"
+    assert response.response_format_mode == RESPONSE_FORMAT_JSON_SCHEMA, (
+        "the reported mode must be the one actually sent"
+    )
+
+
 def test_the_schema_is_sanitised_into_a_name() -> None:
     """A named schema needs a name, and the model name is the natural one."""
     transport = FakeTransport([ok()])

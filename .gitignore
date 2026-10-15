@@ -10,3 +10,4 @@ data/*
 !data/.gitkeep
 .superpowers/
 docs/superpowers/
+review/decisions_sample.md

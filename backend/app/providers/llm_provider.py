@@ -633,6 +633,10 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                 # the next call may ask for a different one.
                 self.response_json_schema = previous_schema
         payload.update(self.reasoning_payload())
+        # Read the mode out of the payload that was actually sent. Reading it back
+        # from the attributes would report whatever survived the restore above, which
+        # is how a run once logged json_object while sending a strict JSON schema.
+        response_format_mode = payload["response_format"]["type"]
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -685,6 +689,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                         # plain form rather than failing the whole run.
                         self._strict_response_format_available = False
                         payload["response_format"] = self._response_format_payload()
+                        response_format_mode = payload["response_format"]["type"]
                         logger.info(
                             "Endpoint rejected response_format=%s with HTTP 400; "
                             "falling back to %s for this and later calls",
@@ -786,11 +791,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                     usage_reported=usage_reported,
                     finish_reason=finish_reason,
                     reasoning_present=reasoning_present,
-                    response_format_mode=(
-                        RESPONSE_FORMAT_JSON_SCHEMA
-                        if self._strict_response_format_available and self.response_json_schema
-                        else RESPONSE_FORMAT_JSON_OBJECT
-                    ),
+                    response_format_mode=response_format_mode,
                     raw_response=data,
                 )
             except LLMNonRetryableError:
