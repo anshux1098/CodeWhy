@@ -89,40 +89,44 @@ def _run_suite_with_env(tmp_path: Path, env_body: str | None) -> subprocess.Comp
                 assert response.status_code == 200
                 assert response.json()["fixture"] is True
 
-            def test_no_real_network_call_was_made():
+            def test_the_child_never_opens_a_socket():
+                # Records any connect attempt so the parent can assert none happened.
+                # This replaces an earlier version that actually dialled 192.0.2.1
+                # and waited for the kernel to refuse it. That call belongs where
+                # the suite guard is installed, not in a child that has no guard.
                 import socket as _socket
-                import httpx
 
-                for module in (_socket.socket, httpx.Client):
-                    assert module is not None
+                attempts = []
+                original = _socket.socket.connect
 
-            def test_opening_a_socket_to_a_real_host_is_refused():
-                with pytest.raises(AssertionError):
-                    import socket as _socket
+                def record(self, address):
+                    attempts.append(address)
+                    raise AssertionError(f"unexpected connect to {address}")
 
-                    original = _socket.socket.connect
-
-                    def refuse(self, address):
-                        raise AssertionError(f"blocked connect to {address}")
-
-                    _socket.socket.connect = refuse
-                    try:
-                        _socket.create_connection(("192.0.2.1", 7687), timeout=0.01)
-                    finally:
-                        _socket.socket.connect = original
+                _socket.socket.connect = record
+                try:
+                    from app.config import Settings
+                    assert Settings(_env_file=None).data_source == "fixture"
+                finally:
+                    _socket.socket.connect = original
+                assert attempts == []
             """
         ).strip()
         + "\n",
         encoding="utf-8",
     )
 
-    return subprocess.run(
+    # Popen with an explicit kill rather than subprocess.run: run() only kills on its
+    # own timeout, and a hung child here would otherwise outlive the suite and keep
+    # whatever it opened, which is how an orphan was left running for hours.
+    process = subprocess.Popen(
         [
             sys.executable, "-m", "pytest", str(test_file),
             "-p", "no:cacheprovider", "-q", "--no-header",
         ],
         cwd=str(workdir),
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
         env={
             "PATH": str(Path(sys.executable).parent),
@@ -130,8 +134,21 @@ def _run_suite_with_env(tmp_path: Path, env_body: str | None) -> subprocess.Comp
             "HOME": str(tmp_path),
             "PYTHONPATH": f"{REPO_ROOT / 'backend'}{__import__('os').pathsep}{REPO_ROOT}",
         },
-        timeout=300,
     )
+    try:
+        stdout, stderr = process.communicate(timeout=300)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        stdout, stderr = process.communicate()
+        raise AssertionError(
+            f"the child suite did not finish within 300s:\n{stdout[-2000:]}\n{stderr[-2000:]}"
+        )
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=30)
+
+    return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
 
 
 def test_a_hostile_env_does_not_change_the_suite(tmp_path: Path) -> None:

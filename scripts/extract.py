@@ -333,8 +333,12 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--sample-review-file",
         type=Path,
-        default=REPO_ROOT / "review" / "decisions_sample.md",
-        help="Path to generate review/decisions_sample.md markdown report",
+        default=None,
+        help=(
+            "Path for a markdown audit file of the decisions just extracted. "
+            "Opt-in: nothing is written unless this is given, so a run cannot leave "
+            "an unverifiable file of extracted quotes in the tree."
+        ),
     )
     return parser.parse_args(argv)
 
