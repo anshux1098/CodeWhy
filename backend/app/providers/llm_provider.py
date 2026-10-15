@@ -213,6 +213,15 @@ class TokenBudget:
 
 
 # ---------------------------------------------------------------------------
+# The two `response_format` shapes, named so a log line can say which was used.
+# Declared before LLMResponse, which carries one as a default.
+# ---------------------------------------------------------------------------
+
+RESPONSE_FORMAT_JSON_OBJECT: Final[str] = "json_object"
+RESPONSE_FORMAT_JSON_SCHEMA: Final[str] = "json_schema"
+
+
+# ---------------------------------------------------------------------------
 # Response Model
 # ---------------------------------------------------------------------------
 
@@ -234,6 +243,9 @@ class LLMResponse:
     #: True when the reply carried a reasoning field, which means tokens were spent
     #: thinking even though the visible reply is what matters.
     reasoning_present: bool = False
+    #: Which `response_format` the endpoint actually accepted, so a run can be
+    #: audited without guessing whether the strict form was honoured.
+    response_format_mode: str = RESPONSE_FORMAT_JSON_OBJECT
     raw_response: dict[str, Any] = field(default_factory=dict)
 
 
@@ -303,6 +315,7 @@ class BaseLLMProvider(ABC):
         system: Optional[str] = None,
         temperature: float = 0.0,
         max_tokens: int = 2048,
+        response_json_schema: Optional[dict[str, Any]] = None,
     ) -> LLMResponse:
         """Execute a text completion, tracking token budget and retries."""
         ...
@@ -314,6 +327,7 @@ class BaseLLMProvider(ABC):
         system: Optional[str] = None,
         temperature: float = 0.0,
         max_tokens: int = 2048,
+        response_json_schema: Optional[dict[str, Any]] = None,
     ) -> tuple[T, LLMResponse]:
         """Calls the LLM expecting JSON output, parses it, and validates against a Pydantic model.
 
@@ -324,6 +338,7 @@ class BaseLLMProvider(ABC):
             system=system,
             temperature=temperature,
             max_tokens=max_tokens,
+            response_json_schema=response_json_schema,
         )
 
         raw = response.content.strip()
@@ -385,6 +400,21 @@ class MockLLMProvider(BaseLLMProvider):
 
     """Mock provider with canned responses, customizable completion handler, and token tracking."""
 
+    #: Recorded so a test can assert which response_format was asked for.
+    requested_json_schema: Optional[dict[str, Any]] = None
+
+    def complete(
+        self,
+        prompt: str,
+        system: Optional[str] = None,
+        temperature: float = 0.0,
+        max_tokens: int = 2048,
+        response_json_schema: Optional[dict[str, Any]] = None,
+    ) -> LLMResponse:
+        self.call_history.append({"prompt": prompt, "system": system})
+        if response_json_schema is not None:
+            self.requested_json_schema = response_json_schema
+
     def __init__(
         self,
         canned_response: Optional[str] = None,
@@ -405,8 +435,11 @@ class MockLLMProvider(BaseLLMProvider):
         system: Optional[str] = None,
         temperature: float = 0.0,
         max_tokens: int = 2048,
+        response_json_schema: Optional[dict[str, Any]] = None,
     ) -> LLMResponse:
         self.call_history.append({"prompt": prompt, "system": system})
+        if response_json_schema is not None:
+            self.requested_json_schema = response_json_schema
 
         # Calculate mock token usage: approx 1 token per 4 chars for prompt, fixed or ratio for output
         prompt_toks = max(1, len(prompt) // 4)
@@ -427,6 +460,7 @@ class MockLLMProvider(BaseLLMProvider):
             model="mock-model",
             status_code=200,
             usage_reported=True,
+            finish_reason="stop",
             raw_response={"mock": True},
         )
 
@@ -448,6 +482,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         max_retries: int = MAX_ATTEMPTS,
         max_output_tokens: Optional[int] = None,
         reasoning_effort: Optional[str] = None,
+        response_json_schema: Optional[dict[str, Any]] = None,
     ) -> None:
         super().__init__(budget=budget, timeout_s=timeout_s, max_retries=max_retries)
         self.api_key = api_key
@@ -457,6 +492,24 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         self.max_output_tokens = max_output_tokens or settings.llm_max_output_tokens
         #: Only sent to providers documented to understand it. See reasoning_payload.
         self.reasoning_effort = reasoning_effort
+        #: Requested as a strict JSON schema. Endpoints that do not understand it
+        #: answer 400, and the call is retried in plain json_object mode once.
+        self.response_json_schema = response_json_schema
+        #: Set to False after a 400 so the strict form is not tried again.
+        self._strict_response_format_available = response_json_schema is not None
+
+    def _response_format_payload(self) -> dict[str, Any]:
+        if self._strict_response_format_available and self.response_json_schema:
+            name = re.sub(r"[^A-Za-z0-9_-]", "_", self.model)[:64] or "extraction"
+            return {
+                "type": RESPONSE_FORMAT_JSON_SCHEMA,
+                "json_schema": {
+                    "name": name,
+                    "strict": True,
+                    "schema": self.response_json_schema,
+                },
+            }
+        return {"type": RESPONSE_FORMAT_JSON_OBJECT}
 
     def reasoning_payload(self) -> dict[str, Any]:
         """The request body fragment that keeps reasoning small, if configured.
@@ -481,6 +534,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         system: Optional[str] = None,
         temperature: float = 0.0,
         max_tokens: Optional[int] = None,
+        response_json_schema: Optional[dict[str, Any]] = None,
     ) -> LLMResponse:
         """Complete, retrying an empty reply at most once.
 
@@ -492,7 +546,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         """
         limit = max_tokens if max_tokens is not None else self.max_output_tokens
         try:
-            return self._complete_once(prompt, system, temperature, limit)
+            return self._complete_once(prompt, system, temperature, limit, response_json_schema)
         except LLMEmptyReplyError as first:
             if first.finish_reason != "length":
                 # Some other reason produced no text; a second identical call is
@@ -500,7 +554,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                 logger.info("Retrying once after an empty reply with finish_reason=%s",
                             first.finish_reason or "unknown")
                 try:
-                    return self._complete_once(prompt, system, temperature, limit)
+                    return self._complete_once(prompt, system, temperature, limit, response_json_schema)
                 except LLMEmptyReplyError as second:
                     raise LLMEmptyReplyError(
                         second.finish_reason,
@@ -529,7 +583,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                 "max_tokens %d -> %d", limit, raised,
             )
             try:
-                return self._complete_once(prompt, system, temperature, raised)
+                return self._complete_once(prompt, system, temperature, raised, response_json_schema)
             except LLMEmptyReplyError as second:
                 raise LLMEmptyReplyError(
                     second.finish_reason,
@@ -546,6 +600,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         system: Optional[str] = None,
         temperature: float = 0.0,
         max_tokens: Optional[int] = None,
+        response_json_schema: Optional[dict[str, Any]] = None,
     ) -> LLMResponse:
         # Check budget before dispatching call
         if not self.budget.can_afford():
@@ -559,13 +614,24 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "response_format": {"type": "json_object"},
-        }
+        # A per-call schema takes precedence over one fixed at construction.
+        previous_schema = self.response_json_schema
+        if response_json_schema is not None:
+            self.response_json_schema = response_json_schema
+            self._strict_response_format_available = True
+        try:
+            payload = {
+                "model": self.model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "response_format": self._response_format_payload(),
+            }
+        finally:
+            if response_json_schema is not None:
+                # Keep whether the endpoint accepted it, but not the schema itself:
+                # the next call may ask for a different one.
+                self.response_json_schema = previous_schema
         payload.update(self.reasoning_payload())
 
         headers = {
@@ -609,6 +675,22 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                     continue
 
                 if resp.status_code in NON_RETRYABLE_STATUSES:
+                    if (
+                        resp.status_code == 400
+                        and self._strict_response_format_available
+                        and payload["response_format"]["type"] == RESPONSE_FORMAT_JSON_SCHEMA
+                    ):
+                        # This endpoint does not understand a strict JSON schema.
+                        # Drop it for the rest of the process and try once in the
+                        # plain form rather than failing the whole run.
+                        self._strict_response_format_available = False
+                        payload["response_format"] = self._response_format_payload()
+                        logger.info(
+                            "Endpoint rejected response_format=%s with HTTP 400; "
+                            "falling back to %s for this and later calls",
+                            RESPONSE_FORMAT_JSON_SCHEMA, RESPONSE_FORMAT_JSON_OBJECT,
+                        )
+                        continue
                     logger.info(
                         "LLM attempt %d/%d got HTTP %d; not retrying",
                         attempt + 1, self.max_retries, resp.status_code,
@@ -704,6 +786,11 @@ class OpenAICompatibleProvider(BaseLLMProvider):
                     usage_reported=usage_reported,
                     finish_reason=finish_reason,
                     reasoning_present=reasoning_present,
+                    response_format_mode=(
+                        RESPONSE_FORMAT_JSON_SCHEMA
+                        if self._strict_response_format_available and self.response_json_schema
+                        else RESPONSE_FORMAT_JSON_OBJECT
+                    ),
                     raw_response=data,
                 )
             except LLMNonRetryableError:

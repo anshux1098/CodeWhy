@@ -90,6 +90,12 @@ class LLMExtractionPayload(BaseModel):
     decisions: list[RawCandidateDecision]
 
 
+#: The JSON schema sent as `response_format` where the endpoint supports it, so the
+#: model is constrained to the agreed shape instead of being asked politely in prose.
+#: Generated from the model so the two cannot drift apart.
+EXTRACTION_JSON_SCHEMA: Final[dict[str, Any]] = LLMExtractionPayload.model_json_schema()
+
+
 class ExtractionSchemaRejected(RuntimeError):
     """Raised when a reply cannot be read as the agreed extraction shape.
 
@@ -276,6 +282,13 @@ def extract_decisions_from_source(
             schema=LLMExtractionPayload,
             prompt=user_prompt,
             system=system_prompt,
+            response_json_schema=EXTRACTION_JSON_SCHEMA,
+        )
+        logger.info(
+            "extraction for %s: response_format=%s finish_reason=%s",
+            source_id,
+            getattr(response, "response_format_mode", "unknown"),
+            getattr(response, "finish_reason", "") or "unknown",
         )
     except LLMSchemaValidationError as exc:
         # The reply was text but not the agreed shape. That is a rejection, and the
