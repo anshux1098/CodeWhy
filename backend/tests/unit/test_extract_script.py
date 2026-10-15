@@ -332,13 +332,19 @@ def test_retry_failed_touches_only_the_recorded_failures(
 def test_a_rerun_skips_a_source_that_already_has_a_stored_result(
     cache_with_sources: SqliteCache, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Completion is remembered whatever the source produced.
+
+    A stored decision is one way a source counts as done; an empty answer is
+    another, and both must be skipped on the next run.
+    """
     run_main(cache_with_sources, monkeypatch, store_decision_for={"pr:urllib3/urllib3#3456"})
     assert RUNS[0] == ["pr:urllib3/urllib3#3456", "pr:urllib3/urllib3#3466"]
 
     run_main(cache_with_sources, monkeypatch)
 
-    assert RUNS[1] == ["pr:urllib3/urllib3#3466"], (
-        "a source with a stored decision must not be extracted again"
+    assert RUNS[1] == [], (
+        "both sources were dealt with, one with a decision and one with nothing, "
+        "so neither may be extracted again"
     )
 
 

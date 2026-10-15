@@ -20,6 +20,7 @@ from app.services.extraction import (
     EXTRACTION_VERSION,
     ExtractionSchemaRejected,
     extract_decisions_from_source,
+    last_call_metadata,
     summarise_injection_flags,
 )
 from app.stores.sqlite_cache import SqliteCache
@@ -37,6 +38,9 @@ TARGET_FILES: tuple[str, ...] = (
     "src/urllib3/connection.py",
     "src/urllib3/util/ssl_.py",
 )
+
+#: Default target description used by `--scope targets`, named after --repo.
+REPO_SLUG = "urllib3__urllib3"
 
 
 def _pull_request_number(source_id: str) -> Optional[int]:
@@ -91,6 +95,129 @@ def _sort_key(row: dict[str, Any]) -> tuple[int, int, str]:
 def select_sources(rows: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
     """The first `limit` candidates in priority order."""
     return sorted(rows, key=_sort_key)[:limit]
+
+
+def resolve_source_ids(args: argparse.Namespace, candidates: list[dict[str, Any]]) -> set[str]:
+    """Map the `--sources` arguments onto known source ids.
+
+    Both `pr:owner/name#3456` and a bare `3456` are accepted, because writing the
+    full id for every run is tedious and the repository is already fixed by --repo.
+    """
+    by_number = {
+        str(_pull_request_number(row["id"])): row["id"]
+        for row in candidates
+        if _pull_request_number(row["id"]) is not None
+    }
+    known = {row["id"] for row in candidates}
+    resolved: set[str] = set()
+    for value in args.sources or []:
+        if value in known:
+            resolved.add(value)
+        elif value.isdigit() and value in by_number:
+            resolved.add(by_number[value])
+        else:
+            logger.warning("--sources: %r is not a known source in this repository", value)
+    return resolved
+
+
+def select_target_scope(
+    cache: SqliteCache,
+    args: argparse.Namespace,
+    candidates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Only the sources that explain the target files.
+
+    That is the pull requests that touched them, the revert chain that ties those
+    pull requests together in either direction, and the documents that describe
+    those same files. Documentation of the repository as a whole is left out: a
+    changelog restates decisions but rarely explains one.
+    """
+    from app.services.ingest.targets import load_targets
+
+    try:
+        targets = load_targets(Path(args.targets)) if getattr(args, "targets", None) else None
+    except Exception as exc:  # noqa: BLE001 - a bad target file must not crash the run
+        logger.warning("--scope targets: could not read the target file: %s", exc)
+        return candidates
+    if targets is None:
+        return candidates
+
+    wanted_suffixes = {name.rsplit("/", 1)[-1] for name in targets.all_files()}
+
+    def touches_targets(row: dict[str, Any]) -> bool:
+        try:
+            payload = json.loads(row["payload"])
+        except (TypeError, ValueError):
+            return False
+        files = payload.get("files") or []
+        if not isinstance(files, list):
+            return False
+        return any(
+            isinstance(name, str) and name.rsplit("/", 1)[-1] in wanted_suffixes
+            for name in files
+        )
+
+    scoped = [row for row in candidates if row["kind"] == "pr" and touches_targets(row)]
+
+    # The revert chain: a scoped pull request that reverts another scoped one, or is
+    # reverted by one, is in scope even if it touched no target file itself. #3466
+    # reverts #3456, which is how the two halves of a decision get read together.
+    numbers = {
+        n for n in (_pull_request_number(row["id"]) for row in scoped) if n is not None
+    }
+    reverted: dict[int, set[int]] = {}
+    for row in candidates:
+        if row["kind"] != "pr":
+            continue
+        number = _pull_request_number(row["id"])
+        if number is None:
+            continue
+        try:
+            payload = json.loads(row["payload"])
+        except (TypeError, ValueError):
+            continue
+        text = " ".join(
+            str(payload.get(field) or "") for field in ("title", "body")
+        )
+        for other in numbers | _revert_targets(text):
+            reverted.setdefault(other, set()).add(number)
+            if other != number and number in numbers:
+                reverted.setdefault(number, set()).add(other)
+
+    chain_numbers = set(reverted)
+    for row in candidates:
+        number = _pull_request_number(row["id"]) if row["kind"] == "pr" else None
+        if number is not None and number in chain_numbers:
+            if row not in scoped:
+                scoped.append(row)
+
+    # Documents that name one of the target files, so a doc explaining the file is
+    # read alongside the pull requests that changed it.
+    for row in candidates:
+        if row["kind"] != "doc":
+            continue
+        try:
+            payload = json.loads(row["payload"])
+        except (TypeError, ValueError):
+            continue
+        blob = json.dumps(payload).lower()
+        if any(suffix.lower() in blob for suffix in wanted_suffixes):
+            scoped.append(row)
+
+    seen: set[str] = set()
+    unique = []
+    for row in scoped:
+        if row["id"] not in seen:
+            seen.add(row["id"])
+            unique.append(row)
+    return unique
+
+
+def _revert_targets(text: str) -> set[int]:
+    """Numbers a pull request reverts, from phrases like 'Reverts owner/name#12'."""
+    import re
+
+    return {int(n) for n in re.findall(r"reverts?\s+[^\s#]*#(\d+)", text, re.IGNORECASE)}
 
 
 def source_url_for(source_id: str, repo: str, payload: dict[str, Any]) -> str:
@@ -167,6 +294,43 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Identifier recorded against this run's token usage",
     )
     parser.add_argument(
+        "--sources",
+        nargs="+",
+        metavar="ID",
+        default=None,
+        help=(
+            "Extract only these sources, given as pr:owner/name#123 or a bare "
+            "pull request number. Overrides --limit."
+        ),
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-extract sources that already have a recorded result",
+    )
+    parser.add_argument(
+        "--scope",
+        choices=("targets", "all"),
+        default="all",
+        help=(
+            "'targets' restricts the run to sources linked to the target files, "
+            "their revert chain and the docs covering those files."
+        ),
+    )
+    parser.add_argument(
+        "--max-sources",
+        dest="max_sources",
+        type=int,
+        default=None,
+        help="Cap how many sources are considered in scope, before any priority limit",
+    )
+    parser.add_argument(
+        "--targets",
+        type=Path,
+        default=REPO_ROOT / "targets" / f"{REPO_SLUG}.json",
+        help="Target file description used by --scope targets",
+    )
+    parser.add_argument(
         "--sample-review-file",
         type=Path,
         default=REPO_ROOT / "review" / "decisions_sample.md",
@@ -202,9 +366,26 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
     # selects the highest priority sources instead of whichever ids sort first.
     candidates = cache.fetch_raw_objects(args.repo, limit=10_000)
     failed_ids = cache.failed_source_ids(args.repo)
-    already_done = cache.extracted_source_ids(args.repo, EXTRACTION_VERSION)
+    # Completion is read from the recorded outcome, not from the presence of a
+    # decision. A source that answered correctly with nothing to extract has no
+    # decision row, and reading only decisions made it look untouched.
+    already_done = cache.processed_source_ids(args.repo, EXTRACTION_VERSION)
 
-    if args.retry_failed:
+    if args.scope == "targets":
+        candidates = select_target_scope(cache, args, candidates)
+        logger.info(
+            "--scope targets: %d sources in scope "
+            "(target files, their revert chain, and the docs covering them)",
+            len(candidates),
+        )
+
+    if args.max_sources is not None:
+        candidates = candidates[: args.max_sources]
+
+    if args.sources:
+        candidates = [row for row in candidates if row["id"] in resolve_source_ids(args, candidates)]
+        logger.info("--sources: %d sources selected", len(candidates))
+    elif args.retry_failed:
         # Filtered before ranking and limiting, not after. Truncating to the top N
         # first meant a limit smaller than the failure count selected sources that
         # had already succeeded, and then discarded them, so `--retry-failed --limit 3`
@@ -212,17 +393,26 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
         candidates = [row for row in candidates if row["id"] in failed_ids]
         logger.info("--retry-failed: %d failed sources to choose from", len(candidates))
 
+    # The limit counts sources that still need doing, so the finished ones are
+    # removed first. Applying the limit before this filter spent the whole
+    # allowance on sources already recorded as complete: with #3456 and #3466
+    # answered and empty, a --limit 2 run selected those two, skipped both, and
+    # did nothing at all.
+    if not args.force:
+        already_counted = len([row for row in candidates if row["id"] in already_done])
+        candidates = [
+            row for row in candidates
+            if row["id"] not in already_done or row["id"] in failed_ids
+        ]
+        if already_counted:
+            logger.info(
+                "%d sources already have a recorded result and were not reconsidered",
+                already_counted,
+            )
+
     rows = select_sources(candidates, args.limit)
 
-    pending = [
-        row for row in rows
-        if row["id"] not in already_done and row["id"] not in noisy_ids
-    ]
-    skipped_done = len([row for row in rows if row["id"] in already_done])
-    if skipped_done:
-        logger.info(
-            "Skipping %d sources that already have a stored extraction result", skipped_done
-        )
+    pending = [row for row in rows if row["id"] not in noisy_ids]
 
     # Counts only. The flagged text itself never reaches a log line.
     injection_counts = summarise_injection_flags(
@@ -251,6 +441,36 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
     stopped_for_budget = False
     sample_records: list[dict[str, Any]] = []
 
+    def record_source_outcome(
+        source_id: str,
+        status: str,
+        tokens_before: int,
+        *,
+        decisions: int = 0,
+        finish_reason: str = "",
+        detail: str = "",
+    ) -> None:
+        """Write one row per source per run, whatever the outcome.
+
+        Without this, a source that answered correctly with no decisions left no
+        trace at all: its failure row was cleared and no decision row existed, so it
+        looked untried and was neither retried nor skipped.
+        """
+        meta = last_call_metadata() if status != "failed" else {}
+        cache.record_extraction_source(
+            repo=args.repo,
+            source_id=source_id,
+            extraction_version=EXTRACTION_VERSION,
+            status=status,
+            run_id=args.run_id,
+            model=str(meta.get("model") or settings.llm_model),
+            response_format_mode=str(meta.get("response_format_mode") or ""),
+            finish_reason=finish_reason or str(meta.get("finish_reason") or ""),
+            decisions=decisions,
+            tokens=int(meta.get("tokens") or 0) or (budget.total_tokens - tokens_before),
+            detail=detail,
+        )
+
     for position, row in enumerate(pending, start=1):
         source_id = row["id"]
         raw_payload = json.loads(row["payload"])
@@ -265,6 +485,7 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
             logger.info("[DRY-RUN] %d/%d %s (%s) %s", position, len(pending), source_id, title[:50], source_url)
             continue
 
+        tokens_before = budget.total_tokens
         logger.info("%d/%d extracting %s", position, len(pending), source_id)
 
         try:
@@ -305,6 +526,7 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
                 final_status="schema_rejected",
                 error=str(rejected),
             )
+            record_source_outcome(source_id, "schema_rejected", tokens_before)
             continue
         except Exception as exc:  # noqa: BLE001 - one bad source must not end the run
             # Recorded so a rerun can retry exactly this source. The exception text
@@ -318,6 +540,10 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
                 final_status=str(getattr(exc, "status_code", type(exc).__name__)),
                 error=str(exc),
             )
+            record_source_outcome(
+                source_id, "failed", tokens_before,
+                finish_reason=getattr(exc, "finish_reason", ""),
+            )
             continue
 
         # The source completed, so it is no longer outstanding work.
@@ -325,6 +551,12 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
 
         if not records:
             no_decision_count += 1
+        record_source_outcome(
+            source_id,
+            "ok" if records else "no_decision",
+            tokens_before,
+            decisions=len(records),
+        )
 
         for dec in records:
             if not dec.quote_verified:

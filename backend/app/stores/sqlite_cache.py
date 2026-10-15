@@ -211,6 +211,30 @@ CREATE TABLE IF NOT EXISTS extraction_runs (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS extraction_runs_repo ON extraction_runs (repo);
+
+-- One row per (source, run). Recorded whatever the outcome: a source that answered
+-- correctly with zero decisions is processed, and recording only failures or only
+-- decisions loses that middle case, leaving a finished source indistinguishable
+-- from one nobody attempted.
+CREATE TABLE IF NOT EXISTS extraction_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    repo TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    extraction_version TEXT NOT NULL,
+    status TEXT NOT NULL,
+    model TEXT NOT NULL DEFAULT '',
+    response_format_mode TEXT NOT NULL DEFAULT '',
+    finish_reason TEXT NOT NULL DEFAULT '',
+    decisions INTEGER NOT NULL DEFAULT 0,
+    tokens INTEGER NOT NULL DEFAULT 0,
+    detail TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+-- A source may be re-extracted, so this is deliberately not unique on source_id:
+-- two runs of the same source are the comparison the columns exist to support.
+CREATE INDEX IF NOT EXISTS extraction_sources_repo ON extraction_sources (repo, extraction_version);
+CREATE INDEX IF NOT EXISTS extraction_sources_source ON extraction_sources (repo, source_id);
 """
 
 
@@ -1021,6 +1045,85 @@ class SqliteCache:
 
     def failed_source_ids(self, repo: str) -> set[str]:
         return {row["source_id"] for row in self.extraction_failures(repo)}
+
+    #: Outcomes that mean the source was dealt with and needs no further work.
+    COMPLETED_STATUSES: tuple[str, ...] = ("ok", "no_decision")
+
+    def record_extraction_source(
+        self,
+        repo: str,
+        source_id: str,
+        extraction_version: str,
+        status: str,
+        run_id: str,
+        model: str = "",
+        response_format_mode: str = "",
+        finish_reason: str = "",
+        decisions: int = 0,
+        tokens: int = 0,
+        detail: str = "",
+    ) -> None:
+        """Record what one attempt at one source produced, whatever the outcome.
+
+        Within a run a source is recorded once: a retry that succeeds replaces the
+        earlier failure for that run, so the row describes where the source ended
+        up rather than every attempt made along the way. Across runs the rows
+        accumulate, which is what makes two models comparable on the same source.
+        """
+        with self.transaction() as connection:
+            existing = connection.execute(
+                "SELECT id FROM extraction_sources WHERE run_id = ? AND source_id = ?",
+                (run_id, source_id),
+            ).fetchone()
+            values = (
+                run_id, repo, source_id, extraction_version, status, model,
+                response_format_mode, finish_reason, decisions, tokens,
+                redact_secrets(redact_emails(detail)) or "", utc_now(),
+            )
+            if existing is None:
+                connection.execute(
+                    "INSERT INTO extraction_sources (run_id, repo, source_id, "
+                    "extraction_version, status, model, response_format_mode, "
+                    "finish_reason, decisions, tokens, detail, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    values,
+                )
+            else:
+                connection.execute(
+                    "UPDATE extraction_sources SET status = ?, model = ?, "
+                    "response_format_mode = ?, finish_reason = ?, decisions = ?, "
+                    "tokens = ?, detail = ?, created_at = ? WHERE id = ?",
+                    (
+                        status, model, response_format_mode, finish_reason, decisions,
+                        tokens, values[10], values[11], existing["id"],
+                    ),
+                )
+
+    def extraction_sources(self, repo: str) -> list[sqlite3.Row]:
+        """Every recorded attempt for a repo, oldest first."""
+        return list(
+            self._connection.execute(
+                "SELECT * FROM extraction_sources WHERE repo = ? ORDER BY id",
+                (repo,),
+            )
+        )
+
+    def processed_source_ids(self, repo: str, extraction_version: str) -> set[str]:
+        """Sources that completed, with or without producing a decision.
+
+        Keyed on the recorded status rather than on the presence of a decision row,
+        so a source whose answer was "nothing to extract" is not reprocessed for
+        ever, and is not lost either.
+        """
+        placeholders = ",".join("?" for _ in self.COMPLETED_STATUSES)
+        return {
+            row["source_id"]
+            for row in self._connection.execute(
+                f"SELECT DISTINCT source_id FROM extraction_sources "
+                f"WHERE repo = ? AND extraction_version = ? AND status IN ({placeholders})",
+                (repo, extraction_version, *self.COMPLETED_STATUSES),
+            )
+        }
 
     def extracted_source_ids(self, repo: str, extraction_version: str) -> set[str]:
         """Sources that already produced a decision for this extraction version.

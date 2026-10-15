@@ -228,6 +228,19 @@ def attribution_for(author: Optional[str]) -> Optional[str]:
     return cleaned
 
 
+def last_call_metadata() -> dict[str, Any]:
+    """Model, mode, finish reason and tokens for the most recent extraction call.
+
+    Kept on the module because the records themselves deliberately carry none of
+    it: the caller needs it to record what produced a result, and putting it on the
+    decision would make the model an attribute of the thing it inferred.
+    """
+    return dict(_LAST_CALL)
+
+
+_LAST_CALL: dict[str, Any] = {}
+
+
 def extract_decisions_from_source(
     provider: BaseLLMProvider,
     source_id: str,
@@ -290,9 +303,23 @@ def extract_decisions_from_source(
             getattr(response, "response_format_mode", "unknown"),
             getattr(response, "finish_reason", "") or "unknown",
         )
+        _LAST_CALL.clear()
+        _LAST_CALL.update({
+            "model": getattr(response, "model", "") or "",
+            "response_format_mode": getattr(response, "response_format_mode", "") or "",
+            "finish_reason": getattr(response, "finish_reason", "") or "",
+            "tokens": int(getattr(response, "total_tokens", 0) or 0),
+        })
     except LLMSchemaValidationError as exc:
         # The reply was text but not the agreed shape. That is a rejection, and the
         # operator has to see it; returning an empty list would report success.
+        _LAST_CALL.clear()
+        _LAST_CALL.update({
+            "model": "",
+            "response_format_mode": "",
+            "finish_reason": exc.finish_reason,
+            "tokens": 0,
+        })
         raise ExtractionSchemaRejected(
             source_id=source_id,
             received_keys=exc.received_keys,
