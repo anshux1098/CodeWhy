@@ -46,12 +46,32 @@ class LLMTimeoutError(LLMProviderError):
 
 
 class LLMSchemaValidationError(LLMProviderError):
-    """Raised when an LLM response fails validation against the expected Pydantic schema."""
+    """Raised when an LLM response fails validation against the expected Pydantic schema.
 
-    def __init__(self, raw_content: str, errors: Any):
+    Carries the top-level key names that arrived and the finish reason, because a
+    caller that drops the reply has to be able to say what it dropped. Values are
+    never carried: the reply may contain untrusted text.
+    """
+
+    def __init__(
+        self,
+        raw_content: str,
+        errors: Any,
+        received_keys: Optional[list[str]] = None,
+        finish_reason: str = "",
+    ) -> None:
         super().__init__(f"LLM output failed Pydantic schema validation: {errors}")
         self.raw_content = raw_content
         self.validation_errors = errors
+        self.received_keys = list(received_keys or [])
+        self.finish_reason = finish_reason
+        #: Short description of what was wrong, for the operator.
+        self.reason = _describe_validation_failure(errors)
+
+    @property
+    def is_json(self) -> bool:
+        """Whether the reply was parseable JSON at all."""
+        return bool(self.received_keys) or _parses_as_json(self.raw_content)
 
 
 class LLMNonRetryableError(LLMProviderError):
@@ -65,6 +85,29 @@ class LLMNonRetryableError(LLMProviderError):
     def __init__(self, message: str, status_code: int) -> None:
         super().__init__(message)
         self.status_code = status_code
+
+
+def _parses_as_json(text: str) -> bool:
+    """Whether the reply is JSON at all, as opposed to prose."""
+    try:
+        json.loads((text or "").strip())
+    except (ValueError, TypeError):
+        return False
+    return True
+
+
+def _describe_validation_failure(errors: Any) -> str:
+    """A short phrase naming the mismatch, with no values from the reply."""
+    entries = errors if isinstance(errors, list) else [{"loc": (), "type": str(errors)}]
+    parts: list[str] = []
+    for entry in entries[:4]:
+        if not isinstance(entry, dict):
+            parts.append(str(entry))
+            continue
+        location = ".".join(str(part) for part in entry.get("loc", ()))
+        kind = entry.get("type", "invalid")
+        parts.append(f"{location or '(top level)'}: {kind}")
+    return "; ".join(parts) or "did not match the schema"
 
 
 class LLMEmptyReplyError(LLMProviderError):
@@ -288,21 +331,29 @@ class BaseLLMProvider(ABC):
         fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw)
         json_str = fence_match.group(1).strip() if fence_match else raw
 
+        received_keys: list[str] = []
         try:
-            parsed = json.loads(json_str)
+            parsed_json = json.loads(json_str)
         except json.JSONDecodeError as exc:
             raise LLMSchemaValidationError(
                 raw_content=raw,
                 errors=f"JSON parsing error: {exc}",
+                received_keys=[],
+                finish_reason=response.finish_reason,
             ) from exc
+        if isinstance(parsed_json, dict):
+            # Key names only. The values may be untrusted repository text.
+            received_keys = [str(key) for key in parsed_json]
 
         try:
-            validated = schema.model_validate(parsed)
+            validated = schema.model_validate(parsed_json)
             return validated, response
         except ValidationError as exc:
             raise LLMSchemaValidationError(
                 raw_content=raw,
                 errors=exc.errors(),
+                received_keys=received_keys,
+                finish_reason=response.finish_reason,
             ) from exc
 
 

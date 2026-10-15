@@ -71,13 +71,53 @@ class RawCandidateDecision(BaseModel):
     explicit_reversal_language: bool = Field(default=False)
     unknown_fields: list[str] = Field(default_factory=list)
 
-
 class LLMExtractionPayload(BaseModel):
-    """Top-level LLM completion schema."""
-    model_config = ConfigDict(extra="ignore")
+    """Top-level LLM completion schema.
+
+    `extra="forbid"` is deliberate. With the default `extra="ignore"` a model that
+    returns a flat object instead of `{"decisions": [...]}` has its fields silently
+    discarded, `decisions` falls back to an empty list, and the run reports success
+    with no decisions extracted. Refusing the reply turns that silent loss into a
+    recorded failure.
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     no_decision: bool = Field(default=False, description="True if no deliberate engineering decision exists")
-    decisions: list[RawCandidateDecision] = Field(default_factory=list)
+    #: Required, with no default. `{"decisions": []}` is how a model says there is
+    #: nothing to extract; a reply that omits the key entirely has not followed the
+    #: contract and is rejected rather than read as "no decision".
+    decisions: list[RawCandidateDecision]
+
+
+class ExtractionSchemaRejected(RuntimeError):
+    """Raised when a reply cannot be read as the agreed extraction shape.
+
+    Carries the key names that arrived so the operator can see what the model
+    actually sent. Values are never included: a rejected reply may quote
+    untrusted repository text, and that text does not belong in a log line.
+    """
+
+    #: Recorded as the failure status so the run summary can count it separately
+    #: from a transport failure or a genuine absence of decisions.
+    status = "schema_rejected"
+
+    def __init__(
+        self,
+        source_id: str,
+        received_keys: Sequence[str],
+        reason: str,
+        finish_reason: str = "",
+    ) -> None:
+        self.source_id = source_id
+        self.received_keys = list(received_keys)
+        self.reason = reason
+        self.finish_reason = finish_reason
+        super().__init__(
+            f"extraction for {source_id} was rejected: {reason}; "
+            f"top-level keys received: {', '.join(self.received_keys) or '(none)'} "
+            f"(values are not logged); finish_reason={finish_reason or 'unknown'}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -232,30 +272,32 @@ def extract_decisions_from_source(
 
     # 3. Call LLM for structured output
     try:
-        payload, _ = provider.complete_structured(
+        parsed, response = provider.complete_structured(
             schema=LLMExtractionPayload,
             prompt=user_prompt,
             system=system_prompt,
         )
     except LLMSchemaValidationError as exc:
-        logger.warning(
-            "Extraction output for %s failed schema validation: %s",
-            source_id,
-            exc,
-        )
-        return []
+        # The reply was text but not the agreed shape. That is a rejection, and the
+        # operator has to see it; returning an empty list would report success.
+        raise ExtractionSchemaRejected(
+            source_id=source_id,
+            received_keys=exc.received_keys,
+            reason=exc.reason,
+            finish_reason=exc.finish_reason,
+        ) from exc
     except Exception as exc:
         logger.error("LLM provider error extracting from %s: %s", source_id, exc)
         raise
 
-    if payload.no_decision or not payload.decisions:
+    if parsed.no_decision or not parsed.decisions:
         return []
 
     # 4. Code enrichment and quote verification
     records: list[ExtractedDecisionRecord] = []
     affected_entities = sorted(set(list(changed_files) + list(config_keys)))
 
-    for idx, raw_dec in enumerate(payload.decisions):
+    for idx, raw_dec in enumerate(parsed.decisions):
         dec_id = make_decision_id(source_id, extraction_version, idx)
 
         # Verify candidate supporting quotes

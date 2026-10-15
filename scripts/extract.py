@@ -17,6 +17,7 @@ from app.config import settings
 from app.providers.llm_provider import TokenBudget, TokenBudgetExhaustedError, get_llm_provider
 from app.services.extraction import (
     EXTRACTION_VERSION,
+    ExtractionSchemaRejected,
     extract_decisions_from_source,
     summarise_injection_flags,
 )
@@ -233,6 +234,13 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
 
     extracted_decisions_count = 0
     extracted_evidence_count = 0
+    #: A source answered correctly with an empty decisions list. The only legitimate
+    #: reading of "nothing to extract".
+    no_decision_count = 0
+    #: Answered, but not in the agreed shape. Recorded, never silently dropped.
+    schema_rejected_count = 0
+    #: A decision was extracted but no supporting quote survived verification.
+    unverified_quote_count = 0
     failed_count = 0
     stopped_for_budget = False
     sample_records: list[dict[str, Any]] = []
@@ -275,6 +283,23 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
             )
             stopped_for_budget = True
             break
+        except ExtractionSchemaRejected as rejected:
+            # A reply that is valid JSON but not the agreed shape. Recorded rather
+            # than dropped: silently returning nothing here is what made a good
+            # extraction disappear from the real run.
+            schema_rejected_count += 1
+            logger.warning(
+                "Source %s schema_rejected: %s; keys received: %s",
+                source_id, rejected.reason, ", ".join(rejected.received_keys) or "(none)",
+            )
+            cache.record_extraction_failure(
+                source_id=source_id,
+                repo=args.repo,
+                extraction_version=EXTRACTION_VERSION,
+                final_status="schema_rejected",
+                error=str(rejected),
+            )
+            continue
         except Exception as exc:  # noqa: BLE001 - one bad source must not end the run
             # Recorded so a rerun can retry exactly this source. The exception text
             # may quote the credential, so it is scrubbed before it is stored.
@@ -291,6 +316,13 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
 
         # The source completed, so it is no longer outstanding work.
         cache.clear_extraction_failure(source_id)
+
+        if not records:
+            no_decision_count += 1
+
+        for dec in records:
+            if not dec.quote_verified:
+                unverified_quote_count += 1
 
         for dec in records:
             dec_row = {
@@ -375,21 +407,37 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
     logger.info(
         "Failures this run: %d of %d attempted sources", failed_count, len(pending)
     )
-    if failed_count:
+    # One line per outcome so a run cannot look productive by accident. Each source
+    # lands in exactly one of these buckets.
+    logger.info(
+        "Run summary: decisions=%d no_decision=%d schema_rejected=%d "
+        "unverified_quote=%d failed=%d (of %d attempted)",
+        extracted_decisions_count,
+        no_decision_count,
+        schema_rejected_count,
+        unverified_quote_count,
+        failed_count,
+        len(pending),
+    )
+    if schema_rejected_count or failed_count:
         for row in cache.extraction_failures(args.repo):
             logger.info(
-                "  failed source %s: status=%s attempts=%s",
+                "  rejected or failed source %s: status=%s attempts=%s",
                 row["source_id"], row["final_status"], row["attempts"],
             )
 
     if sample_records and args.sample_review_file:
         generate_sample_review_file(args.sample_review_file, sample_records)
 
-    # Nothing succeeded at all, so the exit code has to say so. A partial run
-    # still exits 0 because its work is stored and a rerun continues from it.
+    # Nothing usable came back, so the exit code has to say so. A partial run still
+    # exits 0 because its work is stored and a rerun continues from it.
     attempted = len(pending)
-    if attempted and failed_count == attempted:
-        logger.error("Every source failed; nothing was extracted.")
+    unusable = failed_count + schema_rejected_count
+    if attempted and unusable == attempted:
+        logger.error(
+            "No source produced a usable result: %d rejected, %d failed.",
+            schema_rejected_count, failed_count,
+        )
         return 1
     return 0
 
