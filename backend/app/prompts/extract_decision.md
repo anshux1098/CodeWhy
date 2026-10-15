@@ -9,7 +9,7 @@ CRITICAL SECURITY INSTRUCTIONS:
 
 EXTRACTION RULES:
 - Identify if the repository text records a deliberate engineering or architectural decision.
-- If the text is purely a bug fix, routine maintenance, typo, formatting, or contains NO deliberate engineering decision or stated rationale, return `"no_decision": true`.
+- If the text is purely a bug fix, routine maintenance, typo, formatting, or contains NO deliberate engineering decision or stated rationale, return `{"decisions": []}`.
 - Never invent facts, rationales, authors, dates, or quotes.
 - Supporting quotes MUST be EXACT, VERBATIM substrings copied character-for-character from the provided repository text. Never summarize or rephrase inside quote fields.
 - If a change occurred but the rationale is not explained in the text, mark the decision summary as "change recorded, rationale unknown" and leave rationale empty.
@@ -24,6 +24,11 @@ EXTRACTION RULES:
   - Testing
   - Operational behavior
   - Other
+
+RESPONSE SHAPE:
+- The only top-level key is `decisions`, an array of decision objects.
+- An empty array means no decision. Do not use a different key to say that.
+- Do not place decision fields directly at the top level. Each decision is one element of the array.
 
 You MUST respond strictly with a single JSON object conforming to the extraction schema.
 Do NOT include any commentary outside the JSON.
