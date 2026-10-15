@@ -18,7 +18,8 @@ from app.providers.llm_provider import BaseLLMProvider, LLMResponse, LLMSchemaVa
 from app.schemas.common import DecisionState, SourceType
 from app.services.quote_check import (
     FALLBACK_RATIONALE_UNKNOWN,
-    verify_quote,
+    MAX_QUOTE_CHARS,
+    complete_quote,
     verify_quote_against_sources,
 )
 
@@ -345,7 +346,29 @@ def extract_decisions_from_source(
         for ev_idx, raw_ev in enumerate(raw_dec.supporting_evidence):
             q_res = verify_quote_against_sources(raw_ev.quote, all_source_texts)
             if q_res.is_verified:
-                ev_id = make_evidence_id(dec_id, ev_idx, q_res.quote)
+                # Complete the quote to the end of its sentence before storing it.
+                # The model sometimes returns a prefix of the sentence it means, and
+                # a prefix still verifies as a substring, so nothing downstream could
+                # tell a whole quote from a cut one.
+                completed = complete_quote(q_res.quote, "\n".join(all_source_texts))
+                if completed.status == "quote_incomplete":
+                    logger.debug(
+                        "Dropped quote for %s: could not be completed to a whole sentence",
+                        dec_id,
+                    )
+                    continue
+                if completed.status == "long_sentence":
+                    logger.info(
+                        "Quote for %s kept whole at %d characters, over the %d limit: %s",
+                        dec_id, len(completed.quote), MAX_QUOTE_CHARS,
+                        source_id,
+                    )
+                elif completed.status == "extended":
+                    logger.debug(
+                        "Completed a cut quote for %s: %r -> %r",
+                        dec_id, q_res.quote, completed.quote,
+                    )
+                ev_id = make_evidence_id(dec_id, ev_idx, completed.quote)
                 verified_evidence.append(
                     VerifiedEvidence(
                         id=ev_id,
@@ -353,7 +376,7 @@ def extract_decisions_from_source(
                         source_id=source_id,
                         source_type=source_type,
                         source_url=source_url,
-                        quote=q_res.quote,
+                        quote=completed.quote,
                         author=attribution_for(author),
                         timestamp=raw_ev.timestamp or created_at,
                         classification="explicit",

@@ -6,6 +6,18 @@ from typing import Final, Optional, Sequence
 
 FALLBACK_RATIONALE_UNKNOWN: Final[str] = "change recorded, rationale unknown"
 
+#: A quote longer than this is kept whole and flagged rather than cut. The value is
+#: generous enough for a long parenthetical, because the alternative — a quote that
+#: stops mid-sentence — reads as complete and is not.
+MAX_QUOTE_CHARS: Final[int] = 500
+
+#: Characters that close an aside without ending the sentence: the prose continues
+#: after them. A quote ending here is still mid-sentence.
+CLOSERS: Final[str] = ")]}\"'"
+
+#: A sentence ends at one of these, followed by whitespace or the end of the text.
+SENTENCE_END: Final[str] = ".!?…"
+
 
 def normalize_whitespace(text: str) -> str:
     """Collapses runs of whitespace, tabs, and newlines into single spaces."""
@@ -28,6 +40,154 @@ def strip_markdown(text: str) -> str:
 def normalize_for_quote_check(text: str) -> str:
     """Full normalization pipeline: strip markdown formatting, collapse whitespace, lower-case."""
     return normalize_whitespace(strip_markdown(text)).lower()
+
+
+@dataclass(frozen=True)
+class QuoteCompletion:
+    """A quote checked for ending on a sentence boundary.
+
+    `status` is one of:
+      complete        - already whole
+      extended        - completed to the end of its sentence
+      long_sentence   - the whole sentence is over the limit, kept whole and flagged
+      quote_incomplete - the quote could not be located in the source at all
+    """
+
+    quote: str
+    status: str
+    #: True when the completed sentence is over MAX_QUOTE_CHARS and was kept anyway.
+    over_limit: bool = False
+
+
+def _locate(quote: str, source_text: str) -> Optional[tuple[int, int]]:
+    """Where the quote sits in the source, tolerating whitespace differences.
+
+    Returns the (start, end) offsets of the matched span, or None when the quote
+    cannot be found at all. Whitespace is collapsed on both sides because the stored
+    body carries CRLF while a quoted sentence is usually typed with plain spaces.
+    """
+    if quote in source_text:
+        index = source_text.index(quote)
+        return index, index + len(quote)
+
+    # Walk the source on a whitespace-insensitive basis, keeping the offsets.
+    def squash(text: str) -> tuple[str, list[int]]:
+        chars: list[str] = []
+        offsets: list[int] = []
+        previous_space = True
+        for position, char in enumerate(text):
+            if char.isspace():
+                if previous_space:
+                    continue
+                chars.append(" ")
+                offsets.append(position)
+                previous_space = True
+            else:
+                chars.append(char.lower())
+                offsets.append(position)
+                previous_space = False
+        if chars and chars[-1] == " ":
+            chars.pop()
+            offsets.pop()
+        return "".join(chars), offsets
+
+    squashed_quote, quote_offsets = squash(quote)
+    squashed_source, source_offsets = squash(source_text)
+    index = squashed_source.find(squashed_quote)
+    if index < 0:
+        return None
+    start = source_offsets[index]
+    end_offset = index + len(squashed_quote) - 1
+    end = source_offsets[end_offset] + 1
+    return start, end
+
+
+def _is_boundary(text: str, position: int) -> bool:
+    """Whether a sentence terminator at `position` really ends a sentence.
+
+    A terminator followed by a closing bracket still ends one: "support.)" closes a
+    parenthetical. A terminator mid-word, as in a version number, does not.
+    """
+    if position >= len(text):
+        return True
+    if text[position] not in SENTENCE_END:
+        return False
+    cursor = position
+    while cursor < len(text) and text[cursor] in SENTENCE_END:
+        cursor += 1
+    while cursor < len(text) and text[cursor] in CLOSERS:
+        cursor += 1
+    return cursor >= len(text) or text[cursor].isspace()
+
+
+def _extent_at(text: str, end: int) -> Optional[int]:
+    """Offset just past the sentence that finishes at `end`, if one does.
+
+    Closing brackets between `end` and the terminator belong to the sentence, so
+    "support.)" is one boundary rather than a terminator with a stray bracket.
+    """
+    index = end - 1
+    while index >= 0 and text[index] in CLOSERS:
+        index -= 1
+    if index < 0 or text[index] not in SENTENCE_END:
+        return None
+    cursor = index
+    while cursor < len(text) and text[cursor] in SENTENCE_END:
+        cursor += 1
+    while cursor < len(text) and text[cursor] in CLOSERS:
+        cursor += 1
+    if cursor < len(text) and not text[cursor].isspace():
+        return None
+    return cursor
+
+
+def _next_sentence_extent(text: str, start: int) -> Optional[int]:
+    """Offset just past the next sentence boundary at or after `start`."""
+    for index in range(max(0, start), len(text)):
+        if text[index] in SENTENCE_END and _is_boundary(text, index):
+            cursor = index
+            while cursor < len(text) and text[cursor] in SENTENCE_END:
+                cursor += 1
+            while cursor < len(text) and text[cursor] in CLOSERS:
+                cursor += 1
+            return cursor
+    return None
+
+
+def complete_quote(quote: str, source_text: str) -> QuoteCompletion:
+    """Complete a quote to the end of its sentence, never cutting inside one.
+
+    A model asked to quote verbatim sometimes returns a prefix of the sentence it
+    means, and the prefix still verifies as a substring, so nothing downstream can
+    tell a whole quote from a cut one. This resolves the sentence the quote sits in
+    and takes all of it.
+    """
+    clean = quote.strip()
+    if not clean or not source_text:
+        return QuoteCompletion(quote=clean, status="quote_incomplete")
+
+    located = _locate(clean, source_text)
+    if located is None:
+        return QuoteCompletion(quote=clean, status="quote_incomplete")
+    start, end = located
+
+    boundary = _extent_at(source_text, end)
+    if boundary is not None:
+        if boundary <= end:
+            return QuoteCompletion(quote=clean, status="complete")
+        target = boundary
+    else:
+        target = _next_sentence_extent(source_text, end)
+        if target is None:
+            # The text simply runs out; there is nothing to complete the quote to.
+            return QuoteCompletion(quote=clean, status="complete")
+
+    extended = source_text[start:target].strip()
+    if len(extended) > MAX_QUOTE_CHARS:
+        # Kept whole and flagged. Cutting here would produce exactly the defect
+        # this function exists to prevent.
+        return QuoteCompletion(quote=extended, status="long_sentence", over_limit=True)
+    return QuoteCompletion(quote=extended, status="extended")
 
 
 @dataclass(frozen=True)

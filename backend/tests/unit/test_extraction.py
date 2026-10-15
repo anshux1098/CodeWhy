@@ -273,7 +273,11 @@ def test_extraction_verified_quote_keeps_rationale() -> None:
     assert rec.rationale == "Avoid thread exhaustion"
     assert rec.quote_verified is True
     assert len(rec.evidence) == 1
-    assert rec.evidence[0].quote == "setting MAX_RETRIES to 3"
+    # The model returned a fragment of the sentence; it is completed to the whole
+    # sentence, which is what a reader needs in order to trust it.
+    assert rec.evidence[0].quote == (
+        "setting MAX_RETRIES to 3 because higher values cause thread exhaustion."
+    )
     assert "src/urllib3/util/retry.py" in rec.affected_entities
     assert "MAX_RETRIES" in rec.affected_entities
 
