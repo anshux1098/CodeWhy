@@ -72,3 +72,22 @@ def test_a_repository_name_in_every_path_is_not_an_entity_reference() -> None:
     )
     assert result.outcome is ResolutionOutcome.REFUSAL
     assert result.reason_code == "entity_not_found"
+
+
+def test_a_named_path_that_is_absent_does_not_become_a_partial_match() -> None:
+    # Every path shares `src/urllib3`, so the bare words `src` and `util` matched all
+    # entities equally and a path that is simply not in the graph came back
+    # ambiguous. A question that names a path but matches no entity is not found.
+    entities = [
+        _entity("src/urllib3/__init__.py"),
+        _entity("src/urllib3/util/ssl_.py"),
+        _entity("src/urllib3/util/retry.py"),
+    ]
+    result = resolve_entity(
+        "Why was src/urllib3/util/url.py changed?",
+        entities,
+        repository="urllib3/urllib3",
+    )
+    assert result.outcome is ResolutionOutcome.REFUSAL
+    assert result.reason_code == "entity_not_found"
+

@@ -14,4 +14,7 @@ review/decisions_sample.md
 answers.json
 server.out.log
 server.err.log
+srv.out.log
+srv.err.log
 build*.log
+c13*.log

@@ -40,6 +40,16 @@ def _store() -> InMemoryGraphStore:
     })
     store.merge_relationship("GOVERNS", "dec_add", SSL, {})
     store.merge_relationship("GOVERNS", "dec_revert", SSL, {})
+    # A decision whose text mentions the repository name and a directory word. A
+    # question that merely says "netclient" (or names "src/...") must not be pulled
+    # onto this entity through that coincidence.
+    store.merge_node("Decision", {
+        "id": "dec_docs", "repo": REPO, "state": "ACTIVE",
+        "summary": "Document that netclient uses an src layout",
+        "rationale": "netclient moved its package under src, so the docs were updated.",
+        "source_id": "pr:acme/netclient#9",
+    })
+    store.merge_relationship("GOVERNS", "dec_docs", SSL, {})
     return store
 
 
@@ -60,7 +70,7 @@ def test_decisions_are_found_from_the_question_and_the_entity_derived() -> None:
 
 def test_a_question_matching_no_decision_yields_nothing() -> None:
     result = resolve_entity_from_decisions(
-        "Why does urllib3 use Kubernetes for orchestration?", _store(), REPO
+        "Why does netclient use Kubernetes for orchestration?", _store(), REPO
     )
     assert result is None
 
@@ -86,7 +96,23 @@ def test_an_unrelated_question_refuses_without_calling_the_model() -> None:
     source = _source(_store())
     source.provider = Spy()
     response = source.ask(
-        REPO, AskRequest(question="Why does urllib3 use Kubernetes for orchestration?")
+        REPO, AskRequest(question="Why does netclient use Kubernetes for orchestration?")
+    )
+    assert response.outcome == "refusal"
+    assert response.reason_code == "entity_not_found"
+
+
+def test_a_named_path_that_is_absent_refuses_without_reaching_the_decisions() -> None:
+    class Spy:
+        is_real = False
+
+        def complete_structured(self, *args, **kwargs):  # pragma: no cover - must not run
+            raise AssertionError("a named but absent path must not become an answer")
+
+    source = _source(_store())
+    source.provider = Spy()
+    response = source.ask(
+        REPO, AskRequest(question="Why was src/netclient/util/url.py changed?")
     )
     assert response.outcome == "refusal"
     assert response.reason_code == "entity_not_found"

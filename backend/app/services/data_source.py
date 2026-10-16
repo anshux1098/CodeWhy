@@ -16,6 +16,7 @@ from app.services.entity_resolution import (
     EntityCandidate,
     ResolutionOutcome,
     ResolutionResult,
+    names_an_explicit_path_or_quote,
     resolve_entity,
     resolve_entity_from_decisions,
 )
@@ -233,11 +234,13 @@ class GraphDataSource:
         else:
             resolution = resolve_entity(request.question, all_entities, repository_id)
             # The question named no entity, so try to find the decisions from their
-            # own text and take the entity from them. An out-of-scope question, and a
-            # genuine tie between two entities, are left as they are.
+            # own text and take the entity from them. An out-of-scope question, a
+            # genuine tie, and a named path that is simply absent are all left as
+            # they are.
             if (
                 resolution.outcome == ResolutionOutcome.REFUSAL
                 and resolution.reason_code != "out_of_scope"
+                and not names_an_explicit_path_or_quote(request.question)
             ):
                 from_decisions = resolve_entity_from_decisions(
                     request.question, self.store, repository_id

@@ -159,6 +159,31 @@ def _distinct_ids(candidates: Sequence[EntityCandidate]) -> set[str]:
     return {candidate.id for candidate in candidates}
 
 
+def names_an_explicit_path_or_quote(question: str) -> bool:
+    """Whether the question names a file path or a quoted identifier.
+
+    Such a question is asking about that name. If it is not in the graph the honest
+    answer is that it is not found, not an entity derived from decisions that merely
+    share a directory word.
+    """
+    return bool(PATH_PATTERN.search(question) or QUOTED_PATTERN.search(question))
+
+
+def _drop_redundant_tokens(tokens: set[str]) -> set[str]:
+    """Drop tokens that are contained in a longer token.
+
+    A question naming ``src/urllib3/util/url.py`` also yields ``src``, ``util`` and
+    ``url.py``. Those components match directory-mates by substring, so keeping them
+    turns a missing file into a tie across every ``src/...`` entity. The longest form
+    alone says what was named.
+    """
+    kept = set(tokens)
+    for token in list(tokens):
+        if any(other != token and token in other for other in tokens):
+            kept.discard(token)
+    return kept
+
+
 def resolve_entity(
     question: str,
     available_entities: Sequence[dict[str, Any]],
@@ -180,7 +205,7 @@ def resolve_entity(
             error_message="Question is not about a repository code entity, file, or configuration.",
         )
 
-    tokens = extract_query_tokens(question) - _repository_tokens(repository)
+    tokens = _drop_redundant_tokens(extract_query_tokens(question) - _repository_tokens(repository))
     if not tokens:
         return ResolutionResult(
             outcome=ResolutionOutcome.REFUSAL,
@@ -289,7 +314,11 @@ def resolve_entity_from_decisions(
     from the decisions through GOVERNS. Returns None when nothing matches, so the
     caller keeps its original refusal rather than inventing an entity.
     """
-    tokens = _significant_words(question)
+    tokens = [
+        word
+        for word in _significant_words(question)
+        if word not in _repository_tokens(repo)
+    ]
     if not tokens:
         return None
 
