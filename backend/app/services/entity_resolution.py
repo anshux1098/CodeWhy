@@ -141,20 +141,36 @@ def _is_pyi_stub(entity: dict[str, Any]) -> bool:
     return False
 
 
+def _repository_tokens(repository: str) -> set[str]:
+    """Tokens that come from the repository name and name no entity.
+
+    The name sits inside every path (`src/urllib3/...`), so without this a question
+    that merely mentions the project makes every entity a partial match.
+    """
+    text = str(repository or "").strip().lower()
+    if not text:
+        return set()
+    tokens = {text}
+    tokens.update(part for part in re.split(r"[/\-_.]", text) if part)
+    return tokens
+
+
 def _distinct_ids(candidates: Sequence[EntityCandidate]) -> set[str]:
-    return {candidate.path or candidate.name for candidate in candidates}
+    return {candidate.id for candidate in candidates}
 
 
 def resolve_entity(
     question: str,
     available_entities: Sequence[dict[str, Any]],
+    repository: str = "",
 ) -> ResolutionResult:
     """Resolves an entity from the question according to Section 4, Layer 5 of the spec.
 
     Rules:
     - Out-of-scope question -> refusal (reason_code="out_of_scope")
-    - Exact match wins
-    - Multiple candidates scoring within 0.05 of each other -> refusal (reason_code="ambiguous_entity")
+    - An exact or basename match beats a partial token match
+    - Ambiguity is kept only when two genuinely different entities tie
+    - Tokens from the repository name, which sit in every path, are ignored
     - No candidate found -> refusal (reason_code="entity_not_found")
     """
     if is_out_of_scope(question):
@@ -164,7 +180,7 @@ def resolve_entity(
             error_message="Question is not about a repository code entity, file, or configuration.",
         )
 
-    tokens = extract_query_tokens(question)
+    tokens = extract_query_tokens(question) - _repository_tokens(repository)
     if not tokens:
         return ResolutionResult(
             outcome=ResolutionOutcome.REFUSAL,
@@ -216,14 +232,100 @@ def resolve_entity(
         )
 
     # Only weak matches remain. They identify an entity solely when they agree on a
-    # single one; otherwise they are coincidences and nothing was named.
+    # single one; a real tie between different entities is still ambiguous.
     top = scored[0]
     weak_ties = [c for c in scored if c.score == top.score]
-    if top.score >= PARTIAL_MATCH and len(_distinct_ids(weak_ties)) == 1:
-        return ResolutionResult(outcome=ResolutionOutcome.SUCCESS, entity=weak_ties[0])
+    if top.score >= PARTIAL_MATCH:
+        if len(_distinct_ids(weak_ties)) == 1:
+            return ResolutionResult(outcome=ResolutionOutcome.SUCCESS, entity=weak_ties[0])
+        return ResolutionResult(
+            outcome=ResolutionOutcome.AMBIGUOUS,
+            candidates=weak_ties,
+            reason_code="ambiguous_entity",
+            error_message="Question matches multiple code entities. Please select one.",
+        )
 
     return ResolutionResult(
         outcome=ResolutionOutcome.REFUSAL,
         reason_code="entity_not_found",
         error_message="No code entity matched with sufficient confidence.",
+    )
+
+
+#: Words that carry no entity information and would match almost any decision text.
+_STOPWORDS: frozenset[str] = frozenset(
+    {
+        "why", "how", "what", "when", "where", "which", "who", "does", "did", "was",
+        "were", "are", "the", "and", "for", "with", "into", "from", "this", "that",
+        "these", "those", "about", "have", "has", "had", "been", "still", "like",
+        "code", "repo", "make", "made", "team", "time", "test", "work", "use", "used",
+        "using", "add", "added", "remove", "removed", "revert", "reverted", "change",
+        "changed", "changes", "support", "will", "would", "should", "could",
+    }
+)
+
+
+def _significant_words(question: str) -> list[str]:
+    """Lower-cased words from a question that could name a decision's subject."""
+    words: list[str] = []
+    for word in re.findall(r"[a-zA-Z0-9_]{3,}", question):
+        low = word.lower()
+        if low in _STOPWORDS or low in words:
+            continue
+        words.append(low)
+    return words
+
+
+def resolve_entity_from_decisions(
+    question: str,
+    store: Any,
+    repo: str,
+    limit: int = 5,
+) -> Optional[ResolutionResult]:
+    """Resolve an entity from the decisions a question's own text matches.
+
+    Used when the question names no entity: the decisions are found from their text
+    (the evidence full-text index plus summary and rationale), and the entity is taken
+    from the decisions through GOVERNS. Returns None when nothing matches, so the
+    caller keeps its original refusal rather than inventing an entity.
+    """
+    tokens = _significant_words(question)
+    if not tokens:
+        return None
+
+    decisions = store.search_decisions(repo, tokens, limit=limit)
+    if not decisions:
+        return None
+
+    # How many of the top decisions each entity is governed by. The entity the
+    # question is really about is the one the strongest decisions agree on.
+    support: dict[str, tuple[int, dict[str, Any]]] = {}
+    for decision in decisions[:3]:
+        for entity in store.get_entities_for_decision(str(decision.get("id", ""))):
+            key = str(entity.get("id") or entity.get("name"))
+            count, _ = support.get(key, (0, entity))
+            support[key] = (count + 1, entity)
+
+    if not support:
+        return None
+
+    best = max(count for count, _ in support.values())
+    winners = [entity for count, entity in support.values() if count == best]
+    candidates = [
+        EntityCandidate(
+            id=str(entity.get("id", entity.get("name", ""))),
+            name=str(entity.get("name", "")),
+            path=str(entity.get("path", entity.get("name", ""))),
+            entity_type=str(entity.get("entity_type", "File")),
+            score=float(best),
+        )
+        for entity in winners
+    ]
+    if len(candidates) == 1:
+        return ResolutionResult(outcome=ResolutionOutcome.SUCCESS, entity=candidates[0])
+    return ResolutionResult(
+        outcome=ResolutionOutcome.AMBIGUOUS,
+        candidates=candidates,
+        reason_code="ambiguous_entity",
+        error_message="The matching decisions point at more than one entity. Please name one.",
     )

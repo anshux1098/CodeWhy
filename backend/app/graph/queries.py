@@ -31,3 +31,27 @@ WITH DISTINCT node
 LIMIT $node_cap
 RETURN node, labels(node) AS labels
 """
+
+# Decisions whose own text mentions the question's words, ranked by how often the
+# evidence quotes mention them. Used when a question names no entity.
+SEARCH_DECISIONS_BY_TEXT: Final[str] = """
+CALL db.index.fulltext.queryNodes('evidence_quote_fulltext', $q)
+YIELD node AS ev, score
+MATCH (d:Decision)-[:SUPPORTED_BY]->(ev)
+WHERE d.repo = $repo
+RETURN d AS decision, score
+"""
+
+SEARCH_DECISIONS_BY_SUMMARY: Final[str] = """
+MATCH (d:Decision {repo: $repo})
+WHERE any(t IN $tokens WHERE
+  toLower(coalesce(d.summary, '')) CONTAINS toLower(t) OR
+  toLower(coalesce(d.rationale, '')) CONTAINS toLower(t))
+RETURN d AS decision
+"""
+
+# The entities a decision governs, used to turn matched decisions into an entity.
+GET_ENTITIES_FOR_DECISION: Final[str] = """
+MATCH (d:Decision {id: $decision_id})-[:GOVERNS]->(e:CodeEntity)
+RETURN e
+"""

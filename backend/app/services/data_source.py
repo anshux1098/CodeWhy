@@ -17,6 +17,7 @@ from app.services.entity_resolution import (
     ResolutionOutcome,
     ResolutionResult,
     resolve_entity,
+    resolve_entity_from_decisions,
 )
 from app.services.retrieval import retrieve_evidence
 from app.stores.graph_store import BaseGraphStore, get_graph_store
@@ -230,7 +231,19 @@ class GraphDataSource:
         if request.entity_id is not None:
             resolution = self._resolve_explicit_entity(repository_id, request.entity_id)
         else:
-            resolution = resolve_entity(request.question, all_entities)
+            resolution = resolve_entity(request.question, all_entities, repository_id)
+            # The question named no entity, so try to find the decisions from their
+            # own text and take the entity from them. An out-of-scope question, and a
+            # genuine tie between two entities, are left as they are.
+            if (
+                resolution.outcome == ResolutionOutcome.REFUSAL
+                and resolution.reason_code != "out_of_scope"
+            ):
+                from_decisions = resolve_entity_from_decisions(
+                    request.question, self.store, repository_id
+                )
+                if from_decisions is not None:
+                    resolution = from_decisions
 
         bundle = None
         if resolution.entity:

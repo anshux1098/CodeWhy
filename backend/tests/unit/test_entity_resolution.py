@@ -65,6 +65,10 @@ def test_a_repository_name_in_every_path_is_not_an_entity_reference() -> None:
         _entity("src/urllib3/connection.py"),
         _entity("src/urllib3/connectionpool.py"),
     ]
-    result = resolve_entity("Why does urllib3 use Kubernetes for orchestration?", entities)
+    result = resolve_entity(
+        "Why does urllib3 use Kubernetes for orchestration?",
+        entities,
+        repository="urllib3/urllib3",
+    )
     assert result.outcome is ResolutionOutcome.REFUSAL
     assert result.reason_code == "entity_not_found"

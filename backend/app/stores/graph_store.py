@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import logging
+import re
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Sequence
 
 from app.config import Settings, settings
 from app.graph.queries import (
     GET_DECISIONS_GOVERNING_ENTITY,
+    GET_ENTITIES_FOR_DECISION,
     GET_SUBGRAPH_FOR_ENTITY,
+    SEARCH_DECISIONS_BY_SUMMARY,
+    SEARCH_DECISIONS_BY_TEXT,
 )
 from app.graph.schema import (
     FULLTEXT_INDEX_QUERY,
@@ -120,6 +124,23 @@ class BaseGraphStore(ABC):
     @abstractmethod
     def get_decisions_for_entity(self, entity_id: str) -> list[dict[str, Any]]:
         """Fetch decisions governing an entity, including connected evidence."""
+        ...
+
+    @abstractmethod
+    def search_decisions(
+        self, repo: str, tokens: Sequence[str], limit: int = 5
+    ) -> list[dict[str, Any]]:
+        """Find a repository's decisions whose text mentions the given tokens.
+
+        Ranked most-mentioned first. Used to answer a question that names no entity:
+        the decisions are found from their own text and an entity is derived from them
+        through GOVERNS.
+        """
+        ...
+
+    @abstractmethod
+    def get_entities_for_decision(self, decision_id: str) -> list[dict[str, Any]]:
+        """The code entities a decision GOVERNS."""
         ...
 
     @abstractmethod
@@ -295,6 +316,38 @@ class InMemoryGraphStore(BaseGraphStore):
                 decisions.append(dec_props)
         return decisions
 
+    def search_decisions(
+        self, repo: str, tokens: Sequence[str], limit: int = 5
+    ) -> list[dict[str, Any]]:
+        wanted = [t.lower() for t in tokens if t and t.strip()]
+        if not wanted:
+            return []
+        scored: list[tuple[int, dict[str, Any]]] = []
+        for node_id, props in self.nodes.items():
+            if "Decision" not in self.labels.get(node_id, set()):
+                continue
+            if props.get("repo") != repo:
+                continue
+            blob = f"{props.get('summary', '')} {props.get('rationale') or ''}".lower()
+            mentions = sum(1 for token in wanted if token in blob)
+            for (d_id, rel, ev_id) in self.edges:
+                if d_id == node_id and rel == "SUPPORTED_BY":
+                    quote = str(self.nodes.get(ev_id, {}).get("quote", "")).lower()
+                    mentions += sum(1 for token in wanted if token in quote)
+            if mentions:
+                scored.append((mentions, dict(props)))
+        scored.sort(key=lambda pair: pair[0], reverse=True)
+        return [props for _, props in scored[:limit]]
+
+    def get_entities_for_decision(self, decision_id: str) -> list[dict[str, Any]]:
+        entities: list[dict[str, Any]] = []
+        for (f_id, rel, t_id) in self.edges:
+            if f_id == decision_id and rel == "GOVERNS":
+                node = self.nodes.get(t_id)
+                if node and "CodeEntity" in self.labels.get(t_id, set()):
+                    entities.append(dict(node))
+        return entities
+
     def get_subgraph(
         self,
         repo: str,
@@ -462,6 +515,50 @@ class Neo4jGraphStore(BaseGraphStore):
                 d["sources"] = [dict(s) for s in record.get("sources", [])]
                 items.append(d)
             return items
+
+    def search_decisions(
+        self, repo: str, tokens: Sequence[str], limit: int = 5
+    ) -> list[dict[str, Any]]:
+        clean = [t.strip() for t in tokens if t and t.strip()]
+        if not clean:
+            return []
+        # Lucene treats punctuation as operators, so each token is reduced to its
+        # word characters before it is OR-ed into the full-text query.
+        terms = [re.sub(r"[^\w]+", "", token) for token in clean]
+        terms = [term for term in terms if term]
+        scores: dict[str, float] = {}
+        rows: dict[str, dict[str, Any]] = {}
+        with self.driver.session(database=self.database) as session:
+            if terms:
+                lucene = " OR ".join(terms)
+                try:
+                    for record in session.run(
+                        SEARCH_DECISIONS_BY_TEXT,
+                        q=lucene,
+                        repo=repo,
+                    ):
+                        decision = dict(record["decision"])
+                        rows[decision["id"]] = decision
+                        scores[decision["id"]] = scores.get(decision["id"], 0.0) + float(
+                            record["score"]
+                        )
+                except Exception as exc:  # noqa: BLE001 - fall back to substring matching
+                    logger.warning("full-text decision search unavailable: %s", type(exc).__name__)
+            for record in session.run(
+                SEARCH_DECISIONS_BY_SUMMARY,
+                repo=repo,
+                tokens=clean,
+            ):
+                decision = dict(record["decision"])
+                rows.setdefault(decision["id"], decision)
+                scores[decision["id"]] = scores.get(decision["id"], 0.0) + 1.0
+        ranked = sorted(rows.values(), key=lambda d: scores.get(d.get("id", ""), 0.0), reverse=True)
+        return ranked[:limit]
+
+    def get_entities_for_decision(self, decision_id: str) -> list[dict[str, Any]]:
+        with self.driver.session(database=self.database) as session:
+            result = session.run(GET_ENTITIES_FOR_DECISION, decision_id=decision_id)
+            return [dict(record["e"]) for record in result]
 
     def get_subgraph(
         self,
