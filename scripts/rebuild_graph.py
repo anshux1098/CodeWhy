@@ -138,7 +138,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--repo",
         type=str,
-        default="hynek/structlog",
+        default="urllib3/urllib3",
         help="Repository identifier (owner/repo)",
     )
     parser.add_argument(
