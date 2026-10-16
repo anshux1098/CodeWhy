@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import sqlite3
 from contextlib import contextmanager
@@ -10,6 +11,8 @@ from pathlib import Path
 from typing import Any, Iterator, Optional
 
 from app.prompts.extract_decision import mark_injection_flag
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS raw_objects (
@@ -902,9 +905,41 @@ class SqliteCache:
     # Decisions & Evidence
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _decision_would_degrade(existing: sqlite3.Row, incoming: dict[str, Any]) -> bool:
+        """Whether writing `incoming` over `existing` would lose verified content.
+
+        A stored decision that is quote-verified is authoritative. It may only be
+        replaced by a record that is at least as good: still quote-verified and
+        carrying a non-empty summary and rationale. A placeholder, a result whose
+        quotes all failed verification, or a blank summary is therefore refused.
+        """
+        if not existing["quote_verified"]:
+            return False
+        if not incoming.get("quote_verified"):
+            return True
+        summary = (incoming.get("summary") or "").strip()
+        rationale = (incoming.get("rationale") or "").strip()
+        return not summary or not rationale
+
     def put_decision(self, row: dict[str, Any]) -> bool:
-        """Upsert an extracted decision record. Returns True."""
+        """Upsert an extracted decision record.
+
+        A re-run must never degrade a record that was good: see
+        `_decision_would_degrade`. Returns True when the row was written and False
+        when a weaker record was refused in favour of the stored one.
+        """
         with self.transaction() as connection:
+            existing = connection.execute(
+                "SELECT summary, rationale, quote_verified FROM decisions WHERE id = ?",
+                (row["id"],),
+            ).fetchone()
+            if existing is not None and self._decision_would_degrade(existing, row):
+                logger.warning(
+                    "Refused to overwrite verified decision %s with a weaker record",
+                    row["id"],
+                )
+                return False
             connection.execute(
                 "INSERT INTO decisions "
                 "(id, source_id, repo, summary, decision_type, rationale, state, "
@@ -961,8 +996,26 @@ class SqliteCache:
         return count
 
     def put_evidence(self, row: dict[str, Any]) -> bool:
-        """Upsert a verified evidence quote. Returns True."""
+        """Upsert a verified evidence quote.
+
+        Evidence is only ever added or kept. Nothing here deletes a row, and a
+        verified quote is never rewritten as unverified: a re-run that could not
+        re-verify an old quote must not erase the fact that it once verified.
+        Returns True when written and False when a verified row was protected.
+        """
         with self.transaction() as connection:
+            existing = connection.execute(
+                "SELECT quote_verified FROM evidence WHERE id = ?", (row["id"],)
+            ).fetchone()
+            if (
+                existing is not None
+                and existing["quote_verified"]
+                and not row.get("quote_verified", True)
+            ):
+                logger.warning(
+                    "Kept verified evidence %s; refused an unverified rewrite", row["id"]
+                )
+                return False
             connection.execute(
                 "INSERT INTO evidence "
                 "(id, decision_id, source_id, source_type, source_url, "
