@@ -66,6 +66,25 @@ def _touches_target_files(payload: dict[str, Any]) -> bool:
     )
 
 
+def changed_files_from_payload(payload: dict[str, Any]) -> list[str]:
+    """The file paths an ingested payload records, in order and without blanks.
+
+    These become the decision's affected entities. The stored payload is untrusted
+    JSON, so anything that is not a non-empty string is dropped rather than passed
+    through into the graph, and a path repeated in the payload is listed once.
+    """
+    files = payload.get("files")
+    if not isinstance(files, list):
+        return []
+    seen: set[str] = set()
+    result: list[str] = []
+    for name in files:
+        if isinstance(name, str) and name.strip() and name not in seen:
+            seen.add(name)
+            result.append(name)
+    return result
+
+
 def _sort_key(row: dict[str, Any]) -> tuple[int, int, str]:
     """Rank a candidate: pinned pull requests, then target files, then everything else.
 
@@ -484,6 +503,7 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
         body = raw_payload.get("body", "")
         author = raw_payload.get("author", {}).get("login") if isinstance(raw_payload.get("author"), dict) else None
         created_at = raw_payload.get("createdAt") or raw_payload.get("created_at")
+        changed_files = changed_files_from_payload(raw_payload)
 
         if args.dry_run:
             logger.info("[DRY-RUN] %d/%d %s (%s) %s", position, len(pending), source_id, title[:50], source_url)
@@ -503,6 +523,7 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
                 body=body,
                 author=author,
                 created_at=created_at,
+                changed_files=changed_files,
                 extraction_version=EXTRACTION_VERSION,
             )
         except TokenBudgetExhaustedError:

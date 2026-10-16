@@ -86,6 +86,47 @@ def mark_done(cache: SqliteCache, source_id: str, status: str = "no_decision") -
     )
 
 
+def test_changed_files_from_payload_drops_blanks_and_duplicates() -> None:
+    """The payload is untrusted JSON: only non-empty strings are kept, once each."""
+    assert extract_module.changed_files_from_payload(
+        {"files": ["a.py", "", None, "a.py", "   ", "b.py"]}
+    ) == ["a.py", "b.py"]
+    assert extract_module.changed_files_from_payload({"files": "not-a-list"}) == []
+    assert extract_module.changed_files_from_payload({}) == []
+
+
+def test_payload_files_reach_the_extractor_as_changed_files(
+    cache: SqliteCache, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """affected_entities is built from changed_files, so the payload's file list has
+    to reach the extractor. Without it every decision carries no entity, the graph
+    gets no GOVERNS edges, and /ask cannot resolve anything."""
+    from app.providers.llm_provider import MockLLMProvider
+
+    captured: dict[str, Any] = {}
+
+    monkeypatch.setattr(
+        extract_module, "get_llm_provider",
+        lambda **kw: MockLLMProvider(canned_response=json.dumps({"decisions": []})),
+    )
+    monkeypatch.setattr(extract_module, "build_links", lambda *a, **k: 0)
+    monkeypatch.setattr(extract_module, "summarise_injection_flags", lambda rows: {
+        "sources_total": len(rows), "sources_flagged": 0,
+    })
+
+    def fake_extract(**kwargs):
+        captured.update(kwargs)
+        return []
+
+    monkeypatch.setattr(extract_module, "extract_decisions_from_source", fake_extract)
+
+    extract_module.main([
+        "--cache", str(cache.path), "--repo", REPO, "--sources", f"pr:{REPO}#1397",
+    ])
+
+    assert captured["changed_files"] == ["src/urllib3/connectionpool.py"]
+
+
 def test_the_priority_sources_are_chosen_first(
     cache: SqliteCache, monkeypatch: pytest.MonkeyPatch
 ) -> None:
