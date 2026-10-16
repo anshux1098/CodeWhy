@@ -56,10 +56,14 @@ def test_live_database_explains_every_query() -> None:
     assert isinstance(store, Neo4jGraphStore), "EXPLAIN needs a real Neo4j store"
     try:
         for name, text in _query_constants().items():
-            params = {
-                param: (10 if param in {"node_cap", "cap", "limit"} else "x")
-                for param in re.findall(r"\$(\w+)", text)
-            }
+            params = {}
+            for param in re.findall(r"\$(\w+)", text):
+                if param in {"tokens"}:
+                    params[param] = ["x"]
+                elif param in {"node_cap", "cap", "limit"}:
+                    params[param] = 10
+                else:
+                    params[param] = "x"
             with store.driver.session(database=store.database) as session:
                 session.run("EXPLAIN " + text, **params).consume()
     finally:
