@@ -98,8 +98,8 @@ def test_rebuild_graph_fails_loudly_on_a_missing_edge_endpoint(tmp_path: Path) -
         cache.put_link({
             "id": "l1", "repo": "acme/netclient",
             "source_id": "commit:abc", "source_type": "commit",
-            "rel_type": "REVERTS", "target_id": "pr:acme/netclient#7",
-            "target_type": "pull_request", "is_direct": 1,
+            "rel_type": "REVERTS", "target_id": "file:acme/netclient:src/gone.py",
+            "target_type": "file", "is_direct": 1,
             "derivation_method": "revert_subject", "confidence": 1.0,
             "metadata_json": "{}", "created_at": "2026-01-01T00:00:00Z",
         })
@@ -107,7 +107,10 @@ def test_rebuild_graph_fails_loudly_on_a_missing_edge_endpoint(tmp_path: Path) -
     assert missing, "a link whose endpoints do not exist must be reported"
     rel, ids = missing
     assert rel == "REVERTS"
-    assert "commit:abc" in ids
+    # A file endpoint is never stubbed: it has to come from real file history, so a
+    # missing one is a fault. A source endpoint (commit/pr/issue/doc) is, by contrast,
+    # materialised from its id because a commit may name a pull request never ingested.
+    assert "file:acme/netclient:src/gone.py" in ids
 
 
 def test_rebuild_graph_reports_actual_graph_state(tmp_path: Path) -> None:
