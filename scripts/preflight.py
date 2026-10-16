@@ -10,14 +10,13 @@ back in an error, that text is masked before it reaches stdout.
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
-from app.config import Settings, settings  # noqa: E402
+from app.config import settings  # noqa: E402
 
 #: Values that must never appear in output, even inside an error message.
 SECRET_FIELDS = (

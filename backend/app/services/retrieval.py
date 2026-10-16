@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Callable, Optional
 
 from app.config import Settings, settings
 from app.providers.embeddings import BaseEmbeddingProvider, get_embedding_provider

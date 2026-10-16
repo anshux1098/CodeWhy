@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
 from app.config import Settings, SettingsError
-from app.services.ingest.github_client import GitHubAuthError, GitHubGraphQLClient
+from app.services.ingest.github_client import GitHubGraphQLClient
 from app.services.ingest.pipeline import build_plan, run_ingest
 from app.services.ingest.targets import load_targets, require_matching_repo
 from app.stores.sqlite_cache import SqliteCache

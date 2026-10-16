@@ -9,12 +9,11 @@ from typing import Any, Optional, Sequence
 from app.schemas.common import EntityType, SourceType
 from app.services.ingest.git_collect import (
     GITHUB_ISSUE_URL,
-    GITHUB_PULL_URL,
     ISSUE_REFERENCE,
     extract_pull_request_numbers,
     strip_code,
 )
-from app.stores.sqlite_cache import SqliteCache, stable_id
+from app.stores.sqlite_cache import stable_id
 
 REVERT_COMMIT_PATTERN = re.compile(
     r"This reverts commit ([0-9a-f]{7,40})", re.IGNORECASE

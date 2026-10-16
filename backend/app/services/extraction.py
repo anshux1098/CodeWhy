@@ -3,9 +3,8 @@ from __future__ import annotations
 import re
 
 import hashlib
-import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Final, Literal, Optional, Sequence
 
@@ -14,8 +13,8 @@ from pydantic import BaseModel, ConfigDict, Field
 EMAIL_SHAPED = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
 from app.prompts.extract_decision import build_extraction_prompt, detect_injection_attempt
-from app.providers.llm_provider import BaseLLMProvider, LLMResponse, LLMSchemaValidationError
-from app.schemas.common import DecisionState, SourceType
+from app.providers.llm_provider import BaseLLMProvider, LLMSchemaValidationError
+from app.schemas.common import DecisionState
 from app.services.quote_check import (
     FALLBACK_RATIONALE_UNKNOWN,
     MAX_QUOTE_CHARS,

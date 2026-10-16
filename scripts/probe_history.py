@@ -10,7 +10,6 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from app.config import Settings, SettingsError
 from app.services.ingest.git_probe import (
-    GIT_TIMEOUT_SECONDS,
     METRIC_DEFINITIONS,
     MIN_CONSTANT_COMMITS,
     TOP_CONSTANTS,

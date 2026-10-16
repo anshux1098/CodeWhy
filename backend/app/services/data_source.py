@@ -7,7 +7,7 @@ from app.config import Settings, settings
 from app.services.errors import DataSourceError
 from app.providers.llm_provider import get_llm_provider
 from app.schemas.common import DecisionState, EntityType, SourceType
-from app.schemas.decisions import Citation, DecisionDetail, SourceRef
+from app.schemas.decisions import DecisionDetail, SourceRef
 from app.schemas.entities import Entity, EntityListResponse
 from app.schemas.graph import GraphEdge, GraphNode, GraphResponse
 from app.schemas.repository import RepositoryCounts, RepositoryResponse
