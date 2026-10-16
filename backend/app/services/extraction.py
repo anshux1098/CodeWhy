@@ -28,6 +28,44 @@ logger = logging.getLogger(__name__)
 
 EXTRACTION_VERSION: Final[str] = "v1"
 
+#: A change that explains a decision lives in the library itself, so only a path
+#: under the package is kept as an affected entity.
+LIBRARY_SOURCE_PREFIX: Final[str] = "src/urllib3/"
+
+#: Vendored third-party code is not urllib3's own decision, so it is dropped even
+#: though it sits under the package.
+VENDORED_SOURCE_PREFIX: Final[str] = "src/urllib3/packages/"
+
+
+def filter_affected_entities(
+    changed_files: Sequence[str],
+    config_keys: Sequence[str] = (),
+) -> list[str]:
+    """The entities that explain a decision, narrowed to what actually matters.
+
+    A path is kept only when it is the library's own source: a test, a doc, a build
+    file or vendored code records no decision, and keeping them turned a one-file
+    change into a Governs edge to every file a large pull request happened to touch.
+    A configuration key is kept as given — the caller supplies only keys read from a
+    target file, so a key that merely appears in some diff is not attributed here.
+
+    The result is sorted and de-duplicated, so the same set is stored however the
+    payload happened to order it.
+    """
+    kept: set[str] = set()
+    for name in changed_files:
+        if not isinstance(name, str):
+            continue
+        candidate = name.strip()
+        if candidate.startswith(LIBRARY_SOURCE_PREFIX) and not candidate.startswith(
+            VENDORED_SOURCE_PREFIX
+        ):
+            kept.add(candidate)
+    for key in config_keys:
+        if isinstance(key, str) and key.strip():
+            kept.add(key.strip())
+    return sorted(kept)
+
 
 # ---------------------------------------------------------------------------
 # Decision Types
@@ -352,7 +390,7 @@ def extract_decisions_from_source(
 
     # 4. Code enrichment and quote verification
     records: list[ExtractedDecisionRecord] = []
-    affected_entities = sorted(set(list(changed_files) + list(config_keys)))
+    affected_entities = filter_affected_entities(changed_files, config_keys)
 
     for idx, raw_dec in enumerate(parsed.decisions):
         dec_id = make_decision_id(source_id, extraction_version, idx)
