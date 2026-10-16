@@ -6,9 +6,13 @@ CodeWhy answers *"why is this code like this?"* for a software repository by rec
 
 ---
 
-## Current Status: Phase 3 Complete (Graph & Ask)
+## Current Status: Phases 0–3 Complete, Exercised on a Real Repository
 
-The project has advanced through **Phase 0, Phase 1, Phase 2, and Phase 3**. All backend contracts, data ingestion, deterministic linking, AST constant history, noise filtering, decision extraction with verbatim quote checks, Neo4j graph stores, and the 4-gate grounded `/ask` pipeline are fully implemented and verified with **98 passing unit and integration tests**.
+The project has advanced through **Phase 0, Phase 1, Phase 2, and Phase 3**. All backend contracts, data ingestion, deterministic linking, AST constant history, noise filtering, decision extraction with verbatim quote checks, Neo4j graph stores, and the 4-gate grounded `/ask` pipeline are implemented. The suite collects **934 tests**: **923 pass with zero credentials and no `.env` file**, and **11 live tests** (marked `live`, run with `RUN_LIVE=1`) exercise the real Neo4j store, the Cypher `EXPLAIN` plan, and the stored source-text round trip.
+
+The pipeline has been run end to end on the real repository `urllib3/urllib3`: ingest → extract → link → build the Neo4j graph → answer grounded `/ask` questions. The two HTTP/2 questions resolve to `src/urllib3/util/ssl_.py` and answer from the pull request #3456 and #3466 quotes; the questions that name no real entity refuse honestly. `scripts/check_live_answers.py` runs the six questions against a live server and prints every response, including each citation's quote and URL.
+
+A repository is addressed by its **slug id** (`urllib3/urllib3` → `urllib3-urllib3`); the graph build maps the slug back to the GitHub `owner/name` when it writes nodes.
 
 The running example is the fixture repository `acme-netclient`, which does not exist on GitHub.
 Its people, pull request numbers and quotes are fictional, and every response carries
@@ -28,7 +32,7 @@ Real-repository targets are defined under [`targets/`](targets/):
 | **0** | **Contract & Fixtures** | ✅ Complete | Frozen Pydantic v2 schemas, OpenAPI specification, synthetic fixture data source, and strict response rule validators. |
 | **1** | **Data In (Ingestion)** | ✅ Complete | Clone-first `git log --follow`, GitHub GraphQL batched client (20 PRs/query), SQLite cache (`data/ingest.sqlite3`) with stable IDs, rate-limit backoff, and email redaction. |
 | **2** | **Linking & Decision Extraction** | ✅ Complete | Deterministic link extraction (`REVERTS`, `PART_OF`, `REFERENCES`, `SUPERSEDES`), AST constant & config history, 8 noise filters with revert protection, bounded token budget guard, prompt injection defense, Pydantic extraction schema, and 100% verbatim substring quote verification. |
-| **3** | **Graph & Grounded Ask** | ✅ Complete | Neo4j schema & constraints, 384-dim vector index, parameterized Cypher queries, `scripts/rebuild_graph.py`, 384-dim embeddings, rule-based entity resolution, hybrid GraphRAG retrieval, 4-gate refusal pipeline (G1–G4), grounded answer service with citation post-validation, and `GraphDataSource`. |
+| **3** | **Graph & Grounded Ask** | ✅ Complete | Neo4j schema & constraints, 384-dim vector index (created; retrieval uses local cosine over a one-hop neighbourhood, not the index), parameterized Cypher queries, `scripts/rebuild_graph.py`, 384-dim embeddings, rule-based entity resolution, hybrid GraphRAG retrieval, 4-gate refusal pipeline (G1–G4), grounded answer service with citation post-validation, and `GraphDataSource`. |
 | **4** | **History, Confidence & Who-to-Ask** | ⏳ Next | Supersession rules 1 to 3b, temporal state machine (`ACTIVE`, `SUPERSEDED`, `REJECTED`, `UNRESOLVED`), reversal-of-reversal chain preservation, contributor ranking (`who_to_ask`). |
 | **5** | **Proof & Polish** | ⏳ Upcoming | 50-question benchmark (`benchmark/questions.jsonl`), evaluation script (`scripts/evaluate.py`), and React frontend integration. |
 
@@ -95,7 +99,7 @@ Phase 3 builds the connected graph view and grounded retrieval pipeline:
 1. **Neo4j Schema & Constraints** ([`backend/app/graph/schema.py`](backend/app/graph/schema.py)):
    - Unique ID constraints on all 11 node types (`Repository`, `CodeEntity`, `Decision`, `PullRequest`, `Commit`, `Issue`, `Discussion`, `Person`, `Evidence`, `Document`, `Incident`).
    - Property indexes on code entity paths, names, and decision states.
-   - 384-dimensional cosine vector index (`decision_vector_index`) on `Decision.embedding`.
+   - 384-dimensional cosine vector index (`decision_vector_index`) on `Decision.embedding`. It is created by the schema but is **not queried yet**; retrieval scores candidates with local cosine over a one-hop neighbourhood (see Retrieval below).
    - Full-text index on `Evidence.quote`.
 2. **Parameterized Cypher Queries** ([`backend/app/graph/queries.py`](backend/app/graph/queries.py)):
 3. **Graph Stores** ([`backend/app/stores/graph_store.py`](backend/app/stores/graph_store.py)):
@@ -107,14 +111,21 @@ Phase 3 builds the connected graph view and grounded retrieval pipeline:
    - Integrates SentenceTransformers `all-MiniLM-L6-v2` with a deterministic offline hash projection fallback.
 6. **Entity Resolution** ([`backend/app/services/entity_resolution.py`](backend/app/services/entity_resolution.py)):
    - Rule-based candidate matching from questions (paths, `UPPER_CASE` constants, dotted keys, quoted names).
-   - Exact match wins (1.0).
-   - If multiple candidates score within `0.05` of each other, returns `Outcome: refusal, reason_code: ambiguous_entity` with candidate picker choices.
+   - An exact full-path or basename match beats a bare partial token match.
+   - Ambiguity (`ambiguous_entity`) is kept only when two genuinely different entities tie.
+     Tokens that come from the repository name, and path components contained in a longer
+     named path, are ignored, so a generic word cannot tie the whole repository.
+   - A question that names no entity falls back to the decisions whose own text matches it
+     and takes the entity those decisions govern; a path that is named but not in the graph
+     is `entity_not_found`.
    - Non-code questions return `out_of_scope`. Unmatched terms return `entity_not_found`.
 7. **Hybrid GraphRAG Retrieval** ([`backend/app/services/retrieval.py`](backend/app/services/retrieval.py)):
    - Performs a single `GOVERNS` hop from the resolved entity. It does **not** traverse
      `SUPERSEDES` or `REVERTS`; see "Not implemented yet" below.
    - Bounded evidence bundle capped at `MAX_EVIDENCE_ITEMS` (12 items).
-   - Semantic similarity scored only on candidate decisions in the entity's neighborhood.
+   - Semantic similarity is scored with **local cosine over the one-hop neighbourhood**.
+     The 384-dim vector index (`decision_vector_index`) exists in the schema but is not
+     queried; similarity is computed in process against the candidate decisions.
    - Contradiction detection across opposing evidence and unresolved links.
 8. **4-Gate Refusal Pipeline** ([`backend/app/services/gate.py`](backend/app/services/gate.py)):
    - **G1 Entity**: Validates single resolved entity (otherwise `entity_not_found`, `out_of_scope`, or `ambiguous_entity`).
@@ -166,7 +177,7 @@ The test suite runs with **zero credentials and no required `.env` file**.
 
 ### Run the Phase 2 and Phase 3 tests
 
-The full suite collects **655 tests**. It needs no credentials and no `.env` file.
+The full suite collects **934 tests**. It needs no credentials and no `.env` file; the 11 `live` tests skip unless `RUN_LIVE=1` is set.
 ```powershell
 .\.venv\Scripts\pytest.exe backend/tests/unit/test_phase3.py backend/tests/unit/test_extraction.py backend/tests/unit/test_linking.py backend/tests/unit/test_config_keys.py backend/tests/unit/test_noise.py -v
 ```
@@ -293,7 +304,8 @@ codewhy/
 |   |- probe_targets.py               # Per-file and constant history probe
 |   |- probe_history.py               # Full-history reverts and constant value changes
 |   |- sample_repos.py                # Recent pull request sampling across candidates
-|   `- export_contract.py             # Regenerates contract JSON files
+|   |- export_contract.py             # Regenerates contract JSON files
+|   `- check_live_answers.py          # Runs the six C13 questions against a live server
 |- targets/
 |   |- urllib3__urllib3.json          # Test bed targets for urllib3/urllib3
 |   `- sqlalchemy__alembic.json       # Draft targets, never ingested
