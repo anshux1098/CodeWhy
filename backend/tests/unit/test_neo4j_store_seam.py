@@ -162,3 +162,39 @@ def test_the_graph_source_finds_a_repository_through_the_neo4j_store(store) -> N
 
     assert source._has_repository_node("acme-netclient") is True
     assert source._has_repository_node("acme-other") is False
+
+
+@pytest.mark.live
+def test_live_store_reads_the_source_text_back_from_the_database() -> None:
+    """The seam tests use a fake driver; this one talks to the real database.
+
+    Set RUN_LIVE=1 to run it. A probe node is written under a unique id, read back
+    through the store's own query, then deleted in a finally block, so the live graph
+    is left exactly as it was found.
+    """
+    import os
+    import uuid
+
+    if os.environ.get("RUN_LIVE") != "1":
+        pytest.skip("set RUN_LIVE=1 to exercise the real Neo4j store")
+
+    from app.config import settings as global_settings
+    from app.stores.graph_store import get_graph_store
+
+    global_settings.require_neo4j()
+    store = get_graph_store(global_settings)
+    assert isinstance(store, Neo4jGraphStore), "the live probe requires a real store"
+
+    probe_id = f"live-probe:{uuid.uuid4()}"
+    text = "the stored source text a quote is re-checked against"
+    try:
+        store.merge_node("CodeEntity", {"id": probe_id, "repo": "live-probe", "text": text})
+
+        assert store.source_text_for(probe_id) == text
+        assert isinstance(store.node_count(), int)
+        assert isinstance(store.label_counts(), dict)
+        assert isinstance(store.relationship_type_counts(), dict)
+    finally:
+        with store.driver.session(database=store.database) as session:
+            session.run("MATCH (n {id: $id}) DETACH DELETE n", id=probe_id)
+        store.close()
