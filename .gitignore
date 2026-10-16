@@ -11,3 +11,7 @@ data/*
 .superpowers/
 docs/superpowers/
 review/decisions_sample.md
+answers.json
+server.out.log
+server.err.log
+build*.log
