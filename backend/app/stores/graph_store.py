@@ -143,6 +143,16 @@ class BaseGraphStore(ABC):
         """How many relationships are present, read back from the store."""
         ...
 
+    @abstractmethod
+    def label_counts(self) -> dict[str, int]:
+        """How many nodes carry each label, read back from the store."""
+        ...
+
+    @abstractmethod
+    def relationship_type_counts(self) -> dict[str, int]:
+        """How many relationships there are of each type, read back from the store."""
+        ...
+
     def source_text_for(self, source_id: str) -> str:
         """The stored text a quote is re-verified against at answer time.
 
@@ -189,6 +199,19 @@ class InMemoryGraphStore(BaseGraphStore):
 
     def relationship_count(self) -> int:
         return len(self.edges)
+
+    def label_counts(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for labels in self.labels.values():
+            for label in labels:
+                counts[label] = counts.get(label, 0) + 1
+        return dict(sorted(counts.items()))
+
+    def relationship_type_counts(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for (_from_id, rel_type, _to_id) in self.edges:
+            counts[rel_type] = counts.get(rel_type, 0) + 1
+        return dict(sorted(counts.items()))
 
     def init_schema(self) -> None:
         # In-memory stores have implicit constraints
@@ -508,6 +531,24 @@ class Neo4jGraphStore(BaseGraphStore):
         with self.driver.session(database=self.database) as session:
             record = session.run("MATCH ()-[r]->() RETURN count(r) AS c").single()
         return int(record["c"]) if record else 0
+
+    def label_counts(self) -> dict[str, int]:
+        with self.driver.session(database=self.database) as session:
+            return {
+                str(record["l"]): int(record["c"])
+                for record in session.run(
+                    "MATCH (n) UNWIND labels(n) AS l RETURN l, count(*) AS c ORDER BY l"
+                )
+            }
+
+    def relationship_type_counts(self) -> dict[str, int]:
+        with self.driver.session(database=self.database) as session:
+            return {
+                str(record["t"]): int(record["c"])
+                for record in session.run(
+                    "MATCH ()-[r]->() RETURN type(r) AS t, count(*) AS c ORDER BY t"
+                )
+            }
 
     def source_text_for(self, source_id: str) -> str:
         """The corpus stored on a source node, so a quote can be re-verified.

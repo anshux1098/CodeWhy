@@ -87,6 +87,10 @@ def _router(query: str, params: dict):
                 node={"id": "key:MAX_RETRIES", "repo": "acme-netclient"}, labels=["CodeEntity"]
             ),
         ]
+    if "UNWIND labels(n) AS l" in query:
+        return [FakeRecord(l="CodeEntity", c=2), FakeRecord(l="Decision", c=5)]
+    if "type(r) AS t" in query:
+        return [FakeRecord(t="GOVERNS", c=3), FakeRecord(t="SUPPORTED_BY", c=1)]
     if "type(r) AS" in query:
         return [
             FakeRecord(**{"from": "dec_1", "type": "GOVERNS", "to": "key:MAX_RETRIES",
@@ -116,6 +120,11 @@ def test_the_injected_driver_is_used(store) -> None:
 def test_counts_are_read_back_from_the_database(store) -> None:
     assert store.node_count() == 7
     assert store.relationship_count() == 4
+
+
+def test_counts_by_label_and_relationship_type_are_read_back(store) -> None:
+    assert store.label_counts() == {"CodeEntity": 2, "Decision": 5}
+    assert store.relationship_type_counts() == {"GOVERNS": 3, "SUPPORTED_BY": 1}
 
 
 def test_source_text_comes_from_the_node(store) -> None:

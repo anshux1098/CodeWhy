@@ -430,6 +430,8 @@ def rebuild_graph(
         counts["relationships"],
         counts["excluded_placeholders"],
     )
+    logger.info("Nodes by label: %s", store.label_counts())
+    logger.info("Relationships by type: %s", store.relationship_type_counts())
     return counts
 
 
