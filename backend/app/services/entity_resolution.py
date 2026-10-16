@@ -85,7 +85,13 @@ def is_out_of_scope(question: str) -> bool:
 
 
 def score_entity_match(query_tokens: set[str], entity: dict[str, Any]) -> float:
-    """Computes similarity score [0.0 .. 1.0] between extracted tokens and an entity."""
+    """Computes similarity score [0.0 .. 1.0] between extracted tokens and an entity.
+
+    The score has three tiers. An exact id/name/path is 1.0 and beats everything. A
+    basename and a case-insensitive name are strong (0.85-0.90). A bare substring is
+    weak (0.65-0.70) and must never decide between entities on its own: the repository
+    name appears inside every path, so a weak match is a coincidence, not a reference.
+    """
     name = entity.get("name", "")
     path = entity.get("path", "")
     ident = entity.get("id", "")
@@ -100,23 +106,43 @@ def score_entity_match(query_tokens: set[str], entity: dict[str, Any]) -> float:
     is_file = entity.get("entity_type") in ("File", "Module") or "/" in name
     for tok in query_tokens:
         if tok == basename:
-            return 0.95 if is_file else 0.75
+            return 0.90 if is_file else 0.75
 
     # Case-insensitive name match
     for tok in query_tokens:
         if tok.lower() == name.lower():
-            return 0.90
+            return 0.85
 
-    # Token contained in name or path
+    # Token contained in name or basename: weak, never sufficient to choose.
     best_partial = 0.0
     for tok in query_tokens:
         tok_low = tok.lower()
         if tok_low in name.lower():
-            best_partial = max(best_partial, 0.80)
+            best_partial = max(best_partial, 0.70)
         elif tok_low in basename.lower():
-            best_partial = max(best_partial, 0.75)
+            best_partial = max(best_partial, 0.65)
 
     return best_partial
+
+
+#: A score at or above this is a real reference: an exact match or a basename/name.
+#: Below it, matches are coincidences (a shared token such as the repository name).
+STRONG_MATCH = 0.85
+
+#: A weak match must at least reach this to be considered at all.
+PARTIAL_MATCH = 0.70
+
+
+def _is_pyi_stub(entity: dict[str, Any]) -> bool:
+    """A type stub is not a separate entity from the module it describes."""
+    for key in ("path", "name"):
+        if str(entity.get(key, "")).endswith(".pyi"):
+            return True
+    return False
+
+
+def _distinct_ids(candidates: Sequence[EntityCandidate]) -> set[str]:
+    return {candidate.path or candidate.name for candidate in candidates}
 
 
 def resolve_entity(
@@ -148,6 +174,8 @@ def resolve_entity(
 
     scored: list[EntityCandidate] = []
     for ent in available_entities:
+        if _is_pyi_stub(ent):
+            continue
         score = score_entity_match(tokens, ent)
         if score > 0.0:
             scored.append(
@@ -170,32 +198,29 @@ def resolve_entity(
     # Sort descending by score
     scored.sort(key=lambda c: c.score, reverse=True)
 
-    # If exact match exists (1.0), it wins immediately unless another exact match ties
-    top = scored[0]
-    exact_matches = [c for c in scored if c.score >= 0.99]
-    if len(exact_matches) == 1:
-        return ResolutionResult(outcome=ResolutionOutcome.SUCCESS, entity=exact_matches[0])
-    elif len(exact_matches) > 1:
+    # A strong match (exact path/name or a basename) is a real reference. If one
+    # entity alone holds the best strong score, it wins. If several genuinely
+    # different entities tie, the caller must choose.
+    strong = [c for c in scored if c.score >= STRONG_MATCH]
+    if strong:
+        best = strong[0]
+        ties = [c for c in strong if (best.score - c.score) <= 0.05]
+        if len(_distinct_ids(ties)) == 1:
+            winner = max(ties, key=lambda c: c.score)
+            return ResolutionResult(outcome=ResolutionOutcome.SUCCESS, entity=winner)
         return ResolutionResult(
             outcome=ResolutionOutcome.AMBIGUOUS,
-            candidates=exact_matches,
-            reason_code="ambiguous_entity",
-            error_message="Multiple exact matching entities found. Please select one.",
-        )
-
-    # Check for candidates within 0.05 of top score
-    close_candidates = [c for c in scored if (top.score - c.score) <= 0.05]
-    if len(close_candidates) > 1:
-        return ResolutionResult(
-            outcome=ResolutionOutcome.AMBIGUOUS,
-            candidates=close_candidates,
+            candidates=ties,
             reason_code="ambiguous_entity",
             error_message="Question matches multiple code entities. Please select one.",
         )
 
-    # Single winner
-    if top.score >= 0.60:
-        return ResolutionResult(outcome=ResolutionOutcome.SUCCESS, entity=top)
+    # Only weak matches remain. They identify an entity solely when they agree on a
+    # single one; otherwise they are coincidences and nothing was named.
+    top = scored[0]
+    weak_ties = [c for c in scored if c.score == top.score]
+    if top.score >= PARTIAL_MATCH and len(_distinct_ids(weak_ties)) == 1:
+        return ResolutionResult(outcome=ResolutionOutcome.SUCCESS, entity=weak_ties[0])
 
     return ResolutionResult(
         outcome=ResolutionOutcome.REFUSAL,
