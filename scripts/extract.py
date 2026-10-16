@@ -360,6 +360,15 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             "an unverifiable file of extracted quotes in the tree."
         ),
     )
+    parser.add_argument(
+        "--rederive-entities",
+        dest="rederive_entities",
+        action="store_true",
+        help=(
+            "Rebuild stored decisions' affected_entities from the cached payloads and "
+            "exit. No model is called and nothing else is changed."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -392,6 +401,60 @@ def persist_rejected_quotes(
     return cache.put_rejected_quotes(rows)
 
 
+def rederive_affected_entities(
+    cache: SqliteCache,
+    repo: str,
+    targets_path: Path,
+) -> tuple[int, int]:
+    """Rebuild every stored decision's affected_entities from the cached payloads.
+
+    No model is called and nothing but the entity list changes. The payload already
+    in the cache is the same input the original extraction used, so re-deriving it
+    through the current filter is deterministic. Only a configuration key read from a
+    target file is added, which is why the targets file is read here. Returns the
+    number of decisions whose list changed and the number considered.
+    """
+    from app.services.extraction import filter_affected_entities
+    from app.services.ingest.targets import load_targets
+
+    target_files: set[str] = set()
+    try:
+        target_files = set(load_targets(Path(targets_path)).files)
+    except Exception as exc:  # noqa: BLE001 - a missing target file must not stop the run
+        logger.warning("entity re-derivation: could not read the targets file: %s", exc)
+
+    payloads = {
+        row["id"]: row["payload"]
+        for row in cache.fetch_raw_objects(repo, limit=10_000_000)
+    }
+    # A configuration key is attributed only when it was read from a target file.
+    config_keys = [
+        row["name"] for row in cache.config_keys_for(repo) if row["file_path"] in target_files
+    ]
+
+    decisions = cache.decisions_for_repo(repo)
+    changed = 0
+    for decision in decisions:
+        raw = payloads.get(decision["source_id"])
+        if raw is None:
+            continue
+        try:
+            payload = json.loads(raw)
+        except (TypeError, ValueError):
+            payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        entities = filter_affected_entities(changed_files_from_payload(payload), config_keys)
+        try:
+            previous = sorted(json.loads(decision["affected_entities"] or "[]"))
+        except (TypeError, ValueError):
+            previous = []
+        if entities != previous:
+            cache.update_affected_entities(decision["id"], entities)
+            changed += 1
+    return changed, len(decisions)
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     args = parse_args(argv)
     cache_path = args.cache
@@ -403,6 +466,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     # never left locked for the next run.
     args.command_argv = list(argv if argv is not None else sys.argv[1:])
     with SqliteCache(cache_path) as cache:
+        if args.rederive_entities:
+            changed, total = rederive_affected_entities(cache, args.repo, args.targets)
+            logger.info(
+                "Re-derived affected entities: %d of %d decisions changed", changed, total
+            )
+            return 0
         return run_extraction(args, cache)
 
 

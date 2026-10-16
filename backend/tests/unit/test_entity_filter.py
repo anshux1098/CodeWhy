@@ -105,3 +105,43 @@ def test_the_result_is_sorted_and_deduplicated() -> None:
     assert filter_affected_entities(
         ["src/urllib3/util/url.py", "src/urllib3/util/url.py"]
     ) == ["src/urllib3/util/url.py"]
+
+
+def test_rederive_narrows_stored_entities_and_changes_nothing_else(tmp_path) -> None:
+    """Re-derivation rewrites only the entity list, from the payload already cached."""
+    import json
+    from pathlib import Path
+
+    from app.stores.sqlite_cache import SqliteCache
+    from scripts import extract as extract_script
+
+    repo = "acme/netclient"
+    cache_path = tmp_path / "c.sqlite3"
+    targets_path = tmp_path / "targets.json"
+    targets_path.write_text(json.dumps({
+        "repo": repo,
+        "files": ["src/urllib3/util/ssl_.py"],
+    }), encoding="utf-8")
+
+    with SqliteCache(cache_path) as cache:
+        cache.put_raw("pr", repo, "7", {"files": [
+            "setup.py", "test/test_util.py", "src/urllib3/packages/six.py",
+            "src/urllib3/util/ssl_.py",
+        ]})
+        cache.put_decision({
+            "id": "dec_1", "source_id": f"pr:{repo}#7", "repo": repo,
+            "summary": "Keep me", "decision_type": "Other", "state": "ACTIVE",
+            "affected_entities": ["setup.py", "test/test_util.py",
+                                  "src/urllib3/packages/six.py", "src/urllib3/util/ssl_.py"],
+            "quote_verified": True, "extraction_version": "v1", "content_hash": "h",
+        })
+
+        changed, total = extract_script.rederive_affected_entities(
+            cache, repo, Path(targets_path)
+        )
+
+        assert (changed, total) == (1, 1)
+        row = cache.decisions_for_repo(repo)[0]
+        assert json.loads(row["affected_entities"]) == ["src/urllib3/util/ssl_.py"]
+        assert row["summary"] == "Keep me", "re-derivation must not touch anything else"
+

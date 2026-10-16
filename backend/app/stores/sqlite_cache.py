@@ -1015,6 +1015,18 @@ class SqliteCache:
                 count += 1
         return count
 
+    def update_affected_entities(self, decision_id: str, entities: Sequence[str]) -> None:
+        """Replace a decision's affected-entity list, leaving every other column alone.
+
+        Used when the entity filter changes: re-deriving the list from a payload the
+        cache already holds must not touch the summary, the quote or its verification.
+        """
+        with self.transaction() as connection:
+            connection.execute(
+                "UPDATE decisions SET affected_entities = ? WHERE id = ?",
+                (json.dumps(list(entities)), decision_id),
+            )
+
     def put_evidence(self, row: dict[str, Any]) -> bool:
         """Upsert a verified evidence quote.
 
