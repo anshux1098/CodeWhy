@@ -265,3 +265,37 @@ def verify_quote_against_sources(
         quote=quote.strip(),
         failure_reason="Quote not found in any source section",
     )
+
+
+def quote_match_rung(quote: str, source_text: str) -> str:
+    """Deepest normalization rung at which `quote` matches `source_text`.
+
+    Reporting only. It mirrors the ladder `verify_quote` walks but never decides
+    whether a quote is accepted; a rejected candidate is classified here so a run
+    can record what was proposed and where it stopped matching. Returns one of
+    ``exact``, ``case``, ``whitespace``, ``markdown``, ``none`` (matched no rung) or
+    ``empty`` (nothing to compare).
+    """
+    clean_quote = quote.strip()
+    if not clean_quote or not source_text or not source_text.strip():
+        return "empty"
+    if clean_quote in source_text:
+        return "exact"
+    if clean_quote.lower() in source_text.lower():
+        return "case"
+    if normalize_whitespace(clean_quote).lower() in normalize_whitespace(source_text).lower():
+        return "whitespace"
+    if normalize_for_quote_check(clean_quote) in normalize_for_quote_check(source_text):
+        return "markdown"
+    return "none"
+
+
+def deepest_rung_over_sources(quote: str, source_texts: Sequence[str]) -> str:
+    """Best rung any of `source_texts` reaches for `quote`, for reporting."""
+    order = {"exact": 4, "case": 3, "whitespace": 2, "markdown": 1, "none": 0, "empty": -1}
+    best = "empty"
+    for text in source_texts:
+        rung = quote_match_rung(quote, text)
+        if order[rung] > order[best]:
+            best = rung
+    return best

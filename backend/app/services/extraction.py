@@ -20,6 +20,7 @@ from app.services.quote_check import (
     FALLBACK_RATIONALE_UNKNOWN,
     MAX_QUOTE_CHARS,
     complete_quote,
+    deepest_rung_over_sources,
     verify_quote_against_sources,
 )
 
@@ -245,6 +246,16 @@ def last_call_metadata() -> dict[str, Any]:
 
 _LAST_CALL: dict[str, Any] = {}
 
+#: Candidate quotes the most recent call rejected. Kept so the caller can persist
+#: them: the reply that proposed them is gone once the call returns, and a dropped
+#: quote is otherwise indistinguishable from one the model never offered.
+_LAST_REJECTED: list[dict[str, Any]] = []
+
+
+def last_rejected_quotes() -> list[dict[str, Any]]:
+    """Candidate quotes dropped by the most recent extraction call (defensive copy)."""
+    return [dict(item) for item in _LAST_REJECTED]
+
 
 def extract_decisions_from_source(
     provider: BaseLLMProvider,
@@ -283,6 +294,7 @@ def extract_decisions_from_source(
 
     full_text_corpus = "\n".join(all_source_texts)
     content_hash = compute_content_hash(full_text_corpus)
+    _LAST_REJECTED.clear()
 
     # 2. Build prompt
     system_prompt, user_prompt = build_extraction_prompt(
@@ -360,6 +372,14 @@ def extract_decisions_from_source(
                         "Dropped quote for %s: could not be completed to a whole sentence",
                         dec_id,
                     )
+                    _LAST_REJECTED.append({
+                        "decision_id": dec_id,
+                        "decision_summary": raw_dec.summary.strip(),
+                        "candidate": q_res.quote,
+                        "failed_rung": "complete_quote",
+                        "failure_reason": "could not be completed to a whole sentence",
+                        "claim": raw_ev.claim,
+                    })
                     continue
                 if completed.status == "long_sentence":
                     logger.info(
@@ -395,6 +415,14 @@ def extract_decisions_from_source(
                     raw_ev.quote,
                     q_res.failure_reason,
                 )
+                _LAST_REJECTED.append({
+                    "decision_id": dec_id,
+                    "decision_summary": raw_dec.summary.strip(),
+                    "candidate": raw_ev.quote,
+                    "failed_rung": deepest_rung_over_sources(raw_ev.quote, all_source_texts),
+                    "failure_reason": q_res.failure_reason or "",
+                    "claim": raw_ev.claim,
+                })
 
         has_verified_quotes = len(verified_evidence) > 0
 

@@ -21,6 +21,7 @@ from app.services.extraction import (
     ExtractionSchemaRejected,
     extract_decisions_from_source,
     last_call_metadata,
+    last_rejected_quotes,
     summarise_injection_flags,
 )
 from app.stores.sqlite_cache import SqliteCache
@@ -362,6 +363,35 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def persist_rejected_quotes(
+    cache: SqliteCache,
+    args: argparse.Namespace,
+    source_id: str,
+    source_url: str,
+) -> int:
+    """Store the quotes this source's extraction proposed but verification dropped.
+
+    The reply is gone once the call returns, so the candidate, the rung it failed at
+    and the decision it belonged to are written down while they are still known.
+    """
+    rejected = last_rejected_quotes()
+    if not rejected:
+        return 0
+    now = datetime.now(timezone.utc).isoformat()
+    rows = [
+        {
+            "run_id": args.run_id,
+            "repo": args.repo,
+            "source_id": source_id,
+            "source_url": source_url,
+            "created_at": now,
+            **entry,
+        }
+        for entry in rejected
+    ]
+    return cache.put_rejected_quotes(rows)
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     args = parse_args(argv)
     cache_path = args.cache
@@ -460,6 +490,8 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
     schema_rejected_count = 0
     #: A decision was extracted but no supporting quote survived verification.
     unverified_quote_count = 0
+    #: Candidate quotes dropped by verification, kept so a rejection is diagnosable.
+    rejected_quote_count = 0
     failed_count = 0
     stopped_for_budget = False
     sample_records: list[dict[str, Any]] = []
@@ -638,6 +670,8 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
                         "verified": "yes" if ev.quote_verified else "no",
                     })
 
+        rejected_quote_count += persist_rejected_quotes(cache, args, source_id, source_url)
+
     # ------------------------------------------------------------------
     # Linking pass. Without this the links table stayed empty, so the graph
     # build had nothing to replay and every REVERTS/PART_OF/REFERENCES edge was
@@ -683,6 +717,7 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
         failed_count,
         len(pending),
     )
+    logger.info("Rejected quote candidates recorded: %d", rejected_quote_count)
     if schema_rejected_count or failed_count:
         for row in cache.extraction_failures(args.repo):
             logger.info(

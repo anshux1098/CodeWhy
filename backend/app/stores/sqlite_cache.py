@@ -188,6 +188,26 @@ CREATE TABLE IF NOT EXISTS evidence (
 CREATE INDEX IF NOT EXISTS evidence_decision ON evidence (decision_id);
 CREATE INDEX IF NOT EXISTS evidence_source ON evidence (source_id);
 
+-- Candidate quotes the model proposed that failed verification. They are dropped
+-- from the graph, but the candidate, the rung it failed at and the decision it
+-- belonged to are kept so a rejection can be audited after the reply is gone.
+CREATE TABLE IF NOT EXISTS rejected_quotes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    repo TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    decision_id TEXT,
+    decision_summary TEXT,
+    candidate TEXT NOT NULL,
+    failed_rung TEXT NOT NULL,
+    failure_reason TEXT,
+    claim TEXT,
+    source_url TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS rejected_quotes_source ON rejected_quotes (source_id);
+CREATE INDEX IF NOT EXISTS rejected_quotes_repo ON rejected_quotes (repo);
+
 -- One row per source whose extraction did not finish. A source that produced no
 -- decisions is not a failure, so this table records only what actually broke,
 -- which is what --retry-failed replays.
@@ -1050,6 +1070,58 @@ class SqliteCache:
             if self.put_evidence(r):
                 count += 1
         return count
+
+    # -- rejected quotes -------------------------------------------------------
+
+    def put_rejected_quotes(self, rows: Sequence[dict[str, Any]]) -> int:
+        """Record candidate quotes that failed verification for later auditing.
+
+        Appended, never upserted: two runs of the same source may propose different
+        candidates, and the history is what makes a rejection diagnosable after the
+        model reply is gone.
+        """
+        count = 0
+        with self.transaction() as connection:
+            for row in rows:
+                connection.execute(
+                    "INSERT INTO rejected_quotes "
+                    "(run_id, repo, source_id, decision_id, decision_summary, candidate, "
+                    "failed_rung, failure_reason, claim, source_url, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        row["run_id"],
+                        row["repo"],
+                        row["source_id"],
+                        row.get("decision_id"),
+                        row.get("decision_summary"),
+                        row["candidate"],
+                        row["failed_rung"],
+                        row.get("failure_reason"),
+                        row.get("claim"),
+                        row.get("source_url"),
+                        row.get("created_at") or utc_now(),
+                    ),
+                )
+                count += 1
+        return count
+
+    def rejected_quotes(
+        self, repo: Optional[str] = None, source_id: Optional[str] = None
+    ) -> list[sqlite3.Row]:
+        """Rejected quote candidates, oldest first, optionally filtered."""
+        query = "SELECT * FROM rejected_quotes"
+        clauses: list[str] = []
+        params: list[Any] = []
+        if repo is not None:
+            clauses.append("repo = ?")
+            params.append(repo)
+        if source_id is not None:
+            clauses.append("source_id = ?")
+            params.append(source_id)
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        query += " ORDER BY id ASC"
+        return list(self._connection.execute(query, tuple(params)))
 
     # -- extraction bookkeeping ------------------------------------------------
 
