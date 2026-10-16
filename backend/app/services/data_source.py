@@ -12,7 +12,12 @@ from app.schemas.entities import Entity, EntityListResponse
 from app.schemas.graph import GraphEdge, GraphNode, GraphResponse
 from app.schemas.repository import RepositoryCounts, RepositoryResponse
 from app.services.answer import generate_answer
-from app.services.entity_resolution import resolve_entity
+from app.services.entity_resolution import (
+    EntityCandidate,
+    ResolutionOutcome,
+    ResolutionResult,
+    resolve_entity,
+)
 from app.services.retrieval import retrieve_evidence
 from app.stores.graph_store import BaseGraphStore, get_graph_store
 
@@ -149,6 +154,32 @@ class GraphDataSource:
             return nodes.get(node_id)
         return None
 
+    def _resolve_explicit_entity(self, repository_id: str, entity_id: str) -> ResolutionResult:
+        """Resolve an entity a caller named, or refuse plainly.
+
+        A caller who names an entity must get that entity or a clear refusal; falling
+        back to text resolution would answer about a different entity than the one
+        they named. An unknown id is `entity_not_found`, the same contract the fixture
+        source follows.
+        """
+        node = self.store.get_entity(repository_id, entity_id)
+        if node is None:
+            return ResolutionResult(
+                outcome=ResolutionOutcome.REFUSAL,
+                reason_code="entity_not_found",
+                error_message=f"entity {entity_id!r} is not in the graph",
+            )
+        return ResolutionResult(
+            outcome=ResolutionOutcome.SUCCESS,
+            entity=EntityCandidate(
+                id=node.get("id", entity_id),
+                name=node.get("name", ""),
+                path=node.get("path", node.get("name", "")),
+                entity_type=node.get("entity_type", "File"),
+                score=1.0,
+            ),
+        )
+
     def get_repository(self, repository_id: str) -> RepositoryResponse:
         entities = self._require_repository(repository_id)
         # Name and url come from the Repository node the build wrote, not from the id
@@ -196,7 +227,10 @@ class GraphDataSource:
 
     def ask(self, repository_id: str, request: AskRequest) -> AskResponse:
         all_entities = self._require_repository(repository_id)
-        resolution = resolve_entity(request.question, all_entities)
+        if request.entity_id is not None:
+            resolution = self._resolve_explicit_entity(repository_id, request.entity_id)
+        else:
+            resolution = resolve_entity(request.question, all_entities)
 
         bundle = None
         if resolution.entity:
