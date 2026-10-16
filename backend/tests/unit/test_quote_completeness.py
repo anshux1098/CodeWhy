@@ -170,3 +170,63 @@ def test_a_closing_bracket_alone_does_not_end_a_sentence(closer: str) -> None:
 
     assert result.status == "extended"
     assert result.quote.endswith(".")
+
+
+# -- markdown and escape tolerance ---------------------------------------------
+#
+# A model drops the backticks and link addresses its source carries, and sometimes
+# writes an escape where the source has the control character. Those differences must
+# not hide the quote, but the quote that is stored is still the source's own text.
+
+BACKTICK_SOURCE = (
+    "This PR modifies `create_urllib3_context` to add TLS settings. A later sentence."
+)
+BACKTICK_QUOTE = (
+    "This PR modifies create_urllib3_context to add TLS settings."
+)
+
+LINK_SOURCE = (
+    "See the [design note](https://example.com/design) for the reason. Then more text."
+)
+LINK_QUOTE = "See the design note for the reason."
+
+ESCAPE_SOURCE = "Alpha\r\nBeta."
+ESCAPE_QUOTE = "Alpha\\nBeta"
+
+
+def test_a_quote_missing_its_backticks_is_still_located() -> None:
+    result = complete_quote(BACKTICK_QUOTE, BACKTICK_SOURCE)
+
+    assert result.status == "complete"
+    assert result.quote == (
+        "This PR modifies `create_urllib3_context` to add TLS settings."
+    ), "the stored quote is the source's span, backticks and all"
+
+
+def test_a_quote_that_drops_a_link_address_is_still_located() -> None:
+    result = complete_quote(LINK_QUOTE, LINK_SOURCE)
+
+    assert result.status == "complete"
+    assert result.quote == (
+        "See the [design note](https://example.com/design) for the reason."
+    ), "the stored quote is the source's span, address and all"
+
+
+def test_a_literal_escape_matches_the_control_character_it_names() -> None:
+    result = complete_quote(ESCAPE_QUOTE, ESCAPE_SOURCE)
+
+    assert result.status == "extended"
+    assert result.quote == ESCAPE_SOURCE, (
+        "a literal \\n names the newline; the stored quote is the source's own text"
+    )
+    assert "\\n" not in result.quote
+
+
+def test_a_paraphrase_is_not_located_even_through_the_tolerant_pass() -> None:
+    """The tolerance is for formatting, not for a reworded sentence."""
+    source = "The retry limit was increased because mobile clients timed out."
+    paraphrase = "The retry count went up due to phone timeouts."
+
+    result = complete_quote(paraphrase, source)
+
+    assert result.status == "quote_incomplete"

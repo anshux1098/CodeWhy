@@ -18,6 +18,17 @@ CLOSERS: Final[str] = ")]}\"'"
 #: A sentence ends at one of these, followed by whitespace or the end of the text.
 SENTENCE_END: Final[str] = ".!?…"
 
+#: A markdown link `[text](url)`; only the text is kept, mirroring `strip_markdown`, so
+#: a quoted sentence still finds its source when the model dropped the address.
+_MARKDOWN_LINK: Final = re.compile(r"\[([^\]]+)\]\([^\)]+\)")
+
+#: The markdown formatting characters dropped when locating a quote.
+_MARKDOWN_CHARS: Final[str] = "*_~`"
+
+#: The letters a model puts after a backslash when it emits an escape instead of the
+#: control character itself (``\\r``, ``\\n``, ``\\t``).
+_ESCAPE_LETTERS: Final[str] = "rnt"
+
 
 def normalize_whitespace(text: str) -> str:
     """Collapses runs of whitespace, tabs, and newlines into single spaces."""
@@ -59,46 +70,116 @@ class QuoteCompletion:
     over_limit: bool = False
 
 
-def _locate(quote: str, source_text: str) -> Optional[tuple[int, int]]:
-    """Where the quote sits in the source, tolerating whitespace differences.
+def _canonicalize(text: str) -> tuple[str, list[int], list[int]]:
+    """A searchable view of `text`, plus where each view character came from.
 
-    Returns the (start, end) offsets of the matched span, or None when the quote
-    cannot be found at all. Whitespace is collapsed on both sides because the stored
-    body carries CRLF while a quoted sentence is usually typed with plain spaces.
+    The view lower-cases, collapses every run of whitespace (and a literal
+    ``\\r``/``\\n``/``\\t`` escape, which names a control character) to one space, and
+    drops markdown formatting, so a quote matches its source across the differences a
+    model introduces. `starts` and `ends` map each view character back to the source
+    offsets it covers, which is what lets a match be reported as the source's own
+    substring rather than the model's string.
+    """
+    chars: list[str] = []
+    starts: list[int] = []
+    ends: list[int] = []
+    space_start = -1
+    space_end = -1
+    index = 0
+    length = len(text)
+    at_line_start = True
+
+    def emit(char: str, start: int, end: int) -> None:
+        chars.append(char)
+        starts.append(start)
+        ends.append(end)
+
+    def flush_space() -> None:
+        nonlocal space_start, space_end
+        # A leading or trailing run carries no character of its own, matching the way
+        # the whitespace pass dropped it.
+        if space_start >= 0 and chars:
+            emit(" ", space_start, space_end)
+        space_start = -1
+        space_end = -1
+
+    while index < length:
+        link = _MARKDOWN_LINK.match(text, index)
+        if link:
+            inner = link.group(1)
+            base = link.start(1)
+            for offset, char in enumerate(inner):
+                if char.isspace():
+                    if space_start < 0:
+                        space_start = base + offset
+                    space_end = base + offset + 1
+                else:
+                    flush_space()
+                    emit(char.lower(), base + offset, base + offset + 1)
+            index = link.end()
+            at_line_start = False
+            continue
+
+        char = text[index]
+
+        if at_line_start and char in ">#":
+            while index < length and text[index] in ">#":
+                index += 1
+            if index < length and text[index] == " ":
+                index += 1
+            continue
+
+        if char == "\\" and index + 1 < length and text[index + 1] in _ESCAPE_LETTERS:
+            if space_start < 0:
+                space_start = index
+            space_end = index + 2
+            index += 2
+            at_line_start = False
+            continue
+
+        if char.isspace():
+            if space_start < 0:
+                space_start = index
+            space_end = index + 1
+            at_line_start = char == "\n"
+            index += 1
+            continue
+
+        if char in _MARKDOWN_CHARS:
+            index += 1
+            continue
+
+        flush_space()
+        emit(char.lower(), index, index + 1)
+        at_line_start = False
+        index += 1
+
+    return "".join(chars), starts, ends
+
+
+def _locate(quote: str, source_text: str) -> Optional[tuple[int, int]]:
+    """Where the quote sits in the source, tolerating formatting differences.
+
+    Returns the (start, end) offsets of the matched span in the source, or None when
+    the quote cannot be found at all. An exact hit is used as-is. Otherwise the source
+    and the quote are compared through a canonical view that ignores case, collapses
+    whitespace (so the body's CRLF matches a typed space) and a literal escape, strips
+    markdown, and reads a link's text. The span is always a substring of `source_text`,
+    never of the quote the caller supplied.
     """
     if quote in source_text:
         index = source_text.index(quote)
         return index, index + len(quote)
 
-    # Walk the source on a whitespace-insensitive basis, keeping the offsets.
-    def squash(text: str) -> tuple[str, list[int]]:
-        chars: list[str] = []
-        offsets: list[int] = []
-        previous_space = True
-        for position, char in enumerate(text):
-            if char.isspace():
-                if previous_space:
-                    continue
-                chars.append(" ")
-                offsets.append(position)
-                previous_space = True
-            else:
-                chars.append(char.lower())
-                offsets.append(position)
-                previous_space = False
-        if chars and chars[-1] == " ":
-            chars.pop()
-            offsets.pop()
-        return "".join(chars), offsets
-
-    squashed_quote, quote_offsets = squash(quote)
-    squashed_source, source_offsets = squash(source_text)
-    index = squashed_source.find(squashed_quote)
+    canonical_quote = _canonicalize(quote)[0]
+    if not canonical_quote:
+        return None
+    canonical_source, starts, ends = _canonicalize(source_text)
+    index = canonical_source.find(canonical_quote)
     if index < 0:
         return None
-    start = source_offsets[index]
-    end_offset = index + len(squashed_quote) - 1
-    end = source_offsets[end_offset] + 1
+    start = starts[index]
+    end = ends[index + len(canonical_quote) - 1]
     return start, end
 
 
@@ -174,13 +255,16 @@ def complete_quote(quote: str, source_text: str) -> QuoteCompletion:
     boundary = _extent_at(source_text, end)
     if boundary is not None:
         if boundary <= end:
-            return QuoteCompletion(quote=clean, status="complete")
+            # Report the source's own span, not the caller's string: a quote located
+            # only after stripping markdown must still be stored as the exact source
+            # substring, backticks and all.
+            return QuoteCompletion(quote=source_text[start:end].strip(), status="complete")
         target = boundary
     else:
         target = _next_sentence_extent(source_text, end)
         if target is None:
             # The text simply runs out; there is nothing to complete the quote to.
-            return QuoteCompletion(quote=clean, status="complete")
+            return QuoteCompletion(quote=source_text[start:end].strip(), status="complete")
 
     extended = source_text[start:target].strip()
     if len(extended) > MAX_QUOTE_CHARS:
