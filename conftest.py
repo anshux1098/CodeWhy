@@ -78,6 +78,13 @@ def _forbid_real_network() -> Iterator[None]:
         return str(address)
 
     def check(address: object) -> None:
+        # An operator who sets RUN_LIVE=1 has explicitly opted into the marked live
+        # tests; the guard exists to stop an *accidental* connection, so it stands
+        # down for that opt-in. Without it, the live tests could never be run under
+        # pytest at all, and the only proof the queries reach a real server would be
+        # a hand-written script.
+        if os.environ.get("RUN_LIVE") == "1":
+            return
         host = host_of(address)
         if not host.startswith(LOOPBACK_PREFIXES):
             raise RealNetworkAccess(

@@ -9,6 +9,10 @@ that broke the live answer path.
 
 from __future__ import annotations
 
+import re
+
+import pytest
+
 from app.graph import queries
 
 
@@ -29,3 +33,34 @@ def test_no_query_uses_a_nulls_ordering_clause() -> None:
     assert not offenders, (
         f"these queries use a NULLS ordering clause the live database rejects: {offenders}"
     )
+
+
+@pytest.mark.live
+def test_live_database_explains_every_query() -> None:
+    """Every query must be accepted by the deployed server, not just by a fake driver.
+
+    Set RUN_LIVE=1 to run it. EXPLAIN parses and plans the statement without touching
+    any data, so a syntax the offline tests cannot see fails here instead of on the
+    first real request.
+    """
+    import os
+
+    if os.environ.get("RUN_LIVE") != "1":
+        pytest.skip("set RUN_LIVE=1 to EXPLAIN the queries against the live database")
+
+    from app.config import settings as global_settings
+    from app.stores.graph_store import Neo4jGraphStore, get_graph_store
+
+    global_settings.require_neo4j()
+    store = get_graph_store(global_settings)
+    assert isinstance(store, Neo4jGraphStore), "EXPLAIN needs a real Neo4j store"
+    try:
+        for name, text in _query_constants().items():
+            params = {
+                param: (10 if param in {"node_cap", "cap", "limit"} else "x")
+                for param in re.findall(r"\$(\w+)", text)
+            }
+            with store.driver.session(database=store.database) as session:
+                session.run("EXPLAIN " + text, **params).consume()
+    finally:
+        store.close()
