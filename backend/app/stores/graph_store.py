@@ -10,6 +10,7 @@ from app.graph.queries import (
     GET_DECISIONS_GOVERNING_ENTITY,
     GET_ENTITIES_FOR_DECISION,
     GET_SUBGRAPH_FOR_ENTITY,
+    GET_SUBGRAPH_FOR_REPOSITORY,
     SEARCH_DECISIONS_BY_SUMMARY,
     SEARCH_DECISIONS_BY_TEXT,
 )
@@ -586,13 +587,12 @@ class Neo4jGraphStore(BaseGraphStore):
                     node_cap=node_cap,
                 )
             else:
-                # The label is not fixed here: a repository's subgraph spans every
-                # label that carries its `repo`, so matching on the property is what
-                # keeps a Decision from being left out in favour of a CodeEntity.
+                # Seeded from the repository's Decision nodes so the view is the
+                # decisions and what they connect to, not an arbitrary page of nodes.
                 result = session.run(
-                    "MATCH (node {repo: $repo}) RETURN node, labels(node) AS labels LIMIT $cap",
+                    GET_SUBGRAPH_FOR_REPOSITORY,
                     repo=repo,
-                    cap=node_cap,
+                    node_cap=node_cap,
                 )
             nodes: list[dict[str, Any]] = []
             seen: set[str] = set()

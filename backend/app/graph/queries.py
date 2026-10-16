@@ -55,3 +55,19 @@ GET_ENTITIES_FOR_DECISION: Final[str] = """
 MATCH (d:Decision {id: $decision_id})-[:GOVERNS]->(e:CodeEntity)
 RETURN e
 """
+
+# A repository's decision graph. Seeded from the Decision nodes so the result is the
+# decisions and what they connect to, rather than an arbitrary page of nodes whose
+# edges are almost all excluded by the sample.
+GET_SUBGRAPH_FOR_REPOSITORY: Final[str] = """
+MATCH (d:Decision {repo: $repo})
+OPTIONAL MATCH (d)-[:GOVERNS]->(e:CodeEntity)
+OPTIONAL MATCH (d)-[:DECIDED_IN]->(src)
+OPTIONAL MATCH (d)-[:SUPPORTED_BY]->(ev:Evidence)
+WITH collect(DISTINCT d) AS decisions, collect(DISTINCT e) AS entities,
+     collect(DISTINCT src) AS sources, collect(DISTINCT ev) AS evidence
+UNWIND (decisions + entities + sources + evidence) AS node
+WITH DISTINCT node
+LIMIT $node_cap
+RETURN node, labels(node) AS labels
+"""
