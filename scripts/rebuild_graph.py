@@ -32,6 +32,11 @@ from app.stores.sqlite_cache import SqliteCache
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("codewhy.rebuild_graph")
 
+# The Neo4j driver logs a notification for every MERGE at INFO — one per node and one
+# per relationship, each of which is a multi-line block. That buries the run's own
+# output and makes the log useless, so those notifications are raised to WARNING.
+logging.getLogger("neo4j.notifications").setLevel(logging.WARNING)
+
 #: Source kinds whose text is stored on the node so a quote can be re-verified later.
 TEXT_BEARING_LABELS: frozenset[str] = frozenset({"PullRequest", "Issue", "Document"})
 
