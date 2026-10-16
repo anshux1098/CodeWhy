@@ -144,6 +144,11 @@ class BaseGraphStore(ABC):
         ...
 
     @abstractmethod
+    def count_nodes(self, repo: str, label: str) -> int:
+        """How many nodes of a label belong to a repository."""
+        ...
+
+    @abstractmethod
     def get_subgraph(
         self,
         repo: str,
@@ -233,6 +238,13 @@ class InMemoryGraphStore(BaseGraphStore):
         for (_from_id, rel_type, _to_id) in self.edges:
             counts[rel_type] = counts.get(rel_type, 0) + 1
         return dict(sorted(counts.items()))
+
+    def count_nodes(self, repo: str, label: str) -> int:
+        return sum(
+            1
+            for node_id, labels in self.labels.items()
+            if label in labels and self.nodes.get(node_id, {}).get("repo") == repo
+        )
 
     def init_schema(self) -> None:
         # In-memory stores have implicit constraints
@@ -646,6 +658,14 @@ class Neo4jGraphStore(BaseGraphStore):
                     "MATCH ()-[r]->() RETURN type(r) AS t, count(*) AS c ORDER BY t"
                 )
             }
+
+    def count_nodes(self, repo: str, label: str) -> int:
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", label):
+            raise ValueError(f"unsafe node label: {label!r}")
+        query = f"MATCH (n:`{label}` {{repo: $repo}}) RETURN count(n) AS c"
+        with self.driver.session(database=self.database) as session:
+            record = session.run(query, repo=repo).single()
+        return int(record["c"]) if record else 0
 
     def source_text_for(self, source_id: str) -> str:
         """The corpus stored on a source node, so a quote can be re-verified.

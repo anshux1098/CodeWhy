@@ -193,10 +193,10 @@ class GraphDataSource:
             name=node.get("name") or repository_id.rsplit("/", 1)[-1],
             url=node.get("url") or f"https://github.com/{raw_name}",
             counts=RepositoryCounts(
-                decisions=len(entities),
+                decisions=self.store.count_nodes(repository_id, "Decision"),
                 entities=len(entities),
-                pull_requests=0,
-                commits=0,
+                pull_requests=self.store.count_nodes(repository_id, "PullRequest"),
+                commits=self.store.count_nodes(repository_id, "Commit"),
             ),
             fixture=not self.is_real,
         )
