@@ -24,13 +24,10 @@ ORDER BY d.recorded_at DESC NULLS LAST
 
 GET_SUBGRAPH_FOR_ENTITY: Final[str] = """
 MATCH (e:CodeEntity {id: $entity_id})
-OPTIONAL MATCH (d:Decision)-[:GOVERNS]->(e)
-OPTIONAL MATCH (d)-[:SUPPORTED_BY]->(ev:Evidence)
-OPTIONAL MATCH (d)-[s:SUPERSEDES]->(older:Decision)
-OPTIONAL MATCH (p:Person)-[:AUTHORED]->(d)
-RETURN e, collect(DISTINCT d) AS decisions,
-       collect(DISTINCT ev) AS evidence,
-       collect(DISTINCT older) AS older_decisions,
-       collect(DISTINCT p) AS authors
+OPTIONAL MATCH (e)-[*1..2]-(m)
+WITH e, collect(DISTINCT m) AS neighbours
+UNWIND ([e] + neighbours) AS node
+WITH DISTINCT node
 LIMIT $node_cap
+RETURN node, labels(node) AS labels
 """

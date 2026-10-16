@@ -133,6 +133,25 @@ class BaseGraphStore(ABC):
         ...
 
     @abstractmethod
+    def node_count(self) -> int:
+        """How many nodes are present, read back from the store rather than counted
+        from the rows that were merged."""
+        ...
+
+    @abstractmethod
+    def relationship_count(self) -> int:
+        """How many relationships are present, read back from the store."""
+        ...
+
+    def source_text_for(self, source_id: str) -> str:
+        """The stored text a quote is re-verified against at answer time.
+
+        Default is empty: a store without source text can still answer, it just
+        cannot re-verify a quote. A real store overrides this with the node's text.
+        """
+        return ""
+
+    @abstractmethod
     def close(self) -> None:
         """Release underlying connections."""
         ...
@@ -156,7 +175,20 @@ class InMemoryGraphStore(BaseGraphStore):
         self.source_texts: dict[str, str] = {}
 
     def source_text_for(self, source_id: str) -> str:
-        return self.source_texts.get(source_id, "")
+        if source_id in self.source_texts:
+            return self.source_texts[source_id]
+        # A build writes the corpus onto the source node rather than into the dict, so
+        # fall back to the node's `text` before giving up.
+        node = self.nodes.get(source_id)
+        if node and node.get("text"):
+            return str(node["text"])
+        return ""
+
+    def node_count(self) -> int:
+        return len(self.nodes)
+
+    def relationship_count(self) -> int:
+        return len(self.edges)
 
     def init_schema(self) -> None:
         # In-memory stores have implicit constraints
@@ -287,13 +319,24 @@ class InMemoryGraphStore(BaseGraphStore):
 class Neo4jGraphStore(BaseGraphStore):
     """Production graph store backed by Neo4j driver and parameterized Cypher."""
 
-    def __init__(self, uri: str, user: str, password: str, database: str = "neo4j") -> None:
-        try:
-            import neo4j
-        except ImportError as exc:
-            raise RuntimeError("neo4j package is required to connect to Neo4j AuraDB") from exc
-
-        self.driver = neo4j.GraphDatabase.driver(uri, auth=(user, password))
+    def __init__(
+        self,
+        uri: Optional[str] = None,
+        user: Optional[str] = None,
+        password: Optional[str] = None,
+        database: str = "neo4j",
+        *,
+        driver: Optional[Any] = None,
+    ) -> None:
+        # `driver` is an injectable seam: a test can pass a fake driver so the query
+        # construction and record shaping are exercised without a live database.
+        if driver is None:
+            try:
+                import neo4j
+            except ImportError as exc:
+                raise RuntimeError("neo4j package is required to connect to Neo4j AuraDB") from exc
+            driver = neo4j.GraphDatabase.driver(uri, auth=(user, password))
+        self.driver = driver
         self.database = database
 
     def init_schema(self) -> None:
@@ -411,25 +454,73 @@ class Neo4jGraphStore(BaseGraphStore):
                     node_cap=node_cap,
                 )
             else:
+                # The label is not fixed here: a repository's subgraph spans every
+                # label that carries its `repo`, so matching on the property is what
+                # keeps a Decision from being left out in favour of a CodeEntity.
                 result = session.run(
-                    "MATCH (n {repo: $repo}) RETURN n LIMIT $cap",
+                    "MATCH (node {repo: $repo}) RETURN node, labels(node) AS labels LIMIT $cap",
                     repo=repo,
                     cap=node_cap,
                 )
-            nodes = [dict(r["n"]) for r in result]
+            nodes: list[dict[str, Any]] = []
+            seen: set[str] = set()
+            for record in result:
+                node = record.get("node")
+                if node is None:
+                    continue
+                props = dict(node)
+                props["labels"] = list(record.get("labels") or [])
+                nid = props.get("id", props.get("login"))
+                if nid is None or nid in seen:
+                    continue
+                seen.add(str(nid))
+                nodes.append(props)
+
             # Edges between the returned nodes. Without this the /graph endpoint
-            # rendered an empty relationship list even when the graph had them.
+            # rendered an empty relationship list even when the graph had them. The
+            # keys match what the in-memory store returns so the API reads one shape.
             relationships: list[dict[str, Any]] = []
             ids = [n.get("id") for n in nodes if n.get("id") is not None]
             if ids:
                 edge_result = session.run(
                     "MATCH (a)-[r]->(b) WHERE a.id IN $ids AND b.id IN $ids "
-                    "RETURN a.id AS from_id, type(r) AS rel_type, b.id AS to_id, r AS props",
+                    "RETURN a.id AS `from`, type(r) AS `type`, b.id AS `to`, r AS props",
                     ids=ids,
                 )
                 for record in edge_result:
-                    relationships.append(dict(record))
+                    edge = {
+                        "from": record["from"],
+                        "type": record["type"],
+                        "to": record["to"],
+                    }
+                    props = record.get("props")
+                    if props:
+                        edge.update(dict(props))
+                    relationships.append(edge)
             return {"nodes": nodes, "relationships": relationships}
+
+    def node_count(self) -> int:
+        with self.driver.session(database=self.database) as session:
+            record = session.run("MATCH (n) RETURN count(n) AS c").single()
+        return int(record["c"]) if record else 0
+
+    def relationship_count(self) -> int:
+        with self.driver.session(database=self.database) as session:
+            record = session.run("MATCH ()-[r]->() RETURN count(r) AS c").single()
+        return int(record["c"]) if record else 0
+
+    def source_text_for(self, source_id: str) -> str:
+        """The corpus stored on a source node, so a quote can be re-verified.
+
+        The node id is the same cache id the evidence carries, so the lookup is by id.
+        """
+        query = "MATCH (n) WHERE n.id = $source_id RETURN n.text AS text LIMIT 1"
+        with self.driver.session(database=self.database) as session:
+            record = session.run(query, source_id=source_id).single()
+        if record is None:
+            return ""
+        text = record.get("text")
+        return str(text) if text else ""
 
     def close(self) -> None:
         self.driver.close()

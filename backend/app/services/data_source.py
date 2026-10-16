@@ -130,15 +130,14 @@ class GraphDataSource:
         return entities
 
     def _has_repository_node(self, repository_id: str) -> bool:
-        nodes = getattr(self.store, "nodes", None)
-        labels = getattr(self.store, "labels", None)
-        if not isinstance(nodes, dict) or not isinstance(labels, dict):
-            return False
-        return any(
-            "Repository" in labels.get(node_id, set())
-            and props.get("repo") == repository_id
-            for node_id, props in nodes.items()
-        )
+        """Whether the graph holds a Repository node for this id.
+
+        Resolved through `get_node` rather than a duck-typed `nodes` mapping, so the
+        check works against Neo4j instead of silently reporting "no repository" and
+        turning a real hit into a 404.
+        """
+        node = self._find_node(repository_id)
+        return bool(node) and node.get("repo") == repository_id
 
     def _find_node(self, node_id: str) -> Optional[dict[str, Any]]:
         """Look a node up by id in whichever store is in use."""
@@ -152,10 +151,15 @@ class GraphDataSource:
 
     def get_repository(self, repository_id: str) -> RepositoryResponse:
         entities = self._require_repository(repository_id)
+        # Name and url come from the Repository node the build wrote, not from the id
+        # string: the id is the slug the API addresses, and the real address lives on
+        # the node as `url` with the raw `owner/name` in `full_name`.
+        node = self._find_node(repository_id) or {}
+        raw_name = node.get("full_name") or repository_id
         return RepositoryResponse(
             id=repository_id,
-            name=repository_id.split("/")[-1],
-            url=f"https://github.com/{repository_id}",
+            name=node.get("name") or repository_id.rsplit("/", 1)[-1],
+            url=node.get("url") or f"https://github.com/{raw_name}",
             counts=RepositoryCounts(
                 decisions=len(entities),
                 entities=len(entities),
