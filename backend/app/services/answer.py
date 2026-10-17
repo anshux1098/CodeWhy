@@ -6,7 +6,7 @@ from typing import Any, Optional, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.config import Settings
+from app.config import Settings, settings
 from app.providers.llm_provider import BaseLLMProvider
 from app.schemas.ask import AskResponse
 from app.schemas.common import (
