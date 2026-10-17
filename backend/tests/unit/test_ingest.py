@@ -680,6 +680,42 @@ def test_numbers_that_resolve_to_neither_kind_are_recorded_missing(tmp_path: Pat
     assert all("neither" in row["reason"] or "no pull request" in row["reason"] for row in missing)
 
 
+def test_a_pull_request_named_in_a_body_is_not_recorded_as_a_missing_issue(
+    tmp_path: Path,
+) -> None:
+    """A PR body can name another pull request. That number is a pull request, not
+    an issue, so it must never be entered in `missing` as one."""
+    clone_root = build_clone(tmp_path)
+    clone = clone_root / "acme__netclient"
+    (clone / "pkg" / "config.py").write_text("MAX_RETRIES = 7\n", encoding="utf-8")
+    git(clone, "commit", "-qam", "Reference another change (#9)")
+    client = FakeClient()
+    client.pull_requests[9] = pull_request_node(
+        9, closingIssuesReferences={"totalCount": 0, "nodes": []}
+    )
+    client.pull_requests[41] = pull_request_node(
+        41,
+        body="Related to #9",
+        closingIssuesReferences={"totalCount": 0, "nodes": []},
+    )
+    with SqliteCache(tmp_path / "c.sqlite3") as cache:
+        run_ingest(
+            "acme/netclient", TARGETS, settings(), cache=cache, clone_root=clone_root,
+            client=client, max_prs=5, max_issues=0,
+        )
+        stored_prs = {
+            int(row["id"].rsplit("#", 1)[1])
+            for row in cache._connection.execute(
+                "SELECT id FROM raw_objects WHERE kind = 'pr'"
+            )
+        }
+        missing = [dict(row) for row in cache.missing("acme/netclient")]
+
+    assert 9 in stored_prs, "the referenced number was fetched as a pull request"
+    assert 9 not in {row["number"] for row in missing}
+    assert missing == []
+
+
 def test_a_number_stored_as_an_issue_is_counted_as_an_issue(tmp_path: Path) -> None:
     from app.services.ingest.pipeline import fetch_references
 

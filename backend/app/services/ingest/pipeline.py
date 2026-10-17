@@ -346,6 +346,10 @@ def run_ingest(
         summary.issues_fetched += recency_outcome.fetched_issues
 
         recent_issues = issue_numbers_from_cache(cache, repo, sorted(all_numbers) + recent_numbers)
+        # A pull request body can name another pull request, and that number is a
+        # pull request, not an issue. Drop any number already stored as a PR so it
+        # is never entered in `missing` as an issue that never existed.
+        recent_issues = {number for number in recent_issues if not cache.has_raw("pr", repo, str(number))}
         issue_list = sorted(recent_issues)[:effective_issues]
         if len(recent_issues) > effective_issues:
             dropped = len(recent_issues) - effective_issues
