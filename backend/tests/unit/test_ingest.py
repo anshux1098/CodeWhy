@@ -716,6 +716,30 @@ def test_a_pull_request_named_in_a_body_is_not_recorded_as_a_missing_issue(
     assert missing == []
 
 
+def test_purging_missing_rows_removes_only_numbers_stored_as_pull_requests(
+    tmp_path: Path,
+) -> None:
+    """Old runs recorded a pull request's number as a missing issue. Repair the
+    table by deleting only those rows, and leave every other repo alone."""
+    with SqliteCache(tmp_path / "c.sqlite3") as cache:
+        cache.put_raw("pr", "acme/netclient", "9", {"number": 9, "title": "PR 9", "files": []})
+        cache.put_raw("pr", "other/repo", "9", {"number": 9, "title": "PR 9", "files": []})
+        cache.record_missing("r1", "acme/netclient", "issue", 9, "over the max_ingestion_issues bound")
+        cache.record_missing("r1", "acme/netclient", "issue", 5, "over the max_ingestion_issues bound")
+        cache.record_missing(
+            "r1", "acme/netclient", "reference", 9, "resolved to neither an issue nor a pull request"
+        )
+        cache.record_missing("r1", "other/repo", "issue", 9, "over the max_ingestion_issues bound")
+
+        removed = cache.purge_missing_pull_request_numbers("acme/netclient")
+        remaining = [dict(row) for row in cache.missing("acme/netclient")]
+        other_remaining = [dict(row) for row in cache.missing("other/repo")]
+
+    assert removed == 2
+    assert {row["number"] for row in remaining} == {5}
+    assert [row["number"] for row in other_remaining] == [9], "another repo's rows are untouched"
+
+
 def test_a_number_stored_as_an_issue_is_counted_as_an_issue(tmp_path: Path) -> None:
     from app.services.ingest.pipeline import fetch_references
 

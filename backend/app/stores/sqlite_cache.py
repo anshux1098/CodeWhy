@@ -598,6 +598,29 @@ class SqliteCache:
             )
         )
 
+    def purge_missing_pull_request_numbers(self, repo: Optional[str] = None) -> int:
+        """Delete `missing` rows whose number is already stored as a pull request.
+
+        A pull request body can name another pull request, and an earlier ingest
+        recorded such a number as a missing issue. The row is wrong — the number is
+        a pull request, not an issue — so it is removed. Rows for other repos and
+        numbers that are genuinely missing are left untouched. Returns the number
+        of rows deleted.
+        """
+        repo_clause = " AND missing.repo = ?" if repo is not None else ""
+        params: tuple[Any, ...] = (repo,) if repo is not None else ()
+        with self.transaction() as connection:
+            cursor = connection.execute(
+                "DELETE FROM missing WHERE EXISTS ("
+                "SELECT 1 FROM raw_objects "
+                "WHERE raw_objects.kind = 'pr' "
+                "AND raw_objects.repo = missing.repo "
+                "AND raw_objects.id = 'pr:' || missing.repo || '#' || missing.number)"
+                + repo_clause,
+                params,
+            )
+            return cursor.rowcount
+
     def skips(self, repo: Optional[str] = None) -> list[sqlite3.Row]:
         if repo is None:
             return list(self._connection.execute("SELECT * FROM skips ORDER BY id"))
