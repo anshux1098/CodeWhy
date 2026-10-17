@@ -598,6 +598,29 @@ class SqliteCache:
             )
         )
 
+    def purge_missing_pull_request_numbers(self, repo: Optional[str] = None) -> int:
+        """Delete `missing` rows whose number is already stored as a pull request.
+
+        A pull request body can name another pull request, and an earlier ingest
+        recorded such a number as a missing issue. The row is wrong — the number is
+        a pull request, not an issue — so it is removed. Rows for other repos and
+        numbers that are genuinely missing are left untouched. Returns the number
+        of rows deleted.
+        """
+        repo_clause = " AND missing.repo = ?" if repo is not None else ""
+        params: tuple[Any, ...] = (repo,) if repo is not None else ()
+        with self.transaction() as connection:
+            cursor = connection.execute(
+                "DELETE FROM missing WHERE EXISTS ("
+                "SELECT 1 FROM raw_objects "
+                "WHERE raw_objects.kind = 'pr' "
+                "AND raw_objects.repo = missing.repo "
+                "AND raw_objects.id = 'pr:' || missing.repo || '#' || missing.number)"
+                + repo_clause,
+                params,
+            )
+            return cursor.rowcount
+
     def skips(self, repo: Optional[str] = None) -> list[sqlite3.Row]:
         if repo is None:
             return list(self._connection.execute("SELECT * FROM skips ORDER BY id"))
@@ -888,6 +911,21 @@ class SqliteCache:
                 )
                 count += 1
         return count
+
+    def clear_noise_labels(self, repo: str, record_type: Optional[str] = None) -> int:
+        """Delete a repo's noise labels, optionally only one record type.
+
+        A recompute replaces the stored labels, so a rule that no longer matches
+        must be able to remove a stale label rather than leave it behind forever.
+        Returns the number of rows deleted.
+        """
+        query = "DELETE FROM noise_labels WHERE repo = ?"
+        params: list[Any] = [repo]
+        if record_type is not None:
+            query += " AND record_type = ?"
+            params.append(record_type)
+        with self.transaction() as connection:
+            return connection.execute(query, tuple(params)).rowcount
 
     def noise_labels_for(
         self,

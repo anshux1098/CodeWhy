@@ -52,19 +52,29 @@ def _pull_request_number(source_id: str) -> Optional[int]:
     return int(tail) if tail.isdigit() else None
 
 
-def _touches_target_files(payload: dict[str, Any]) -> bool:
-    """Whether an ingested payload lists one of the target files.
+def _target_file_match_count(payload: dict[str, Any]) -> int:
+    """How many distinct target files an ingested payload lists.
 
     Matched on the suffix because the stored paths carry different roots: `git`
     recorded `src/urllib3/...` while GitHub reported `urllib3/...` for older files.
+    The count is the relevance signal: a change touching two target files is more
+    relevant to the retry/connection/TLS behaviour than one touching a single file.
     """
     files = payload.get("files") or []
     if not isinstance(files, list):
-        return False
+        return 0
     wanted = {name.rsplit("/", 1)[-1] for name in TARGET_FILES}
-    return any(
-        isinstance(name, str) and name.rsplit("/", 1)[-1] in wanted for name in files
-    )
+    matched = {
+        name.rsplit("/", 1)[-1]
+        for name in files
+        if isinstance(name, str) and name.rsplit("/", 1)[-1] in wanted
+    }
+    return len(matched)
+
+
+def _touches_target_files(payload: dict[str, Any]) -> bool:
+    """Whether an ingested payload lists one of the target files."""
+    return _target_file_match_count(payload) > 0
 
 
 def changed_files_from_payload(payload: dict[str, Any]) -> list[str]:
@@ -86,30 +96,43 @@ def changed_files_from_payload(payload: dict[str, Any]) -> list[str]:
     return result
 
 
-def _sort_key(row: dict[str, Any]) -> tuple[int, int, str]:
-    """Rank a candidate: pinned pull requests, then target files, then everything else.
+def _pull_request_sort_number(source_id: str) -> int:
+    """The numeric tie-break for a source: its pull request number, or a large value."""
+    number = _pull_request_number(source_id)
+    return number if number is not None else 1_000_000_000
 
-    Documentation sorts last because a changelog restates a decision rather than
-    making one, so it should never crowd out the record of the decision itself.
+
+def _sort_key(row: dict[str, Any]) -> tuple[int, int, int, str]:
+    """Rank a candidate in the extraction queue.
+
+    Order: pinned pull requests, then the target-file tier ranked by how many target
+    files the change touches (its relevance), then everything else, then documentation.
+    Within a tier, ties are broken by the pull request number, so the queue is ordered
+    by intent rather than by whichever string id happens to sort first (`#2` before
+    `#1000`). Documentation sorts last because a changelog restates a decision rather
+    than making one, so it should never crowd out the record of the decision itself.
     """
     source_id = row["id"]
     number = _pull_request_number(source_id)
 
     if number is not None and number in PINNED_PULL_REQUESTS:
-        rank = PINNED_PULL_REQUESTS.index(number)
-        return (rank, 0, source_id)
+        return (0, PINNED_PULL_REQUESTS.index(number), 0, source_id)
 
     if row.get("kind") == "doc":
-        return (len(PINNED_PULL_REQUESTS) + 2, 0, source_id)
+        return (3, 0, 0, source_id)
 
     try:
         payload = json.loads(row["payload"])
     except (TypeError, ValueError):
         payload = {}
-    if isinstance(payload, dict) and _touches_target_files(payload):
-        return (len(PINNED_PULL_REQUESTS), 0, source_id)
+    if not isinstance(payload, dict):
+        payload = {}
 
-    return (len(PINNED_PULL_REQUESTS) + 1, 0, source_id)
+    matched = _target_file_match_count(payload)
+    if matched:
+        return (1, -matched, _pull_request_sort_number(source_id), source_id)
+
+    return (2, 0, _pull_request_sort_number(source_id), source_id)
 
 
 def select_sources(rows: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
@@ -342,7 +365,11 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         dest="max_sources",
         type=int,
         default=None,
-        help="Cap how many sources are considered in scope, before any priority limit",
+        help=(
+            "Cap how many sources are extracted this run. Applied after ranking "
+            "and after skipping finished or noisy sources, so the allowance goes "
+            "to the highest-priority pending sources."
+        ),
     )
     parser.add_argument(
         "--targets",
@@ -501,9 +528,6 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
             len(candidates),
         )
 
-    if args.max_sources is not None:
-        candidates = candidates[: args.max_sources]
-
     if args.sources:
         candidates = [row for row in candidates if row["id"] in resolve_source_ids(args, candidates)]
         logger.info("--sources: %d sources selected", len(candidates))
@@ -532,9 +556,22 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
                 already_counted,
             )
 
+    # Noise is dropped before the caps for the same reason finished sources are:
+    # a noisy record has nothing to contribute, so letting it hold a --limit or
+    # --max-sources slot starves a source that does.
+    candidates = [row for row in candidates if row["id"] not in noisy_ids]
+    considered = len(candidates)
+
+    # --max-sources caps the ranked list, not the raw one. Truncating before the
+    # ranking spent the allowance on whichever ids sorted first, so a second pass
+    # over a repository selected the lowest-numbered sources, skipped the ones
+    # already done, and extracted nothing at all.
+    if args.max_sources is not None:
+        candidates = select_sources(candidates, args.max_sources)
+
     rows = select_sources(candidates, args.limit)
 
-    pending = [row for row in rows if row["id"] not in noisy_ids]
+    pending = rows
 
     # Counts only. The flagged text itself never reaches a log line.
     injection_counts = summarise_injection_flags(
@@ -547,7 +584,7 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
     )
     logger.info(
         "Selected %d of %d candidates in priority order for %s",
-        len(pending), len(candidates), args.repo,
+        len(pending), considered, args.repo,
     )
 
     extracted_decisions_count = 0
@@ -741,6 +778,11 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
 
         rejected_quote_count += persist_rejected_quotes(cache, args, source_id, source_url)
 
+    # A dry run makes no change at all: the linking pass writes the `links` table and
+    # must be stopped before it runs, not after.
+    if args.dry_run:
+        return 0
+
     # ------------------------------------------------------------------
     # Linking pass. Without this the links table stayed empty, so the graph
     # build had nothing to replay and every REVERTS/PART_OF/REFERENCES edge was
@@ -748,9 +790,6 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
     # ------------------------------------------------------------------
     links_written = build_links(cache, args.repo, rows)
     logger.info("Linking finished: %d links written.", links_written)
-
-    if args.dry_run:
-        return 0
 
     # Tokens spent by earlier runs are part of the true total, so they are read
     # back rather than implied by this run alone.

@@ -8,7 +8,7 @@ CodeWhy answers *"why is this code like this?"* for a software repository by rec
 
 ## Current Status: Phases 0–3 Complete, Exercised on a Real Repository
 
-The project has advanced through **Phase 0, Phase 1, Phase 2, and Phase 3**. All backend contracts, data ingestion, deterministic linking, AST constant history, noise filtering, decision extraction with verbatim quote checks, Neo4j graph stores, and the 4-gate grounded `/ask` pipeline are implemented. The suite collects **934 tests**: **923 pass with zero credentials and no `.env` file**, and **11 tests skip** (4 live tests marked `live`, run with `RUN_LIVE=1`, exercise the real Neo4j store, Cypher `EXPLAIN` plan, and GitHub API; 6 review honesty tests skip on probe files that cite no pull requests; and 1 review test skips un-ingested alembic targets).
+The project has advanced through **Phase 0, Phase 1, Phase 2, and Phase 3**. All backend contracts, data ingestion, deterministic linking, AST constant history, noise filtering, decision extraction with verbatim quote checks, Neo4j graph stores, and the 4-gate grounded `/ask` pipeline are implemented. The suite collects **970 tests**: **959 pass with zero credentials and no `.env` file**, and **11 tests skip** (4 live tests marked `live`, run with `RUN_LIVE=1`, exercise the real Neo4j store, Cypher `EXPLAIN` plan, and GitHub API; 6 review honesty tests skip on probe files that cite no pull requests; and 1 review test skips un-ingested alembic targets).
 
 The pipeline has been run end to end on the real repository `urllib3/urllib3`: ingest → extract → link → build the Neo4j graph → answer grounded `/ask` questions. The two HTTP/2 questions resolve to `src/urllib3/util/ssl_.py` and answer from the pull request #3456 and #3466 quotes; the questions that name no real entity refuse honestly. `scripts/check_live_answers.py` runs the six questions against a live server and prints every response, including each citation's quote and URL.
 
@@ -181,7 +181,7 @@ The test suite runs with **zero credentials and no required `.env` file**.
 
 ### Run the Phase 2 and Phase 3 tests
 
-The full suite collects **934 tests**. It needs no credentials and no `.env` file; 923 pass out of the box, while 11 tests skip (4 marked `live` requiring `RUN_LIVE=1`, 6 on review probe files without PR references, and 1 on un-ingested repository probes).
+The full suite collects **970 tests**. It needs no credentials and no `.env` file; 959 pass out of the box, while 11 tests skip (4 marked `live` requiring `RUN_LIVE=1`, 6 on review probe files without PR references, and 1 on un-ingested repository probes).
 ```powershell
 .\.venv\Scripts\pytest.exe backend/tests/unit/test_phase3.py backend/tests/unit/test_extraction.py backend/tests/unit/test_linking.py backend/tests/unit/test_config_keys.py backend/tests/unit/test_noise.py -v
 ```
@@ -231,6 +231,31 @@ Ask a question about a code entity:
 $body = @{ question = "Why is NAME_TO_LEVEL defined?" } | ConvertTo-Json
 Invoke-RestMethod "http://127.0.0.1:8000/api/v1/repositories/acme-netclient/ask" -Method Post -Body $body -ContentType "application/json"
 ```
+
+---
+
+## Guided Walkthrough
+
+One command reads the real cache and the graph and walks through the whole pipeline
+stage by stage, with the real numbers at each step. It is read only by default: it
+never fetches from GitHub, never writes the cache or the graph, and never calls a
+language model. It prints a plain-text report and exits non-zero if any self-check
+fails, so it doubles as a check to run before a demo.
+
+```powershell
+.\walkthrough.cmd
+```
+
+The wrapper activates `.venv`, runs `scripts/walkthrough.py`, and saves the same
+output to `walkthrough_report.txt`. To run it directly:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\walkthrough.py
+```
+
+Useful flags: `--stage N` stops after stage N, `--pause` waits for Enter between
+stages, `--with-llm` allows the answer path to call the model (otherwise the line
+"LLM calls made" stays at 0), and `--out PATH` changes the report path.
 
 ---
 
@@ -313,7 +338,8 @@ codewhy/
 |   |- probe_history.py               # Full-history reverts and constant value changes
 |   |- sample_repos.py                # Recent pull request sampling across candidates
 |   |- export_contract.py             # Regenerates contract JSON files
-|   `- check_live_answers.py          # Runs the six C13 questions against a live server
+|   |- check_live_answers.py          # Runs the six C13 questions against a live server
+|   `- walkthrough.py                 # Read-only guided walkthrough of the whole pipeline
 |- targets/
 |   |- urllib3__urllib3.json          # Test bed targets for urllib3/urllib3
 |   `- sqlalchemy__alembic.json       # Draft targets, never ingested
@@ -372,6 +398,14 @@ schema surface until the supersession work lands.
 
 Contradiction detection checks only whether a decision's stored state is `UNRESOLVED`. There is
 no detection across opposing evidence.
+
+## Known limitations
+
+- **Confidence is a heuristic, not a calibrated probability.** `score` is the fixed weighted
+  sum in [`services/confidence.py`](backend/app/services/confidence.py)
+  (`0.30·directness + 0.20·provenance + 0.20·agreement + 0.15·relevance + 0.15·temporal_consistency − 0.30·contradiction`),
+  not a benchmark-tuned value, and it is not calibrated against a labelled set. A correct answer
+  grounded in a single verbatim quote can therefore reach `HIGH`.
 
 ## Real versus mock
 

@@ -74,6 +74,31 @@ def test_get_decision_returns_real_content_when_present() -> None:
     assert detail.rationale == "mobile clients time out"
 
 
+def test_get_decision_returns_its_evidence_as_citations() -> None:
+    """A decision detail must carry the evidence that supports it, not an empty list."""
+    source = GraphDataSource(Settings(_env_file=None), store=seeded_store())
+    detail = source.get_decision("d1")
+
+    assert [c.quote for c in detail.citations] == ["mobile clients time out"]
+    citation = detail.citations[0]
+    assert citation.decision_id == "d1"
+    assert citation.kind.value == "SOURCE"
+    # The URL names the real source; its number is the decision's source number.
+    assert citation.source_url == f"https://github.com/{REPO}/pull/7"
+    assert detail.source.number == 7
+    assert citation.author == "real-reviewer"
+
+
+def test_get_decision_citations_are_empty_when_the_decision_has_no_evidence() -> None:
+    store = seeded_store()
+    store.merge_node("Decision", {
+        "id": "d2", "repo": REPO, "summary": "No evidence", "state": "ACTIVE",
+        "source_id": f"pr:{REPO}#8",
+    })
+    source = GraphDataSource(Settings(_env_file=None), store=store)
+    assert source.get_decision("d2").citations == []
+
+
 # --- the fixture flag must be derived, not hardcoded ------------------------
 
 

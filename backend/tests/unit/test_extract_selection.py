@@ -179,6 +179,92 @@ def test_limit_ranks_failures_and_unprocessed_together(
     ]
 
 
+def test_max_sources_spends_its_allowance_on_pending_priority_sources(
+    cache: SqliteCache, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--max-sources must rank and drop finished sources before it caps.
+
+    Truncating the raw candidate list first cut by id, so a cap smaller than the
+    number of finished sources selected only those, skipped them all, and
+    extracted nothing.
+    """
+    mark_done(cache, f"pr:{REPO}#1356", "no_decision")
+    mark_done(cache, f"pr:{REPO}#1397", "no_decision")
+
+    _, attempted = run(cache, monkeypatch, "--max-sources", "2")
+
+    assert attempted == [f"pr:{REPO}#3456", f"pr:{REPO}#3466"]
+
+
+def test_a_noisy_source_does_not_spend_a_max_sources_slot(
+    cache: SqliteCache, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Noise is dropped before the cap, so a noisy top-ranked source cannot
+    consume one of the limited slots that a source worth reading needs."""
+    cache.put_noise_labels(
+        f"pr:{REPO}#3456", "pr", REPO,
+        [{"reason": "dependency_update", "confidence": 1.0}],
+    )
+
+    _, attempted = run(cache, monkeypatch, "--max-sources", "2")
+
+    assert f"pr:{REPO}#3456" not in attempted
+    assert attempted == [f"pr:{REPO}#3466", f"pr:{REPO}#1356"]
+
+
+def test_a_dry_run_does_not_touch_the_links_table(
+    cache: SqliteCache, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A dry run must make no change at all — the linking pass rewrote `links`."""
+    from app.providers.llm_provider import MockLLMProvider
+
+    called: list[int] = []
+    monkeypatch.setattr(
+        extract_module, "get_llm_provider",
+        lambda **kw: MockLLMProvider(canned_response=json.dumps({"decisions": []})),
+    )
+    monkeypatch.setattr(extract_module, "build_links", lambda *a, **k: called.append(1) or 0)
+    monkeypatch.setattr(extract_module, "summarise_injection_flags", lambda rows: {
+        "sources_total": len(rows), "sources_flagged": 0,
+    })
+    monkeypatch.setattr(extract_module, "extract_decisions_from_source", lambda **k: [])
+
+    code = extract_module.main([
+        "--cache", str(cache.path), "--repo", REPO,
+        "--sample-review-file", str(cache.path) + ".md",
+        "--limit", "4", "--dry-run",
+    ])
+
+    assert code == 0
+    assert called == [], "a dry run must not rewrite the links table"
+
+
+def test_a_normal_run_still_runs_the_linking_pass(
+    cache: SqliteCache, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The dry-run guard must not disable linking for ordinary runs."""
+    from app.providers.llm_provider import MockLLMProvider
+
+    called: list[int] = []
+    monkeypatch.setattr(
+        extract_module, "get_llm_provider",
+        lambda **kw: MockLLMProvider(canned_response=json.dumps({"decisions": []})),
+    )
+    monkeypatch.setattr(extract_module, "build_links", lambda *a, **k: called.append(1) or 0)
+    monkeypatch.setattr(extract_module, "summarise_injection_flags", lambda rows: {
+        "sources_total": len(rows), "sources_flagged": 0,
+    })
+    monkeypatch.setattr(extract_module, "extract_decisions_from_source", lambda **k: [])
+
+    code = extract_module.main([
+        "--cache", str(cache.path), "--repo", REPO, "--sources", f"pr:{REPO}#1397",
+        "--sample-review-file", str(cache.path) + ".md",
+    ])
+
+    assert code == 0
+    assert called, "a normal run must still run the linking pass"
+
+
 def test_sources_selects_exactly_the_named_ones(
     cache: SqliteCache, monkeypatch: pytest.MonkeyPatch
 ) -> None:

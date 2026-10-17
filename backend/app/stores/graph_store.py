@@ -118,7 +118,9 @@ class BaseGraphStore(ABC):
         ...
 
     @abstractmethod
-    def search_entities(self, repo: str, query: str) -> list[dict[str, Any]]:
+    def search_entities(
+        self, repo: str, query: str, limit: Optional[int] = None
+    ) -> list[dict[str, Any]]:
         """Search code entities matching a substring or pattern."""
         ...
 
@@ -187,6 +189,25 @@ class BaseGraphStore(ABC):
         cannot re-verify a quote. A real store overrides this with the node's text.
         """
         return ""
+
+    def get_evidence_for_decision(self, decision_id: str) -> list[dict[str, Any]]:
+        """The evidence nodes that support a decision, reached through SUPPORTED_BY.
+
+        Default is empty: a store that does not model evidence reports none rather
+        than inventing any. A real store returns the stored rows so a decision
+        detail can carry the quotations behind it.
+        """
+        return []
+
+    def index_states(self) -> dict[str, str]:
+        """Name -> state for the indexes the store actually has.
+
+        Read only, and empty by default: a store without indexes reports nothing
+        rather than inventing a state. A real store reads the names and states
+        back so the guided walkthrough can show whether the vector and full-text
+        indexes exist instead of asserting that they do.
+        """
+        return {}
 
     @abstractmethod
     def close(self) -> None:
@@ -297,7 +318,9 @@ class InMemoryGraphStore(BaseGraphStore):
                 return props
         return None
 
-    def search_entities(self, repo: str, query: str) -> list[dict[str, Any]]:
+    def search_entities(
+        self, repo: str, query: str, limit: Optional[int] = None
+    ) -> list[dict[str, Any]]:
         clean_q = query.strip().lower()
         results: list[dict[str, Any]] = []
         for node_id, props in self.nodes.items():
@@ -311,6 +334,8 @@ class InMemoryGraphStore(BaseGraphStore):
                 or clean_q in props.get("path", "").lower()
             ):
                 results.append(props)
+                if limit is not None and len(results) >= limit:
+                    break
         return results
 
     def get_decisions_for_entity(self, entity_id: str) -> list[dict[str, Any]]:
@@ -360,6 +385,15 @@ class InMemoryGraphStore(BaseGraphStore):
                 if node and "CodeEntity" in self.labels.get(t_id, set()):
                     entities.append(dict(node))
         return entities
+
+    def get_evidence_for_decision(self, decision_id: str) -> list[dict[str, Any]]:
+        evidence: list[dict[str, Any]] = []
+        for (f_id, rel, t_id) in self.edges:
+            if f_id == decision_id and rel == "SUPPORTED_BY":
+                node = self.nodes.get(t_id)
+                if node is not None and "Evidence" in self.labels.get(t_id, set()):
+                    evidence.append(dict(node))
+        return evidence
 
     def get_subgraph(
         self,
@@ -508,12 +542,16 @@ class Neo4jGraphStore(BaseGraphStore):
             record = result.single()
             return dict(record["e"]) if record else None
 
-    def search_entities(self, repo: str, query: str) -> list[dict[str, Any]]:
+    def search_entities(
+        self, repo: str, query: str, limit: Optional[int] = None
+    ) -> list[dict[str, Any]]:
         cql = (
             "MATCH (e:CodeEntity {repo: $repo}) "
             "WHERE toLower(e.name) CONTAINS toLower($q) OR toLower(e.path) CONTAINS toLower($q) "
-            "RETURN e LIMIT 20"
+            "RETURN e"
         )
+        if limit is not None:
+            cql += f" LIMIT {int(limit)}"
         with self.driver.session(database=self.database) as session:
             result = session.run(cql, repo=repo, q=query.strip())
             return [dict(record["e"]) for record in result]
@@ -572,6 +610,14 @@ class Neo4jGraphStore(BaseGraphStore):
         with self.driver.session(database=self.database) as session:
             result = session.run(GET_ENTITIES_FOR_DECISION, decision_id=decision_id)
             return [dict(record["e"]) for record in result]
+
+    def get_evidence_for_decision(self, decision_id: str) -> list[dict[str, Any]]:
+        query = (
+            "MATCH (d:Decision {id: $decision_id})-[:SUPPORTED_BY]->(ev:Evidence) "
+            "RETURN ev"
+        )
+        with self.driver.session(database=self.database) as session:
+            return [dict(record["ev"]) for record in session.run(query, decision_id=decision_id)]
 
     def get_subgraph(
         self,
@@ -679,6 +725,15 @@ class Neo4jGraphStore(BaseGraphStore):
             return ""
         text = record.get("text")
         return str(text) if text else ""
+
+    def index_states(self) -> dict[str, str]:
+        """Read the index names and states back from the database."""
+        query = "SHOW INDEXES YIELD name, state RETURN name, state ORDER BY name"
+        with self.driver.session(database=self.database) as session:
+            return {
+                str(record["name"]): str(record["state"])
+                for record in session.run(query)
+            }
 
     def close(self) -> None:
         self.driver.close()

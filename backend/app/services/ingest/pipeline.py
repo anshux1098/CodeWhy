@@ -30,6 +30,7 @@ from app.services.ingest.git_probe import (
     read_history,
 )
 from app.services.ingest.targets import IngestTargets
+from app.services.noise import label_repository_noise
 from app.stores.sqlite_cache import SqliteCache
 
 logger = logging.getLogger("codewhy.ingest")
@@ -254,6 +255,7 @@ class IngestSummary:
     issues_fetched: int = 0
     skips: list[dict[str, Any]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    noise: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -277,6 +279,7 @@ class IngestSummary:
             },
             "skips": self.skips,
             "notes": self.notes,
+            "noise": self.noise,
         }
 
 
@@ -346,6 +349,10 @@ def run_ingest(
         summary.issues_fetched += recency_outcome.fetched_issues
 
         recent_issues = issue_numbers_from_cache(cache, repo, sorted(all_numbers) + recent_numbers)
+        # A pull request body can name another pull request, and that number is a
+        # pull request, not an issue. Drop any number already stored as a PR so it
+        # is never entered in `missing` as an issue that never existed.
+        recent_issues = {number for number in recent_issues if not cache.has_raw("pr", repo, str(number))}
         issue_list = sorted(recent_issues)[:effective_issues]
         if len(recent_issues) > effective_issues:
             dropped = len(recent_issues) - effective_issues
@@ -368,6 +375,12 @@ def run_ingest(
         summary.notes.append(str(stopped))
         cache.record_skip(summary.run_id, repo, "ingest", "rate_limit", 0)
         summary.skips.append({"kind": "ingest", "reason": "rate_limit", "count": 0})
+
+    summary.noise = label_repository_noise(cache, repo)
+    logger.info(
+        "labelled noise: %d of %d pull requests flagged",
+        summary.noise.get("noisy", 0), summary.noise.get("assessed", 0),
+    )
 
     summary.pull_requests = cache.count_kind("pr", repo)
     summary.issues = cache.count_kind("issue", repo)

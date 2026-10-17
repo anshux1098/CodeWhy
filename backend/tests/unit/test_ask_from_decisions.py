@@ -9,14 +9,21 @@ question whose words match no decision stays a refusal instead of becoming a gue
 
 from __future__ import annotations
 
+import json
+
 from app.config import Settings
+from app.providers.llm_provider import MockLLMProvider
 from app.schemas.ask import AskRequest
+from app.schemas.common import Outcome
 from app.services.data_source import GraphDataSource
 from app.services.entity_resolution import ResolutionOutcome, resolve_entity_from_decisions
 from app.stores.graph_store import InMemoryGraphStore
 
 REPO = "acme/netclient"
 SSL = "file:acme/netclient:src/netclient/ssl_.py"
+#: An entity whose path happens to contain the token "http". It has nothing to do
+#: with the HTTP/2 TLS change, so it must not steal a question that merely says "HTTP/2".
+HTTP2 = "file:acme/netclient:src/netclient/http2/connection.py"
 
 
 def _store() -> InMemoryGraphStore:
@@ -28,18 +35,32 @@ def _store() -> InMemoryGraphStore:
     })
     store.merge_node("Decision", {
         "id": "dec_add", "repo": REPO, "state": "ACTIVE",
-        "summary": "Add TLS settings required for HTTP/2",
-        "rationale": "RFC 7540 requires the newer cipher list.",
+        "summary": "Add HTTP/2 TLS support",
+        "rationale": "HTTP/2 TLS support was added for the new client.",
         "source_id": "pr:acme/netclient#3456",
     })
     store.merge_node("Decision", {
         "id": "dec_revert", "repo": REPO, "state": "ACTIVE",
-        "summary": "Revert the addition of TLS settings for HTTP/2",
-        "rationale": "The settings broke older proxies.",
+        "summary": "Revert HTTP/2 TLS support",
+        "rationale": "HTTP/2 TLS support was added and then reverted.",
         "source_id": "pr:acme/netclient#3466",
     })
     store.merge_relationship("GOVERNS", "dec_add", SSL, {})
     store.merge_relationship("GOVERNS", "dec_revert", SSL, {})
+    # A second entity whose name carries the token "http2" and an unrelated decision.
+    # The question's loose "HTTP" token matches it (a substring of "http2"), which is a
+    # coincidence: the entity route must not let that coincidence preempt the text route.
+    store.merge_node("CodeEntity", {
+        "id": HTTP2, "repo": REPO, "name": "src/netclient/http2/connection.py",
+        "path": "src/netclient/http2/connection.py", "entity_type": "File",
+    })
+    store.merge_node("Decision", {
+        "id": "dec_port0", "repo": REPO, "state": "ACTIVE",
+        "summary": "Preserve an explicit port 0 in the URL",
+        "rationale": "A falsy check dropped an explicit port 0 from the URL.",
+        "source_id": "pr:acme/netclient#5101",
+    })
+    store.merge_relationship("GOVERNS", "dec_port0", HTTP2, {})
     # A decision whose text mentions the repository name and a directory word. A
     # question that merely says "netclient" (or names "src/...") must not be pulled
     # onto this entity through that coincidence.
@@ -54,8 +75,63 @@ def _store() -> InMemoryGraphStore:
 
 
 def _source(store: InMemoryGraphStore) -> GraphDataSource:
-    cfg = Settings(_env_file=None, data_source="graph", allow_mock_providers=True)
+    # Offline forces the deterministic embedder, so the similarity the gate sees is
+    # reproducible and no model weights are fetched.
+    cfg = Settings(_env_file=None, data_source="graph", allow_mock_providers=True, offline=True)
     return GraphDataSource(cfg, store=store)
+
+
+def _store_with_evidence() -> InMemoryGraphStore:
+    """The same graph, now with a verified quote behind each decision.
+
+    Source text is stored alongside each quote, because the answer path re-verifies
+    every quote against it before citing.
+    """
+    store = _store()
+    evidence = {
+        "ev_add": ("dec_add", "pr:acme/netclient#3456",
+                   "https://github.com/acme/netclient/pull/3456",
+                   "Add the TLS settings that HTTP/2 needs"),
+        "ev_revert": ("dec_revert", "pr:acme/netclient#3466",
+                      "https://github.com/acme/netclient/pull/3466",
+                      "Revert the TLS settings that HTTP/2 needs"),
+        "ev_port0": ("dec_port0", "pr:acme/netclient#5101",
+                     "https://github.com/acme/netclient/pull/5101",
+                     "Keep an explicit port 0 in the URL"),
+    }
+    for ev_id, (decision_id, source_id, source_url, quote) in evidence.items():
+        store.merge_node("Evidence", {
+            "id": ev_id, "repo": REPO, "decision_id": decision_id,
+            "source_id": source_id, "source_type": "pull_request",
+            "source_url": source_url, "quote": quote, "claim": quote,
+            "author": "real-reviewer", "timestamp": "2024-03-01T00:00:00Z",
+            "quote_verified": True,
+        })
+        store.merge_relationship("SUPPORTED_BY", decision_id, ev_id, {})
+        store.source_texts[source_id] = quote
+    return store
+
+
+def test_the_http2_question_is_answered_from_the_ssl_decisions() -> None:
+    source = _source(_store_with_evidence())
+    source.provider = MockLLMProvider(canned_response=json.dumps({
+        "answer": "TLS support was added for HTTP/2 in #3456 and reverted in #3466.",
+        "cited_evidence_ids": ["ev_add", "ev_revert"],
+    }))
+
+    response = source.ask(
+        REPO, AskRequest(question="Why was HTTP/2 TLS support added and then reverted?")
+    )
+
+    # The loose "HTTP" token inside the http2 path is a coincidence, not a reference.
+    # The decisions whose text is actually about the change win, and the answer cites
+    # both the addition and the revert.
+    assert response.entity is not None
+    assert response.entity.id == SSL
+    assert response.outcome == Outcome.FULL
+    urls = {citation.source_url for citation in response.citations}
+    assert "https://github.com/acme/netclient/pull/3456" in urls
+    assert "https://github.com/acme/netclient/pull/3466" in urls
 
 
 def test_decisions_are_found_from_the_question_and_the_entity_derived() -> None:

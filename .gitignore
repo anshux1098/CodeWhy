@@ -12,6 +12,7 @@ data/*
 docs/superpowers/
 review/decisions_sample.md
 answers.json
+walkthrough_report.txt
 *.log
 .idea/
 .vscode/

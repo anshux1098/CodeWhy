@@ -16,10 +16,12 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections import Counter
 from pathlib import Path
@@ -75,6 +77,83 @@ def wait_for_health():
     return None
 
 
+_URL_IDENTIFIER = re.compile(r"/(?:pull|issues|discussions)/(\d+)|/commit/([0-9a-fA-F]+)")
+
+
+def source_number_from_url(url: str) -> str:
+    """The pull request, issue or commit number a citation's URL points at.
+
+    Returns "?" when the URL carries no such number, so the field is never filled
+    with a citation id by mistake.
+    """
+    match = _URL_IDENTIFIER.search(url or "")
+    if not match:
+        return "?"
+    return match.group(1) or match.group(2)
+
+
+def _single_decision_entity(graph: dict, entity_id: str) -> dict | None:
+    """The story for one entity, or None if it is not "one change, one quote"."""
+    nodes = {node["id"]: node for node in graph.get("nodes", []) if node.get("id")}
+    node = nodes.get(entity_id)
+    if not node or node.get("type") != "CodeEntity":
+        return None
+    decisions = {
+        edge.get("source")
+        for edge in graph.get("edges", [])
+        if edge.get("type") == "GOVERNS" and edge.get("target") == entity_id
+    } - {None}
+    if len(decisions) != 1:
+        return None
+    decision_id = next(iter(decisions))
+    quotes = sum(
+        1 for edge in graph.get("edges", [])
+        if edge.get("type") == "SUPPORTED_BY" and edge.get("source") == decision_id
+    )
+    if quotes != 1:
+        return None
+    return {
+        "entity_id": entity_id,
+        "path": node.get("label") or node.get("id"),
+        "decision_id": decision_id,
+    }
+
+
+def pick_single_quote_entity(repo_graph: dict, fetch_entity_graph) -> dict | None:
+    """An entity governed by exactly one decision that carries exactly one quote.
+
+    That is the clearest partial-answer story: one change, one reason, one quote.
+
+    The repository-wide /graph response is capped at a fixed number of nodes. Once
+    that cap fills with code entities, decisions and pull requests, the response
+    carries no Evidence node and therefore no SUPPORTED_BY edge, so the quote count
+    cannot be read from it. Each code entity named by that response is re-fetched
+    on its own through /graph?entity_id=, where the traversal does reach the
+    supporting evidence. ``fetch_entity_graph`` returns ``(status, graph)``.
+
+    Returns None when the repository holds no such entity, so the caller can say
+    the scenario is not available rather than run it against a guess.
+    """
+    entity_ids = sorted(
+        node["id"] for node in repo_graph.get("nodes", [])
+        if node.get("id") and node.get("type") == "CodeEntity"
+    )
+
+    candidates: list[dict] = []
+    for entity_id in entity_ids:
+        try:
+            status, subgraph = fetch_entity_graph(entity_id)
+        except Exception:
+            continue
+        if status != 200:
+            continue
+        found = _single_decision_entity(subgraph, entity_id)
+        if found is not None:
+            candidates.append(found)
+    candidates.sort(key=lambda c: (c["path"], c["entity_id"]))
+    return candidates[0] if candidates else None
+
+
 def print_ask(name: str, entry: dict) -> None:
     response = entry["response"]
     print("-" * 72)
@@ -87,12 +166,30 @@ def print_ask(name: str, entry: dict) -> None:
     print("QUESTION:", entry["request"]["question"])
     if response.get("entity"):
         print("ENTITY:", json.dumps(response["entity"], ensure_ascii=False))
+    confidence = response.get("confidence")
+    if confidence is None:
+        print("CONFIDENCE none (this outcome is decided before scoring)")
+    else:
+        print(f"CONFIDENCE label={confidence.get('label')} score={confidence.get('score')}")
+        signals = confidence.get("signals")
+        if signals:
+            print(
+                "  components:",
+                json.dumps(signals, ensure_ascii=False, sort_keys=True),
+            )
     if response.get("answer"):
         print("ANSWER:", response["answer"])
-    for citation in response.get("citations") or []:
+    citations = response.get("citations") or []
+    if citations:
+        print(
+            "CITATIONS (the citation id is the citation's own handle; the source "
+            "number is the pull request or issue it points at):"
+        )
+    for citation in citations:
+        number = source_number_from_url(citation.get("source_url") or "")
         print(
             f"  CITATION kind={citation.get('kind')} type={citation.get('source_type')} "
-            f"number={citation.get('id')} url={citation.get('source_url')}"
+            f"id={citation.get('id')} source_number={number} url={citation.get('source_url')}"
         )
         print(f"    quote: {citation.get('quote')}")
     for decision in response.get("decisions") or []:
@@ -178,6 +275,27 @@ def main() -> int:
             print("-" * 72)
             print("DECISION", results["decision_id"], "status:", results["decision_status"])
             print(json.dumps(results["decision"], indent=2, ensure_ascii=False))
+
+        print("-" * 72)
+        partial = pick_single_quote_entity(
+            results["graph"],
+            lambda eid: get(
+                f"/repositories/{REPO}/graph?entity_id={urllib.parse.quote(eid, safe='')}"
+            ),
+        )
+        if partial is not None:
+            payload = {"question": f"Why was {partial['path']} changed?"}
+            status, body = post(f"/repositories/{REPO}/ask", payload)
+            results["single_quote"] = {
+                "status": status, "request": payload, "response": body, "picked": partial,
+            }
+            print("SINGLE-DECISION SCENARIO:", json.dumps(partial, ensure_ascii=False))
+            print_ask("single-decision", results["single_quote"])
+        else:
+            print(
+                "SINGLE-DECISION SCENARIO: not available — no code entity in the "
+                "repository has exactly one decision backed by exactly one verified quote"
+            )
         print("=" * 72)
         print("wrote", OUT)
         return 0

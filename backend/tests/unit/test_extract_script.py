@@ -86,6 +86,30 @@ def test_a_path_without_the_source_prefix_still_matches_the_target_file() -> Non
     assert chosen[0] == "pr:urllib3/urllib3#200"
 
 
+def test_more_target_files_touched_outranks_fewer() -> None:
+    """Relevance within the target-file tier is how many target files a PR touches."""
+    rows = [
+        pr_row(100, ["src/urllib3/connectionpool.py"]),
+        pr_row(200, ["src/urllib3/connection.py", "src/urllib3/util/ssl_.py"]),
+    ]
+
+    chosen = [row["id"] for row in extract_module.select_sources(rows, 2)]
+
+    assert chosen == ["pr:urllib3/urllib3#200", "pr:urllib3/urllib3#100"]
+
+
+def test_equal_relevance_is_broken_by_pull_request_number_not_the_string_id() -> None:
+    """Ties are ordered by the pull request number, so #2 precedes #1000."""
+    rows = [
+        pr_row(1000, ["src/urllib3/connectionpool.py"]),
+        pr_row(2, ["src/urllib3/connectionpool.py"]),
+    ]
+
+    chosen = [row["id"] for row in extract_module.select_sources(rows, 2)]
+
+    assert chosen == ["pr:urllib3/urllib3#2", "pr:urllib3/urllib3#1000"]
+
+
 def test_the_limit_cuts_the_list_rather_than_the_candidates() -> None:
     rows = [pr_row(n, ["src/urllib3/connectionpool.py"]) for n in range(50)]
 
