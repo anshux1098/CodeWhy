@@ -8,7 +8,7 @@ CodeWhy answers *"why is this code like this?"* for a software repository by rec
 
 ## Current Status: Phases 0–3 Complete, Exercised on a Real Repository
 
-The project has advanced through **Phase 0, Phase 1, Phase 2, and Phase 3**. All backend contracts, data ingestion, deterministic linking, AST constant history, noise filtering, decision extraction with verbatim quote checks, Neo4j graph stores, and the 4-gate grounded `/ask` pipeline are implemented. The suite collects **934 tests**: **923 pass with zero credentials and no `.env` file**, and **11 live tests** (marked `live`, run with `RUN_LIVE=1`) exercise the real Neo4j store, the Cypher `EXPLAIN` plan, and the stored source-text round trip.
+The project has advanced through **Phase 0, Phase 1, Phase 2, and Phase 3**. All backend contracts, data ingestion, deterministic linking, AST constant history, noise filtering, decision extraction with verbatim quote checks, Neo4j graph stores, and the 4-gate grounded `/ask` pipeline are implemented. The suite collects **934 tests**: **923 pass with zero credentials and no `.env` file**, and **11 tests skip** (4 live tests marked `live`, run with `RUN_LIVE=1`, exercise the real Neo4j store, Cypher `EXPLAIN` plan, and GitHub API; 6 review honesty tests skip on probe files that cite no pull requests; and 1 review test skips un-ingested alembic targets).
 
 The pipeline has been run end to end on the real repository `urllib3/urllib3`: ingest → extract → link → build the Neo4j graph → answer grounded `/ask` questions. The two HTTP/2 questions resolve to `src/urllib3/util/ssl_.py` and answer from the pull request #3456 and #3466 quotes; the questions that name no real entity refuse honestly. `scripts/check_live_answers.py` runs the six questions against a live server and prints every response, including each citation's quote and URL.
 
@@ -90,9 +90,9 @@ Phase 2 bridges raw repository records into structured engineering decisions and
    - Requires quotes to be exact substrings of source text (with whitespace, case, and markdown normalization).
    - Unverified quotes are dropped.
    - **Invariant**: If no verified quote remains, the decision summary falls back to `"change recorded, rationale unknown"`, rationale is cleared, and `quote_verified = False`.
-8. **Extraction CLI & Audit Report**:
+8. **Extraction CLI & Decision Auditing**:
    - [`scripts/extract.py`](scripts/extract.py) executes the extraction pipeline from SQLite cache.
-   - [`review/decisions_sample.md`](review/decisions_sample.md) contains 20 hand-audited decisions verifying quote accuracy and rationale fallbacks.
+   - Supports `--sample-review-file` to generate an opt-in review sample of extracted decisions verifying quote accuracy and rationale fallbacks.
 
 ### Phase 3: Neo4j Knowledge Graph & Grounded Ask Endpoint
 Phase 3 builds the connected graph view and grounded retrieval pipeline:
@@ -181,7 +181,7 @@ The test suite runs with **zero credentials and no required `.env` file**.
 
 ### Run the Phase 2 and Phase 3 tests
 
-The full suite collects **934 tests**. It needs no credentials and no `.env` file; the 11 `live` tests skip unless `RUN_LIVE=1` is set.
+The full suite collects **934 tests**. It needs no credentials and no `.env` file; 923 pass out of the box, while 11 tests skip (4 marked `live` requiring `RUN_LIVE=1`, 6 on review probe files without PR references, and 1 on un-ingested repository probes).
 ```powershell
 .\.venv\Scripts\pytest.exe backend/tests/unit/test_phase3.py backend/tests/unit/test_extraction.py backend/tests/unit/test_linking.py backend/tests/unit/test_config_keys.py backend/tests/unit/test_noise.py -v
 ```
@@ -245,7 +245,11 @@ Copy `.env.example` to `.env` to configure settings. Defaults work out of the bo
 | `NEO4J_URI` | `""` | Neo4j AuraDB Bolt URI (`neo4j+s://...`). |
 | `NEO4J_USERNAME` | `""` | Neo4j username. |
 | `NEO4J_PASSWORD` | `""` | Neo4j password. |
-| `LLM_PROVIDER` | `mock` | `openai`, `ollama`, or `mock`. |
+| `LLM_PROVIDER` | `""` | Provider identifier: `openai`, `ollama`, `google`, `gemini`, `vllm`, `openrouter`, or `mock`. |
+| `LLM_BASE_URL` | `""` | Custom OpenAI-compatible base URL. |
+| `LLM_MAX_OUTPUT_TOKENS` | `4096` | Ceiling for a single LLM completion reply. |
+| `ALLOW_MOCK_PROVIDERS` | `false` | When true, allows graph data source to run on in-memory mocks. |
+| `OFFLINE` | `false` | When true, disables remote downloads and uses deterministic embeddings. |
 | `LLM_MODEL` | `""` | Model identifier (e.g. `gpt-4o-mini`). |
 | `LLM_API_KEY` | `""` | API key for LLM provider. |
 | `MAX_LLM_TOKENS_PER_RUN` | `500000` | Token budget guard stopping execution when reached. |
