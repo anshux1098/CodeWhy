@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 from app.config import Settings, settings
 from app.services.errors import DataSourceError
 from app.providers.llm_provider import get_llm_provider
-from app.schemas.common import DecisionState, EntityType, SourceType
-from app.schemas.decisions import DecisionDetail, SourceRef
+from app.schemas.common import CitationKind, DecisionState, EntityType, SourceType
+from app.schemas.decisions import Citation, DecisionDetail, SourceRef
 from app.schemas.entities import Entity, EntityListResponse
 from app.schemas.graph import GraphEdge, GraphNode, GraphResponse
 from app.schemas.repository import RepositoryCounts, RepositoryResponse
@@ -77,6 +77,58 @@ def source_ref_for(node: dict) -> SourceRef:
             "decision carries no usable source reference; refusing to invent one"
         )
     return SourceRef(type=source_type, number=number, url=source_url)
+
+
+def source_type_from_stored(raw: Any) -> Optional[SourceType]:
+    """Map a stored source type onto the contract enum, case-insensitively.
+
+    The cache stores kinds as ``pull_request`` while the contract spells them
+    ``PullRequest``. An unrecognised value returns None so the caller falls back to
+    the provenance derived from the source id instead of guessing a kind.
+    """
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    for member in SourceType:
+        if text.lower() in (member.value.lower(), member.name.lower()):
+            return member
+    return None
+
+
+def citations_for_decision(
+    decision_id: str, evidence: list[dict[str, Any]]
+) -> list[Citation]:
+    """Build the citations behind a decision from its stored evidence.
+
+    Each citation carries the verified quote, the URL it points at, and its author
+    and timestamp. Evidence with no quote is dropped rather than cited blank: a
+    citation that quotes nothing asserts nothing.
+    """
+    citations: list[Citation] = []
+    for ev in evidence:
+        quote = str(ev.get("quote") or "")
+        if not quote.strip():
+            continue
+        url = str(ev.get("source_url") or "")
+        kind = source_type_from_stored(ev.get("source_type"))
+        if not url or kind is None:
+            derived_url, _number, derived_type = from_source_id(ev.get("source_id"))
+            url = url or derived_url
+            if kind is None:
+                kind = derived_type
+        citations.append(
+            Citation(
+                id=f"cit_{ev.get('id', '')}",
+                decision_id=decision_id,
+                kind=CitationKind.SOURCE,
+                quote=quote,
+                source_url=url,
+                source_type=kind or SourceType.PULL_REQUEST,
+                author=ev.get("author"),
+                timestamp=ev.get("timestamp"),
+            )
+        )
+    return citations
 
 
 def from_source_id(source_id: Any) -> tuple[str, Optional[int], SourceType]:
@@ -270,12 +322,16 @@ class GraphDataSource:
         if not node:
             raise NotFoundError(f"decision {decision_id!r} not found")
 
+        citations = citations_for_decision(
+            decision_id, self.store.get_evidence_for_decision(decision_id)
+        )
         return DecisionDetail(
             id=decision_id,
             summary=node.get("summary", ""),
             rationale=node.get("rationale"),
             state=DecisionState(node.get("state", "ACTIVE")),
             source=source_ref_for(node),
+            citations=citations,
             fixture=not self.is_real,
         )
 

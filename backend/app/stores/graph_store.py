@@ -190,6 +190,15 @@ class BaseGraphStore(ABC):
         """
         return ""
 
+    def get_evidence_for_decision(self, decision_id: str) -> list[dict[str, Any]]:
+        """The evidence nodes that support a decision, reached through SUPPORTED_BY.
+
+        Default is empty: a store that does not model evidence reports none rather
+        than inventing any. A real store returns the stored rows so a decision
+        detail can carry the quotations behind it.
+        """
+        return []
+
     def index_states(self) -> dict[str, str]:
         """Name -> state for the indexes the store actually has.
 
@@ -376,6 +385,15 @@ class InMemoryGraphStore(BaseGraphStore):
                 if node and "CodeEntity" in self.labels.get(t_id, set()):
                     entities.append(dict(node))
         return entities
+
+    def get_evidence_for_decision(self, decision_id: str) -> list[dict[str, Any]]:
+        evidence: list[dict[str, Any]] = []
+        for (f_id, rel, t_id) in self.edges:
+            if f_id == decision_id and rel == "SUPPORTED_BY":
+                node = self.nodes.get(t_id)
+                if node is not None and "Evidence" in self.labels.get(t_id, set()):
+                    evidence.append(dict(node))
+        return evidence
 
     def get_subgraph(
         self,
@@ -592,6 +610,14 @@ class Neo4jGraphStore(BaseGraphStore):
         with self.driver.session(database=self.database) as session:
             result = session.run(GET_ENTITIES_FOR_DECISION, decision_id=decision_id)
             return [dict(record["e"]) for record in result]
+
+    def get_evidence_for_decision(self, decision_id: str) -> list[dict[str, Any]]:
+        query = (
+            "MATCH (d:Decision {id: $decision_id})-[:SUPPORTED_BY]->(ev:Evidence) "
+            "RETURN ev"
+        )
+        with self.driver.session(database=self.database) as session:
+            return [dict(record["ev"]) for record in session.run(query, decision_id=decision_id)]
 
     def get_subgraph(
         self,

@@ -75,6 +75,20 @@ def test_a_known_record_is_still_served(graph_client) -> None:
     assert [node["id"] for node in entity_graph.json()["nodes"]]
 
 
+def test_a_known_decision_returns_its_evidence_as_citations(graph_client) -> None:
+    """The decision detail must carry the supporting evidence as citations."""
+    payload = graph_client.get(f"{API}/decisions/dec_1").json()
+
+    assert payload["citations"], "the decision's evidence must be returned as citations"
+    citation = payload["citations"][0]
+    assert citation["quote"] == "mobile clients kept timing out"
+    assert citation["source_url"] == f"https://github.com/{REPO}/pull/7"
+    # The citation id and the source number are different things: the id is the
+    # citation's own handle, the number is the pull request it points at.
+    assert payload["source"]["number"] == 7
+    assert citation["id"] != str(payload["source"]["number"])
+
+
 def test_graph_responses_are_flagged_as_fixtures(graph_client) -> None:
     """An in-memory store is not a real repository, and must not pretend to be."""
     decision = graph_client.get(f"{API}/decisions/dec_1")
