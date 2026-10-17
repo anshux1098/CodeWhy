@@ -91,6 +91,39 @@ def source_number_from_url(url: str) -> str:
     return match.group(1) or match.group(2)
 
 
+def pick_single_quote_entity(graph: dict) -> dict | None:
+    """An entity governed by exactly one decision that carries exactly one quote.
+
+    That is the clearest partial-answer story: one change, one reason, one quote.
+    Returns None when the graph holds no such entity, so the scenario is skipped
+    rather than run against a guess.
+    """
+    nodes = {node["id"]: node for node in graph.get("nodes", []) if node.get("id")}
+    governs: dict[str, list[str]] = {}
+    supported: Counter[str] = Counter()
+    for edge in graph.get("edges", []):
+        if edge.get("type") == "GOVERNS":
+            governs.setdefault(edge.get("target"), []).append(edge.get("source"))
+        elif edge.get("type") == "SUPPORTED_BY":
+            supported[edge.get("source")] += 1
+
+    candidates: list[dict] = []
+    for entity_id, decisions in governs.items():
+        distinct = sorted({d for d in decisions if d})
+        if len(distinct) != 1 or supported.get(distinct[0], 0) != 1:
+            continue
+        node = nodes.get(entity_id)
+        if not node or node.get("type") != "CodeEntity":
+            continue
+        candidates.append({
+            "entity_id": entity_id,
+            "path": node.get("label") or node.get("id"),
+            "decision_id": distinct[0],
+        })
+    candidates.sort(key=lambda c: (c["path"], c["entity_id"]))
+    return candidates[0] if candidates else None
+
+
 def print_ask(name: str, entry: dict) -> None:
     response = entry["response"]
     print("-" * 72)
@@ -206,6 +239,22 @@ def main() -> int:
             print("-" * 72)
             print("DECISION", results["decision_id"], "status:", results["decision_status"])
             print(json.dumps(results["decision"], indent=2, ensure_ascii=False))
+
+        print("-" * 72)
+        partial = pick_single_quote_entity(results["graph"])
+        if partial is not None:
+            payload = {"question": f"Why was {partial['path']} changed?"}
+            status, body = post(f"/repositories/{REPO}/ask", payload)
+            results["single_quote"] = {
+                "status": status, "request": payload, "response": body, "picked": partial,
+            }
+            print("SINGLE-DECISION SCENARIO:", json.dumps(partial, ensure_ascii=False))
+            print_ask("single-decision", results["single_quote"])
+        else:
+            print(
+                "SINGLE-DECISION SCENARIO: no entity with exactly one decision and "
+                "one verified quote was found"
+            )
         print("=" * 72)
         print("wrote", OUT)
         return 0
