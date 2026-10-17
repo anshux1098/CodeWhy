@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -75,6 +76,21 @@ def wait_for_health():
     return None
 
 
+_URL_IDENTIFIER = re.compile(r"/(?:pull|issues|discussions)/(\d+)|/commit/([0-9a-fA-F]+)")
+
+
+def source_number_from_url(url: str) -> str:
+    """The pull request, issue or commit number a citation's URL points at.
+
+    Returns "?" when the URL carries no such number, so the field is never filled
+    with a citation id by mistake.
+    """
+    match = _URL_IDENTIFIER.search(url or "")
+    if not match:
+        return "?"
+    return match.group(1) or match.group(2)
+
+
 def print_ask(name: str, entry: dict) -> None:
     response = entry["response"]
     print("-" * 72)
@@ -87,12 +103,24 @@ def print_ask(name: str, entry: dict) -> None:
     print("QUESTION:", entry["request"]["question"])
     if response.get("entity"):
         print("ENTITY:", json.dumps(response["entity"], ensure_ascii=False))
+    confidence = response.get("confidence")
+    if confidence is None:
+        print("CONFIDENCE none (this outcome is decided before scoring)")
+    else:
+        print(f"CONFIDENCE label={confidence.get('label')} score={confidence.get('score')}")
     if response.get("answer"):
         print("ANSWER:", response["answer"])
-    for citation in response.get("citations") or []:
+    citations = response.get("citations") or []
+    if citations:
+        print(
+            "CITATIONS (the citation id is the citation's own handle; the source "
+            "number is the pull request or issue it points at):"
+        )
+    for citation in citations:
+        number = source_number_from_url(citation.get("source_url") or "")
         print(
             f"  CITATION kind={citation.get('kind')} type={citation.get('source_type')} "
-            f"number={citation.get('id')} url={citation.get('source_url')}"
+            f"id={citation.get('id')} source_number={number} url={citation.get('source_url')}"
         )
         print(f"    quote: {citation.get('quote')}")
     for decision in response.get("decisions") or []:
