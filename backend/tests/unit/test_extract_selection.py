@@ -179,6 +179,39 @@ def test_limit_ranks_failures_and_unprocessed_together(
     ]
 
 
+def test_max_sources_spends_its_allowance_on_pending_priority_sources(
+    cache: SqliteCache, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--max-sources must rank and drop finished sources before it caps.
+
+    Truncating the raw candidate list first cut by id, so a cap smaller than the
+    number of finished sources selected only those, skipped them all, and
+    extracted nothing.
+    """
+    mark_done(cache, f"pr:{REPO}#1356", "no_decision")
+    mark_done(cache, f"pr:{REPO}#1397", "no_decision")
+
+    _, attempted = run(cache, monkeypatch, "--max-sources", "2")
+
+    assert attempted == [f"pr:{REPO}#3456", f"pr:{REPO}#3466"]
+
+
+def test_a_noisy_source_does_not_spend_a_max_sources_slot(
+    cache: SqliteCache, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Noise is dropped before the cap, so a noisy top-ranked source cannot
+    consume one of the limited slots that a source worth reading needs."""
+    cache.put_noise_labels(
+        f"pr:{REPO}#3456", "pr", REPO,
+        [{"reason": "dependency_update", "confidence": 1.0}],
+    )
+
+    _, attempted = run(cache, monkeypatch, "--max-sources", "2")
+
+    assert f"pr:{REPO}#3456" not in attempted
+    assert attempted == [f"pr:{REPO}#3466", f"pr:{REPO}#1356"]
+
+
 def test_a_dry_run_does_not_touch_the_links_table(
     cache: SqliteCache, monkeypatch: pytest.MonkeyPatch
 ) -> None:

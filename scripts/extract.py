@@ -365,7 +365,11 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         dest="max_sources",
         type=int,
         default=None,
-        help="Cap how many sources are considered in scope, before any priority limit",
+        help=(
+            "Cap how many sources are extracted this run. Applied after ranking "
+            "and after skipping finished or noisy sources, so the allowance goes "
+            "to the highest-priority pending sources."
+        ),
     )
     parser.add_argument(
         "--targets",
@@ -524,9 +528,6 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
             len(candidates),
         )
 
-    if args.max_sources is not None:
-        candidates = candidates[: args.max_sources]
-
     if args.sources:
         candidates = [row for row in candidates if row["id"] in resolve_source_ids(args, candidates)]
         logger.info("--sources: %d sources selected", len(candidates))
@@ -555,9 +556,22 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
                 already_counted,
             )
 
+    # Noise is dropped before the caps for the same reason finished sources are:
+    # a noisy record has nothing to contribute, so letting it hold a --limit or
+    # --max-sources slot starves a source that does.
+    candidates = [row for row in candidates if row["id"] not in noisy_ids]
+    considered = len(candidates)
+
+    # --max-sources caps the ranked list, not the raw one. Truncating before the
+    # ranking spent the allowance on whichever ids sorted first, so a second pass
+    # over a repository selected the lowest-numbered sources, skipped the ones
+    # already done, and extracted nothing at all.
+    if args.max_sources is not None:
+        candidates = select_sources(candidates, args.max_sources)
+
     rows = select_sources(candidates, args.limit)
 
-    pending = [row for row in rows if row["id"] not in noisy_ids]
+    pending = rows
 
     # Counts only. The flagged text itself never reaches a log line.
     injection_counts = summarise_injection_flags(
@@ -570,7 +584,7 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
     )
     logger.info(
         "Selected %d of %d candidates in priority order for %s",
-        len(pending), len(candidates), args.repo,
+        len(pending), considered, args.repo,
     )
 
     extracted_decisions_count = 0
