@@ -159,6 +159,7 @@ py -V:3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -e ".[dev]"
+pip install -e ".[embeddings]"
 ```
 
 **Bash:**
@@ -167,7 +168,10 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -e ".[dev]"
+pip install -e ".[embeddings]"
 ```
+
+> **Note on embeddings:** Installing `.[embeddings]` provides `sentence-transformers` for semantic similarity. Without it, the deterministic fallback embedder is used and answers are weaker.
 
 ---
 
