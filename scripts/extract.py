@@ -52,19 +52,29 @@ def _pull_request_number(source_id: str) -> Optional[int]:
     return int(tail) if tail.isdigit() else None
 
 
-def _touches_target_files(payload: dict[str, Any]) -> bool:
-    """Whether an ingested payload lists one of the target files.
+def _target_file_match_count(payload: dict[str, Any]) -> int:
+    """How many distinct target files an ingested payload lists.
 
     Matched on the suffix because the stored paths carry different roots: `git`
     recorded `src/urllib3/...` while GitHub reported `urllib3/...` for older files.
+    The count is the relevance signal: a change touching two target files is more
+    relevant to the retry/connection/TLS behaviour than one touching a single file.
     """
     files = payload.get("files") or []
     if not isinstance(files, list):
-        return False
+        return 0
     wanted = {name.rsplit("/", 1)[-1] for name in TARGET_FILES}
-    return any(
-        isinstance(name, str) and name.rsplit("/", 1)[-1] in wanted for name in files
-    )
+    matched = {
+        name.rsplit("/", 1)[-1]
+        for name in files
+        if isinstance(name, str) and name.rsplit("/", 1)[-1] in wanted
+    }
+    return len(matched)
+
+
+def _touches_target_files(payload: dict[str, Any]) -> bool:
+    """Whether an ingested payload lists one of the target files."""
+    return _target_file_match_count(payload) > 0
 
 
 def changed_files_from_payload(payload: dict[str, Any]) -> list[str]:
@@ -86,30 +96,43 @@ def changed_files_from_payload(payload: dict[str, Any]) -> list[str]:
     return result
 
 
-def _sort_key(row: dict[str, Any]) -> tuple[int, int, str]:
-    """Rank a candidate: pinned pull requests, then target files, then everything else.
+def _pull_request_sort_number(source_id: str) -> int:
+    """The numeric tie-break for a source: its pull request number, or a large value."""
+    number = _pull_request_number(source_id)
+    return number if number is not None else 1_000_000_000
 
-    Documentation sorts last because a changelog restates a decision rather than
-    making one, so it should never crowd out the record of the decision itself.
+
+def _sort_key(row: dict[str, Any]) -> tuple[int, int, int, str]:
+    """Rank a candidate in the extraction queue.
+
+    Order: pinned pull requests, then the target-file tier ranked by how many target
+    files the change touches (its relevance), then everything else, then documentation.
+    Within a tier, ties are broken by the pull request number, so the queue is ordered
+    by intent rather than by whichever string id happens to sort first (`#2` before
+    `#1000`). Documentation sorts last because a changelog restates a decision rather
+    than making one, so it should never crowd out the record of the decision itself.
     """
     source_id = row["id"]
     number = _pull_request_number(source_id)
 
     if number is not None and number in PINNED_PULL_REQUESTS:
-        rank = PINNED_PULL_REQUESTS.index(number)
-        return (rank, 0, source_id)
+        return (0, PINNED_PULL_REQUESTS.index(number), 0, source_id)
 
     if row.get("kind") == "doc":
-        return (len(PINNED_PULL_REQUESTS) + 2, 0, source_id)
+        return (3, 0, 0, source_id)
 
     try:
         payload = json.loads(row["payload"])
     except (TypeError, ValueError):
         payload = {}
-    if isinstance(payload, dict) and _touches_target_files(payload):
-        return (len(PINNED_PULL_REQUESTS), 0, source_id)
+    if not isinstance(payload, dict):
+        payload = {}
 
-    return (len(PINNED_PULL_REQUESTS) + 1, 0, source_id)
+    matched = _target_file_match_count(payload)
+    if matched:
+        return (1, -matched, _pull_request_sort_number(source_id), source_id)
+
+    return (2, 0, _pull_request_sort_number(source_id), source_id)
 
 
 def select_sources(rows: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
