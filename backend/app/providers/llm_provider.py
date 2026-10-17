@@ -68,11 +68,6 @@ class LLMSchemaValidationError(LLMProviderError):
         #: Short description of what was wrong, for the operator.
         self.reason = _describe_validation_failure(errors)
 
-    @property
-    def is_json(self) -> bool:
-        """Whether the reply was parseable JSON at all."""
-        return bool(self.received_keys) or _parses_as_json(self.raw_content)
-
 
 class LLMNonRetryableError(LLMProviderError):
     """Raised for a status that must not be retried.

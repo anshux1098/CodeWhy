@@ -43,9 +43,6 @@ class IngestTargets(BaseModel):
     def config_key_names(self) -> list[str]:
         return [key.name for key in self.config_keys]
 
-    def target_files_in_clone(self) -> list[str]:
-        return list(self.files)
-
 
 def load_targets(path: Path) -> IngestTargets:
     import json

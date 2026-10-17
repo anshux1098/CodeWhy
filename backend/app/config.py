@@ -129,10 +129,6 @@ class Settings(BaseSettings):
             raise ValueError("limits must be positive")
         return value
 
-    @property
-    def fixture_mode(self) -> bool:
-        return self.data_source == "fixture"
-
     def require_github(self) -> None:
         _require({"github_token": self.github_token})
 

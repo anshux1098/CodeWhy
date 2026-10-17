@@ -46,15 +46,6 @@ class DataSource(Protocol):
     def get_graph(self, repository_id: str, entity_id: str | None) -> GraphResponse: ...
 
 
-def node_repo_hint(store: object) -> str:
-    nodes = getattr(store, "nodes", None)
-    if isinstance(nodes, dict):
-        for props in nodes.values():
-            repo = (props or {}).get("repo")
-            if repo:
-                return str(repo)
-    return "unknown"
-
 
 def source_ref_for(node: dict) -> SourceRef:
     """Build a SourceRef from the stored node.

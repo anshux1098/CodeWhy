@@ -102,14 +102,6 @@ def strip_code(text: str) -> str:
 def extract_issue_numbers(text: str) -> list[int]:
     return sorted({int(number) for number in ISSUE_REFERENCE.findall(strip_code(text))})
 
-
-def extract_closing_issue_numbers(text: str) -> list[int]:
-    trailing = text or ""
-    if trailing.endswith("."):
-        trailing = trailing[:-1]
-    return sorted({int(number) for number in ISSUE_REFERENCE.findall(strip_code(trailing))})
-
-
 def parse_trailer_block(message: str) -> dict[str, list[str]]:
     """Read the trailing run of trailer paragraphs.
 

@@ -267,23 +267,6 @@ def _all_generated_files(changed_files: Sequence[str]) -> bool:
         GENERATED_FILE_PATTERN.search(f) for f in changed_files
     )
 
-
-def _has_meaningful_body(body: str, min_chars: int = 30) -> bool:
-    """Return True when the body contains real prose (ignoring trailers and blanks)."""
-    if not body:
-        return False
-    for line in body.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            continue
-        # Skip trailer lines (Token: value)
-        if re.match(r"^[A-Za-z][A-Za-z0-9_-]+:", stripped):
-            continue
-        if len(stripped) >= min_chars:
-            return True
-    return False
-
-
 # ---------------------------------------------------------------------------
 # Primary public API
 # ---------------------------------------------------------------------------
