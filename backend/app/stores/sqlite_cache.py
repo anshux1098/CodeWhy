@@ -912,6 +912,21 @@ class SqliteCache:
                 count += 1
         return count
 
+    def clear_noise_labels(self, repo: str, record_type: Optional[str] = None) -> int:
+        """Delete a repo's noise labels, optionally only one record type.
+
+        A recompute replaces the stored labels, so a rule that no longer matches
+        must be able to remove a stale label rather than leave it behind forever.
+        Returns the number of rows deleted.
+        """
+        query = "DELETE FROM noise_labels WHERE repo = ?"
+        params: list[Any] = [repo]
+        if record_type is not None:
+            query += " AND record_type = ?"
+            params.append(record_type)
+        with self.transaction() as connection:
+            return connection.execute(query, tuple(params)).rowcount
+
     def noise_labels_for(
         self,
         repo: Optional[str] = None,

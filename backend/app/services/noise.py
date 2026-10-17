@@ -448,6 +448,9 @@ def label_repository_noise(
     noisy at ``min_confidence``, how many carry each reason, and how many label
     rows were written.
     """
+    # Recompute, don't accumulate: clearing first lets a rule change remove a label
+    # that no longer applies, instead of leaving the stale row behind forever.
+    cache.clear_noise_labels(repo, "pr")
     revert_targets = build_revert_target_set(cache.iter_commits(repo))
     results: list[NoiseResult] = []
     for row in cache.fetch_raw_objects(repo, limit=limit):

@@ -427,6 +427,27 @@ def test_label_repository_noise_flags_stored_pull_requests(tmp_path: Path) -> No
         assert len(cache.noise_labels_for(repo=REPO)) == 3
 
 
+def test_relabelling_clears_a_label_that_no_longer_applies(tmp_path: Path) -> None:
+    """A recompute replaces the stored labels: a rule change must be able to remove
+    a label, not only add one."""
+    with SqliteCache(tmp_path / "relabel.sqlite3") as cache:
+        cache.put_raw("pr", REPO, "7", {
+            "title": "Fix a socket leak in the connection pool",
+            "body": "The pool dropped a reference on error.",
+            "author": "dev",
+            "files": ["src/urllib3/connectionpool.py"],
+            "merge_commit": "aa",
+        })
+        cache.put_noise_labels(
+            f"pr:{REPO}#7", "pr", REPO, [{"reason": "bot_author", "confidence": 1.0}]
+        )
+
+        report = label_repository_noise(cache, REPO)
+
+        assert report["noisy"] == 0
+        assert cache.noise_labels_for(record_id=f"pr:{REPO}#7") == []
+
+
 def test_label_repository_noise_never_suppresses_a_reverted_pull_request(
     tmp_path: Path,
 ) -> None:
