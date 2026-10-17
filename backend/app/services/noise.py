@@ -64,7 +64,8 @@ DEPENDENCY_TITLE = re.compile(
     (?:^|\b)
     (?:
         bump(?:s|ed|ing)?\ +[\w./\-]+ |          # "Bump requests from 2.x to 2.y"
-        update(?:s|d|ing)?\ +[\w./\-]+\ +to\ |   # "Update requests to 2.y"
+        upgrade(?:s|d|ing)?\ +(?!to\b)[\w./\-]+ | # "Upgrade Python pre-commit tools"
+        update(?:s|d|ing)?\ +[\w./\-]+\ +to\ +v?\d |  # "Update requests to 2.y"
         chore[\(:].*(?:deps|dependencies) |       # "chore(deps): bump ..."
         (?:build|chore)\s*[\(:].*dep              # "build(deps): ..."
     )

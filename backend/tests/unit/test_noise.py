@@ -101,6 +101,47 @@ def test_chore_deps_title_detected() -> None:
     assert NoiseReason.DEPENDENCY_UPDATE in result.reasons
 
 
+def test_a_docs_update_is_not_a_dependency_update() -> None:
+    """'Updated docs to reflect ...' is prose that happens to contain the word
+    'update', not a dependency bump (#3721)."""
+    result = assess_pr_noise(
+        pr_id="pr:repo#3721",
+        title="Updated docs to reflect change in optional zstd dependency from "
+              "`zstandard` to `backports.zstd`",
+        body="",
+        author_login="edgarrmondragon",
+        author_email=None,
+        changed_files=["docs/advanced-usage.rst"],
+    )
+    assert NoiseReason.DEPENDENCY_UPDATE not in result.reasons
+
+
+def test_upgrading_tooling_is_a_dependency_update() -> None:
+    """'Upgrade Python pre-commit tools' is a routine tooling upgrade (#3529)."""
+    result = assess_pr_noise(
+        pr_id="pr:repo#3529",
+        title="Upgrade Python pre-commit tools",
+        body="",
+        author_login="illia-v",
+        author_email=None,
+        changed_files=[".pre-commit-config.yaml", "src/urllib3/connection.py"],
+    )
+    assert NoiseReason.DEPENDENCY_UPDATE in result.reasons
+
+
+def test_upgrade_to_a_technology_is_not_a_dependency_update() -> None:
+    """'Upgrade to TLS 1.3' names a capability, not a dependency."""
+    result = assess_pr_noise(
+        pr_id="pr:repo#13",
+        title="Upgrade to TLS 1.3",
+        body="",
+        author_login="dev",
+        author_email=None,
+        changed_files=["src/urllib3/util/ssl_.py"],
+    )
+    assert NoiseReason.DEPENDENCY_UPDATE not in result.reasons
+
+
 def test_engineering_pr_not_flagged_as_dependency() -> None:
     result = assess_pr_noise(
         pr_id="pr:repo#12",
