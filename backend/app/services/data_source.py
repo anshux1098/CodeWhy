@@ -186,7 +186,7 @@ class GraphDataSource:
             url=node.get("url") or f"https://github.com/{raw_name}",
             counts=RepositoryCounts(
                 decisions=self.store.count_nodes(repository_id, "Decision"),
-                entities=len(entities),
+                entities=self.store.count_nodes(repository_id, "CodeEntity"),
                 pull_requests=self.store.count_nodes(repository_id, "PullRequest"),
                 commits=self.store.count_nodes(repository_id, "Commit"),
             ),

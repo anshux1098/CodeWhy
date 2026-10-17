@@ -118,7 +118,9 @@ class BaseGraphStore(ABC):
         ...
 
     @abstractmethod
-    def search_entities(self, repo: str, query: str) -> list[dict[str, Any]]:
+    def search_entities(
+        self, repo: str, query: str, limit: Optional[int] = None
+    ) -> list[dict[str, Any]]:
         """Search code entities matching a substring or pattern."""
         ...
 
@@ -307,7 +309,9 @@ class InMemoryGraphStore(BaseGraphStore):
                 return props
         return None
 
-    def search_entities(self, repo: str, query: str) -> list[dict[str, Any]]:
+    def search_entities(
+        self, repo: str, query: str, limit: Optional[int] = None
+    ) -> list[dict[str, Any]]:
         clean_q = query.strip().lower()
         results: list[dict[str, Any]] = []
         for node_id, props in self.nodes.items():
@@ -321,6 +325,8 @@ class InMemoryGraphStore(BaseGraphStore):
                 or clean_q in props.get("path", "").lower()
             ):
                 results.append(props)
+                if limit is not None and len(results) >= limit:
+                    break
         return results
 
     def get_decisions_for_entity(self, entity_id: str) -> list[dict[str, Any]]:
@@ -518,12 +524,16 @@ class Neo4jGraphStore(BaseGraphStore):
             record = result.single()
             return dict(record["e"]) if record else None
 
-    def search_entities(self, repo: str, query: str) -> list[dict[str, Any]]:
+    def search_entities(
+        self, repo: str, query: str, limit: Optional[int] = None
+    ) -> list[dict[str, Any]]:
         cql = (
             "MATCH (e:CodeEntity {repo: $repo}) "
             "WHERE toLower(e.name) CONTAINS toLower($q) OR toLower(e.path) CONTAINS toLower($q) "
-            "RETURN e LIMIT 20"
+            "RETURN e"
         )
+        if limit is not None:
+            cql += f" LIMIT {int(limit)}"
         with self.driver.session(database=self.database) as session:
             result = session.run(cql, repo=repo, q=query.strip())
             return [dict(record["e"]) for record in result]
