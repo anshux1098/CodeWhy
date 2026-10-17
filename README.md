@@ -234,6 +234,31 @@ Invoke-RestMethod "http://127.0.0.1:8000/api/v1/repositories/acme-netclient/ask"
 
 ---
 
+## Guided Walkthrough
+
+One command reads the real cache and the graph and walks through the whole pipeline
+stage by stage, with the real numbers at each step. It is read only by default: it
+never fetches from GitHub, never writes the cache or the graph, and never calls a
+language model. It prints a plain-text report and exits non-zero if any self-check
+fails, so it doubles as a check to run before a demo.
+
+```powershell
+.\walkthrough.cmd
+```
+
+The wrapper activates `.venv`, runs `scripts/walkthrough.py`, and saves the same
+output to `walkthrough_report.txt`. To run it directly:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\walkthrough.py
+```
+
+Useful flags: `--stage N` stops after stage N, `--pause` waits for Enter between
+stages, `--with-llm` allows the answer path to call the model (otherwise the line
+"LLM calls made" stays at 0), and `--out PATH` changes the report path.
+
+---
+
 ## Configuration (`.env`)
 
 Copy `.env.example` to `.env` to configure settings. Defaults work out of the box for testing:
@@ -313,7 +338,8 @@ codewhy/
 |   |- probe_history.py               # Full-history reverts and constant value changes
 |   |- sample_repos.py                # Recent pull request sampling across candidates
 |   |- export_contract.py             # Regenerates contract JSON files
-|   `- check_live_answers.py          # Runs the six C13 questions against a live server
+|   |- check_live_answers.py          # Runs the six C13 questions against a live server
+|   `- walkthrough.py                 # Read-only guided walkthrough of the whole pipeline
 |- targets/
 |   |- urllib3__urllib3.json          # Test bed targets for urllib3/urllib3
 |   `- sqlalchemy__alembic.json       # Draft targets, never ingested
