@@ -322,8 +322,12 @@ class GraphDataSource:
         if not node:
             raise NotFoundError(f"decision {decision_id!r} not found")
 
-        citations = citations_for_decision(
-            decision_id, self.store.get_evidence_for_decision(decision_id)
+        from app.services.answer import dedupe_citations
+
+        citations = dedupe_citations(
+            citations_for_decision(
+                decision_id, self.store.get_evidence_for_decision(decision_id)
+            )
         )
         return DecisionDetail(
             id=decision_id,

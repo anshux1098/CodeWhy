@@ -134,6 +134,47 @@ def agreement_from_citations(citations: Sequence[Any]) -> float:
     return 1.0
 
 
+def _normalise_quote(quote: str) -> str:
+    """Whitespace collapsed and lower-cased, so containment ignores formatting."""
+    return " ".join((quote or "").split()).lower()
+
+
+def dedupe_citations(citations: Sequence[Citation]) -> list[Citation]:
+    """Drop citations whose quote is contained in another from the same source.
+
+    Two quotes from one document where one is a fragment of the other are the same
+    claim printed twice. Only the longest is kept, so a response cites each source
+    once with its fullest quote. Quotes from different sources are always separate,
+    and among identical quotes one survives. First-seen order is preserved.
+    """
+    groups: dict[str, list[Citation]] = {}
+    order: list[str] = []
+    for citation in citations:
+        key = (citation.source_url or "").strip()
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(citation)
+
+    kept: list[Citation] = []
+    for key in order:
+        group = groups[key]
+        normalised = [(c, _normalise_quote(c.quote)) for c in group]
+        group_kept: list[Citation] = []
+        for citation, quote in normalised:
+            if quote and any(
+                other is not citation and quote in other_quote
+                for other, other_quote in normalised
+            ):
+                continue
+            group_kept.append(citation)
+        if not group_kept:
+            # Every quote was contained in another (identical quotes): keep the longest.
+            group_kept = [max(group, key=lambda c: len(c.quote or ""))]
+        kept.extend(group_kept)
+    return kept
+
+
 def _decision_source_ref(decision: dict[str, Any]) -> SourceRef:
     """Provenance for a decision, taken from its own stored source.
 
@@ -472,6 +513,9 @@ def generate_answer(
     # quote so a real answer stays grounded in real evidence.
     if not valid_citations:
         valid_citations.append(cite(verified_items[0]))
+
+    # One quote contained in another from the same source is the same claim twice.
+    valid_citations = dedupe_citations(valid_citations)
 
     # Determine final outcome and confidence
     contradiction_val = 1.0 if bundle.has_contradiction else 0.0
