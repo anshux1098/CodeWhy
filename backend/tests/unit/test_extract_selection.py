@@ -179,6 +179,59 @@ def test_limit_ranks_failures_and_unprocessed_together(
     ]
 
 
+def test_a_dry_run_does_not_touch_the_links_table(
+    cache: SqliteCache, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A dry run must make no change at all — the linking pass rewrote `links`."""
+    from app.providers.llm_provider import MockLLMProvider
+
+    called: list[int] = []
+    monkeypatch.setattr(
+        extract_module, "get_llm_provider",
+        lambda **kw: MockLLMProvider(canned_response=json.dumps({"decisions": []})),
+    )
+    monkeypatch.setattr(extract_module, "build_links", lambda *a, **k: called.append(1) or 0)
+    monkeypatch.setattr(extract_module, "summarise_injection_flags", lambda rows: {
+        "sources_total": len(rows), "sources_flagged": 0,
+    })
+    monkeypatch.setattr(extract_module, "extract_decisions_from_source", lambda **k: [])
+
+    code = extract_module.main([
+        "--cache", str(cache.path), "--repo", REPO,
+        "--sample-review-file", str(cache.path) + ".md",
+        "--limit", "4", "--dry-run",
+    ])
+
+    assert code == 0
+    assert called == [], "a dry run must not rewrite the links table"
+
+
+def test_a_normal_run_still_runs_the_linking_pass(
+    cache: SqliteCache, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The dry-run guard must not disable linking for ordinary runs."""
+    from app.providers.llm_provider import MockLLMProvider
+
+    called: list[int] = []
+    monkeypatch.setattr(
+        extract_module, "get_llm_provider",
+        lambda **kw: MockLLMProvider(canned_response=json.dumps({"decisions": []})),
+    )
+    monkeypatch.setattr(extract_module, "build_links", lambda *a, **k: called.append(1) or 0)
+    monkeypatch.setattr(extract_module, "summarise_injection_flags", lambda rows: {
+        "sources_total": len(rows), "sources_flagged": 0,
+    })
+    monkeypatch.setattr(extract_module, "extract_decisions_from_source", lambda **k: [])
+
+    code = extract_module.main([
+        "--cache", str(cache.path), "--repo", REPO, "--sources", f"pr:{REPO}#1397",
+        "--sample-review-file", str(cache.path) + ".md",
+    ])
+
+    assert code == 0
+    assert called, "a normal run must still run the linking pass"
+
+
 def test_sources_selects_exactly_the_named_ones(
     cache: SqliteCache, monkeypatch: pytest.MonkeyPatch
 ) -> None:

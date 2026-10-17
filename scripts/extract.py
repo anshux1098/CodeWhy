@@ -764,6 +764,11 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
 
         rejected_quote_count += persist_rejected_quotes(cache, args, source_id, source_url)
 
+    # A dry run makes no change at all: the linking pass writes the `links` table and
+    # must be stopped before it runs, not after.
+    if args.dry_run:
+        return 0
+
     # ------------------------------------------------------------------
     # Linking pass. Without this the links table stayed empty, so the graph
     # build had nothing to replay and every REVERTS/PART_OF/REFERENCES edge was
@@ -771,9 +776,6 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
     # ------------------------------------------------------------------
     links_written = build_links(cache, args.repo, rows)
     logger.info("Linking finished: %d links written.", links_written)
-
-    if args.dry_run:
-        return 0
 
     # Tokens spent by earlier runs are part of the true total, so they are read
     # back rather than implied by this run alone.
