@@ -399,6 +399,14 @@ schema surface until the supersession work lands.
 Contradiction detection checks only whether a decision's stored state is `UNRESOLVED`. There is
 no detection across opposing evidence.
 
+## Known limitations
+
+- **Confidence is a heuristic, not a calibrated probability.** `score` is the fixed weighted
+  sum in [`services/confidence.py`](backend/app/services/confidence.py)
+  (`0.30·directness + 0.20·provenance + 0.20·agreement + 0.15·relevance + 0.15·temporal_consistency − 0.30·contradiction`),
+  not a benchmark-tuned value, and it is not calibrated against a labelled set. A correct answer
+  grounded in a single verbatim quote can therefore reach `HIGH`.
+
 ## Real versus mock
 
 Every response carries a `fixture` boolean. It is **derived**, never asserted: a response is

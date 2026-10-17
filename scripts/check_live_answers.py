@@ -21,6 +21,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections import Counter
 from pathlib import Path
@@ -91,35 +92,64 @@ def source_number_from_url(url: str) -> str:
     return match.group(1) or match.group(2)
 
 
-def pick_single_quote_entity(graph: dict) -> dict | None:
+def _single_decision_entity(graph: dict, entity_id: str) -> dict | None:
+    """The story for one entity, or None if it is not "one change, one quote"."""
+    nodes = {node["id"]: node for node in graph.get("nodes", []) if node.get("id")}
+    node = nodes.get(entity_id)
+    if not node or node.get("type") != "CodeEntity":
+        return None
+    decisions = {
+        edge.get("source")
+        for edge in graph.get("edges", [])
+        if edge.get("type") == "GOVERNS" and edge.get("target") == entity_id
+    } - {None}
+    if len(decisions) != 1:
+        return None
+    decision_id = next(iter(decisions))
+    quotes = sum(
+        1 for edge in graph.get("edges", [])
+        if edge.get("type") == "SUPPORTED_BY" and edge.get("source") == decision_id
+    )
+    if quotes != 1:
+        return None
+    return {
+        "entity_id": entity_id,
+        "path": node.get("label") or node.get("id"),
+        "decision_id": decision_id,
+    }
+
+
+def pick_single_quote_entity(repo_graph: dict, fetch_entity_graph) -> dict | None:
     """An entity governed by exactly one decision that carries exactly one quote.
 
     That is the clearest partial-answer story: one change, one reason, one quote.
-    Returns None when the graph holds no such entity, so the scenario is skipped
-    rather than run against a guess.
+
+    The repository-wide /graph response is capped at a fixed number of nodes. Once
+    that cap fills with code entities, decisions and pull requests, the response
+    carries no Evidence node and therefore no SUPPORTED_BY edge, so the quote count
+    cannot be read from it. Each code entity named by that response is re-fetched
+    on its own through /graph?entity_id=, where the traversal does reach the
+    supporting evidence. ``fetch_entity_graph`` returns ``(status, graph)``.
+
+    Returns None when the repository holds no such entity, so the caller can say
+    the scenario is not available rather than run it against a guess.
     """
-    nodes = {node["id"]: node for node in graph.get("nodes", []) if node.get("id")}
-    governs: dict[str, list[str]] = {}
-    supported: Counter[str] = Counter()
-    for edge in graph.get("edges", []):
-        if edge.get("type") == "GOVERNS":
-            governs.setdefault(edge.get("target"), []).append(edge.get("source"))
-        elif edge.get("type") == "SUPPORTED_BY":
-            supported[edge.get("source")] += 1
+    entity_ids = sorted(
+        node["id"] for node in repo_graph.get("nodes", [])
+        if node.get("id") and node.get("type") == "CodeEntity"
+    )
 
     candidates: list[dict] = []
-    for entity_id, decisions in governs.items():
-        distinct = sorted({d for d in decisions if d})
-        if len(distinct) != 1 or supported.get(distinct[0], 0) != 1:
+    for entity_id in entity_ids:
+        try:
+            status, subgraph = fetch_entity_graph(entity_id)
+        except Exception:
             continue
-        node = nodes.get(entity_id)
-        if not node or node.get("type") != "CodeEntity":
+        if status != 200:
             continue
-        candidates.append({
-            "entity_id": entity_id,
-            "path": node.get("label") or node.get("id"),
-            "decision_id": distinct[0],
-        })
+        found = _single_decision_entity(subgraph, entity_id)
+        if found is not None:
+            candidates.append(found)
     candidates.sort(key=lambda c: (c["path"], c["entity_id"]))
     return candidates[0] if candidates else None
 
@@ -141,6 +171,12 @@ def print_ask(name: str, entry: dict) -> None:
         print("CONFIDENCE none (this outcome is decided before scoring)")
     else:
         print(f"CONFIDENCE label={confidence.get('label')} score={confidence.get('score')}")
+        signals = confidence.get("signals")
+        if signals:
+            print(
+                "  components:",
+                json.dumps(signals, ensure_ascii=False, sort_keys=True),
+            )
     if response.get("answer"):
         print("ANSWER:", response["answer"])
     citations = response.get("citations") or []
@@ -241,7 +277,12 @@ def main() -> int:
             print(json.dumps(results["decision"], indent=2, ensure_ascii=False))
 
         print("-" * 72)
-        partial = pick_single_quote_entity(results["graph"])
+        partial = pick_single_quote_entity(
+            results["graph"],
+            lambda eid: get(
+                f"/repositories/{REPO}/graph?entity_id={urllib.parse.quote(eid, safe='')}"
+            ),
+        )
         if partial is not None:
             payload = {"question": f"Why was {partial['path']} changed?"}
             status, body = post(f"/repositories/{REPO}/ask", payload)
@@ -252,8 +293,8 @@ def main() -> int:
             print_ask("single-decision", results["single_quote"])
         else:
             print(
-                "SINGLE-DECISION SCENARIO: no entity with exactly one decision and "
-                "one verified quote was found"
+                "SINGLE-DECISION SCENARIO: not available — no code entity in the "
+                "repository has exactly one decision backed by exactly one verified quote"
             )
         print("=" * 72)
         print("wrote", OUT)
