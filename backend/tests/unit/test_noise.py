@@ -11,6 +11,7 @@ from app.services.noise import (
     assess_pr_noise,
     build_revert_target_set,
     filter_noise,
+    label_repository_noise,
 )
 from app.stores.sqlite_cache import SqliteCache
 
@@ -373,3 +374,81 @@ def test_sqlite_noisy_record_ids_excludes_revert_targets(tmp_path: Path) -> None
         noisy = cache.noisy_record_ids("org/repo")
         assert "pr:repo#10" in noisy
         assert "pr:repo#11" not in noisy   # revert target must be excluded
+
+
+# ---------------------------------------------------------------------------
+# Labelling every stored pull request (the wiring used by the pipeline)
+# ---------------------------------------------------------------------------
+
+def test_label_repository_noise_flags_stored_pull_requests(tmp_path: Path) -> None:
+    with SqliteCache(tmp_path / "label.sqlite3") as cache:
+        cache.put_raw("pr", REPO, "1", {
+            "title": "Bump pyupgrade from 3.0.0 to 3.1.0",
+            "body": "",
+            "author": "pyup-bot",
+            "files": ["requirements.txt"],
+            "merge_commit": "aaaa",
+        })
+        cache.put_raw("pr", REPO, "2", {
+            "title": "Fix a socket leak in the connection pool",
+            "body": "The pool dropped a reference on error so the socket was never closed.",
+            "author": "dev",
+            "files": ["src/urllib3/connectionpool.py"],
+            "merge_commit": "bbbb",
+        })
+        cache.put_raw("pr", REPO, "3", {
+            "title": "Tidy up the test workflow",
+            "body": "",
+            "author": "dev",
+            "files": [".github/workflows/tests.yml"],
+            "merge_commit": "cccc",
+        })
+        # An issue is not a pull request and must not be assessed here.
+        cache.put_raw("issue", REPO, "9", {"title": "Bump x", "body": "", "author": "pyup-bot"})
+
+        report = label_repository_noise(cache, REPO)
+
+        assert report["assessed"] == 3
+        assert report["noisy"] == 2
+        assert report["clean"] == 1
+        assert report["labels"] == 3
+        assert report["reasons"]["bot_author"] == 1
+        assert report["reasons"]["dependency_update"] == 1
+        assert report["reasons"]["ci_config"] == 1
+
+        labelled = {row["record_id"] for row in cache.noise_labels_for(repo=REPO)}
+        assert labelled == {f"pr:{REPO}#1", f"pr:{REPO}#3"}
+        assert cache.noise_labels_for(record_id=f"issue:{REPO}#9") == []
+        assert cache.noisy_record_ids(REPO) == {f"pr:{REPO}#1", f"pr:{REPO}#3"}
+
+        # Idempotent: a second pass rewrites the same rows, adding none.
+        again = label_repository_noise(cache, REPO)
+        assert again["noisy"] == 2
+        assert len(cache.noise_labels_for(repo=REPO)) == 3
+
+
+def test_label_repository_noise_never_suppresses_a_reverted_pull_request(
+    tmp_path: Path,
+) -> None:
+    with SqliteCache(tmp_path / "label_revert.sqlite3") as cache:
+        cache.put_commit(REPO, {
+            "sha": "c1",
+            "subject": "Revert 'Bump pyupgrade'",
+            "message": "This reverts commit deadbeefdeadbeef.\n",
+        })
+        cache.put_raw("pr", REPO, "5", {
+            "title": "Bump pyupgrade from 3.0.0 to 3.1.0",
+            "body": "",
+            "author": "pyup-bot",
+            "files": ["requirements.txt"],
+            "merge_commit": "deadbeefdeadbeef",
+        })
+
+        report = label_repository_noise(cache, REPO)
+
+        assert report["assessed"] == 1
+        assert report["noisy"] == 0
+        assert report["clean"] == 1
+        # The labels are still recorded — flag, never delete.
+        assert cache.noise_labels_for(record_id=f"pr:{REPO}#5")
+        assert f"pr:{REPO}#5" not in cache.noisy_record_ids(REPO)

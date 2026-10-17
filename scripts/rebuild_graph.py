@@ -26,6 +26,7 @@ from app.graph.ids import (
     to_api_id,
 )
 from app.providers.embeddings import get_embedding_provider
+from app.services.noise import label_repository_noise
 from app.stores.graph_store import BaseGraphStore, get_graph_store
 from app.stores.sqlite_cache import SqliteCache
 
@@ -417,6 +418,17 @@ def rebuild_graph(
                 "derivation": link["derivation_method"],
             },
         )
+
+    # Noise labels are additive metadata on the source records. Every stored pull
+    # request is assessed and its labels persisted, so a consumer can flag — never
+    # drop — an automated or generated change.
+    noise = label_repository_noise(cache, repo)
+    logger.info(
+        "Labelled noise: %d of %d pull requests flagged (%s).",
+        noise["noisy"],
+        noise["assessed"],
+        ", ".join(f"{reason}={count}" for reason, count in sorted(noise["reasons"].items())),
+    )
 
     # Measured, not accumulated.
     counts = graph_state(store, excluded_placeholders=excluded_placeholders)

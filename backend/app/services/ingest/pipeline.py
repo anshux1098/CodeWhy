@@ -30,6 +30,7 @@ from app.services.ingest.git_probe import (
     read_history,
 )
 from app.services.ingest.targets import IngestTargets
+from app.services.noise import label_repository_noise
 from app.stores.sqlite_cache import SqliteCache
 
 logger = logging.getLogger("codewhy.ingest")
@@ -254,6 +255,7 @@ class IngestSummary:
     issues_fetched: int = 0
     skips: list[dict[str, Any]] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    noise: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -277,6 +279,7 @@ class IngestSummary:
             },
             "skips": self.skips,
             "notes": self.notes,
+            "noise": self.noise,
         }
 
 
@@ -372,6 +375,12 @@ def run_ingest(
         summary.notes.append(str(stopped))
         cache.record_skip(summary.run_id, repo, "ingest", "rate_limit", 0)
         summary.skips.append({"kind": "ingest", "reason": "rate_limit", "count": 0})
+
+    summary.noise = label_repository_noise(cache, repo)
+    logger.info(
+        "labelled noise: %d of %d pull requests flagged",
+        summary.noise.get("noisy", 0), summary.noise.get("assessed", 0),
+    )
 
     summary.pull_requests = cache.count_kind("pr", repo)
     summary.issues = cache.count_kind("issue", repo)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -427,3 +428,70 @@ def build_revert_target_set(commit_rows: Sequence[dict[str, Any]]) -> set[str]:
             for match in REVERT_TRAILER_PATTERN.finditer(text):
                 target_shas.add(match.group(1).lower())
     return target_shas
+
+
+def label_repository_noise(
+    cache: Any,
+    repo: str,
+    *,
+    min_confidence: float = 0.8,
+    limit: int = 10_000_000,
+) -> dict[str, Any]:
+    """Assess every stored pull request for noise and persist the labels.
+
+    The labels are additive metadata written to the cache's ``noise_labels``
+    table; nothing is deleted. A pull request whose merge commit is the target of
+    a stored revert is protected (``is_revert_target``), so it is never counted as
+    noise even when its own title looks automated.
+
+    Returns a small report: how many pull requests were assessed, how many are
+    noisy at ``min_confidence``, how many carry each reason, and how many label
+    rows were written.
+    """
+    revert_targets = build_revert_target_set(cache.iter_commits(repo))
+    results: list[NoiseResult] = []
+    for row in cache.fetch_raw_objects(repo, limit=limit):
+        if row["kind"] != "pr":
+            continue
+        try:
+            payload = json.loads(row["payload"] or "{}")
+        except (TypeError, ValueError):
+            payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        merge_commit = payload.get("merge_commit") or ""
+        results.append(
+            assess_pr_noise(
+                pr_id=row["id"],
+                title=payload.get("title") or "",
+                body=payload.get("body"),
+                author_login=payload.get("author"),
+                author_email=None,
+                changed_files=payload.get("files") or [],
+                is_revert_target=bool(merge_commit) and merge_commit.lower() in revert_targets,
+            )
+        )
+
+    noisy, clean = filter_noise(results, min_confidence=min_confidence)
+    reasons: dict[str, int] = {}
+    written = 0
+    for result in results:
+        labels = [
+            {"reason": lbl.reason, "confidence": lbl.confidence, "detail": lbl.detail}
+            for lbl in result.labels
+        ]
+        if not labels:
+            continue
+        written += cache.put_noise_labels(
+            result.record_id, "pr", repo, labels, is_revert_target=result.is_revert_target
+        )
+        for lbl in result.labels:
+            reasons[lbl.reason] = reasons.get(lbl.reason, 0) + 1
+
+    return {
+        "assessed": len(results),
+        "noisy": len(noisy),
+        "clean": len(clean),
+        "labels": written,
+        "reasons": reasons,
+    }
