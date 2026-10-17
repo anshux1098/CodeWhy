@@ -188,6 +188,16 @@ class BaseGraphStore(ABC):
         """
         return ""
 
+    def index_states(self) -> dict[str, str]:
+        """Name -> state for the indexes the store actually has.
+
+        Read only, and empty by default: a store without indexes reports nothing
+        rather than inventing a state. A real store reads the names and states
+        back so the guided walkthrough can show whether the vector and full-text
+        indexes exist instead of asserting that they do.
+        """
+        return {}
+
     @abstractmethod
     def close(self) -> None:
         """Release underlying connections."""
@@ -679,6 +689,15 @@ class Neo4jGraphStore(BaseGraphStore):
             return ""
         text = record.get("text")
         return str(text) if text else ""
+
+    def index_states(self) -> dict[str, str]:
+        """Read the index names and states back from the database."""
+        query = "SHOW INDEXES YIELD name, state RETURN name, state ORDER BY name"
+        with self.driver.session(database=self.database) as session:
+            return {
+                str(record["name"]): str(record["state"])
+                for record in session.run(query)
+            }
 
     def close(self) -> None:
         self.driver.close()

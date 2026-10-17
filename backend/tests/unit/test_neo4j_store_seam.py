@@ -87,6 +87,11 @@ def _router(query: str, params: dict):
                 node={"id": "key:MAX_RETRIES", "repo": "acme-netclient"}, labels=["CodeEntity"]
             ),
         ]
+    if "SHOW INDEXES" in query:
+        return [
+            FakeRecord(name="decision_vector_index", state="ONLINE"),
+            FakeRecord(name="evidence_quote_fulltext", state="ONLINE"),
+        ]
     if "UNWIND labels(n) AS l" in query:
         return [FakeRecord(l="CodeEntity", c=2), FakeRecord(l="Decision", c=5)]
     if "type(r) AS t" in query:
@@ -125,6 +130,19 @@ def test_counts_are_read_back_from_the_database(store) -> None:
 def test_counts_by_label_and_relationship_type_are_read_back(store) -> None:
     assert store.label_counts() == {"CodeEntity": 2, "Decision": 5}
     assert store.relationship_type_counts() == {"GOVERNS": 3, "SUPPORTED_BY": 1}
+
+
+def test_index_states_are_read_back_from_the_database(store) -> None:
+    assert store.index_states() == {
+        "decision_vector_index": "ONLINE",
+        "evidence_quote_fulltext": "ONLINE",
+    }
+
+
+def test_the_in_memory_store_reports_no_indexes() -> None:
+    from app.stores.graph_store import InMemoryGraphStore
+
+    assert InMemoryGraphStore().index_states() == {}
 
 
 def test_source_text_comes_from_the_node(store) -> None:
