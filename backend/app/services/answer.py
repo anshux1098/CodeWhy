@@ -273,6 +273,7 @@ def generate_answer(
     *,
     is_real: bool = True,
     min_score: Optional[float] = None,
+    store: Optional[Any] = None,
     cfg: Optional[Settings] = None,
 ) -> AskResponse:
     """End-to-end question answering pipeline enforcing the 4-gate refusal system and citation verification."""
@@ -407,6 +408,12 @@ def generate_answer(
                 rationale=d.get("rationale"),
                 state=state_val,
                 source=source_ref,
+                supersedes=d.get("supersedes") or [],
+                superseded_by=d.get("superseded_by") or [],
+                rule=d.get("rule"),
+                probable_superseded_by=d.get("probable_superseded_by") or [],
+                conflicts_with=d.get("conflicts_with") or [],
+                reaffirms=d.get("reaffirms") or [],
             )
         )
 
@@ -537,6 +544,16 @@ def generate_answer(
         outcome = Outcome.PARTIAL
         reason_code = None
 
+    from app.services.who_to_ask import determine_who_to_ask
+
+    who_to_ask_list = determine_who_to_ask(
+        decisions=bundle.decisions if bundle else [],
+        sources=bundle.sources if bundle else [],
+        people=bundle.people if bundle else [],
+        evidence_items=bundle.evidence_items if bundle else [],
+        store=store,
+    )
+
     return AskResponse(
         outcome=outcome,
         reason_code=reason_code,
@@ -546,5 +563,7 @@ def generate_answer(
         citations=valid_citations,
         evidence_gaps=[] if outcome == Outcome.FULL else ["Partial evidence coverage"],
         confidence=conf,
+        who_to_ask=who_to_ask_list,
+        code_differs_from_latest=bundle.current_value_differs if bundle else None,
         fixture=not is_real,
     )

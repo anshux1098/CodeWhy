@@ -124,6 +124,47 @@ def retrieve_evidence(
     all_evidence.sort(key=lambda x: x.similarity_score, reverse=True)
     bundle.evidence_items = all_evidence[:cap_evidence]
 
+    repo = entity.get("repo") or entity_id.split(":")[1] if ":" in entity_id else ""
+    links = []
+    if hasattr(store, "get_links_for_repo"):
+        try:
+            links = store.get_links_for_repo(repo)
+        except Exception:
+            links = []
+
+    # Phase 4: Supersession & State Analysis
+    from app.services.state import check_code_differs_from_latest, compute_decision_states
+    from app.services.supersession import compute_supersession_edges
+
+    edges = compute_supersession_edges(decisions, links=links)
+    analysis = compute_decision_states(decisions, edges=edges, max_chain_length=chain_limit)
+
+    for d in decisions:
+        dec_id = d.get("id")
+        if dec_id and dec_id in analysis.states:
+            st = analysis.states[dec_id]
+            d["state"] = st.state.value
+            d["supersedes"] = st.supersedes
+            d["superseded_by"] = st.superseded_by
+            d["rule"] = st.rule
+            d["probable_superseded_by"] = st.probable_superseded_by
+            d["conflicts_with"] = st.conflicts_with
+            d["reaffirms"] = st.reaffirms
+
+    bundle.supersession_chains = analysis.supersession_chains
+    bundle.chain_truncated = analysis.chain_truncated
+    bundle.has_contradiction = analysis.has_contradiction or bundle.has_contradiction
+    bundle.current_value_differs = any(
+        check_code_differs_from_latest(d.get("id", ""), analysis, decisions)
+        for d in decisions
+    )
+
+    if hasattr(store, "get_people_for_entity"):
+        try:
+            bundle.people = store.get_people_for_entity(repo, entity_id)
+        except Exception:
+            bundle.people = []
+
     # Load the stored text behind every retained source so the answer path can
     # re-verify quotes instead of trusting the extraction-time flag.
     if source_text_provider is None:
