@@ -157,6 +157,21 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _author_login(value: Any) -> str:
+    """The login a raw payload names as a source's author.
+
+    GitHub's payload uses `{"login": "..."}`; a plain string is accepted too so a
+    cache that stored only the name still yields an author. Anything else is empty
+    rather than guessed.
+    """
+    if isinstance(value, dict):
+        login = value.get("login") or value.get("username")
+        return str(login).strip() if login else ""
+    if isinstance(value, str):
+        return value.strip()
+    return ""
+
+
 def _materialise_source_stub(
     store: BaseGraphStore,
     endpoint: str,
@@ -259,6 +274,7 @@ def rebuild_graph(
     #    The merge date is captured here so a decision can be dated by when its pull
     #    request merged, rather than by when the row happened to be extracted.
     merged_at_by_source: dict[str, str] = {}
+    author_by_source: dict[str, str] = {}
     for row in cache.fetch_raw_objects(repo, limit=10_000_000):
         label = source_label_for(row["id"])
         if label is None:
@@ -280,10 +296,14 @@ def rebuild_graph(
         }
         if label in TEXT_BEARING_LABELS:
             properties["text"] = source_text_from_payload(payload)
+        author = _author_login(payload.get("author"))
+        if author:
+            author_by_source[str(row["id"])] = author
         if label == "PullRequest":
             merged = payload.get("mergedAt") or payload.get("merged_at")
             if merged:
                 merged_at_by_source[str(row["id"])] = str(merged)
+            properties["author"] = author or ""
         store.merge_node(label, properties)
 
     for commit in cache.iter_commits(repo):
@@ -400,6 +420,9 @@ def rebuild_graph(
             "effective_at": merged_at_by_source.get(source_id),
             "ended_at": None,
             "evaluated_at": d["created_at"],
+            # The person who proposed the change, taken from the cached pull request.
+            # No Person node or AUTHORED edge is made; the login is a plain property.
+            "author": author_by_source.get(source_id) or "",
             "quote_verified": bool(d["quote_verified"]),
             # Provenance, so a citation can be built without re-deriving it.
             "source_id": source_id,
@@ -441,7 +464,10 @@ def rebuild_graph(
                 "source_type": ev["source_type"],
                 "source_url": ev["source_url"],
                 "quote": ev["quote"],
-                "author": ev["author"],
+                # The cache leaves the evidence author empty for these quotes, but the
+                # pull request it came from names its author, so fall back to that
+                # rather than citing the quote with no one behind it.
+                "author": ev["author"] or author_by_source.get(ev["source_id"]) or "",
                 "timestamp": ev["timestamp"],
                 "classification": ev["classification"],
                 "claim": ev["claim"],
