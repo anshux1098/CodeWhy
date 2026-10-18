@@ -8,7 +8,7 @@ CodeWhy answers *"why is this code like this?"* for a software repository by rec
 
 ## Current Status: Phases 0–3 Complete, Exercised on a Real Repository
 
-The project has advanced through **Phase 0, Phase 1, Phase 2, and Phase 3**. All backend contracts, data ingestion, deterministic linking, AST constant history, noise filtering, decision extraction with verbatim quote checks, Neo4j graph stores, and the 4-gate grounded `/ask` pipeline are implemented. The suite collects **1013 tests**: **999 pass with zero credentials and no `.env` file**, and **14 tests skip** (5 live tests marked `live`, run with `RUN_LIVE=1`, exercise the real Neo4j store, Cypher `EXPLAIN` plan, GitHub API, and the live answer path; 8 review honesty tests skip on probe files that cite no pull requests; and 1 review test skips when it cannot count tests).
+The project has advanced through **Phase 0, Phase 1, Phase 2, and Phase 3**. All backend contracts, data ingestion, deterministic linking, AST constant history, noise filtering, decision extraction with verbatim quote checks, Neo4j graph stores, and the 4-gate grounded `/ask` pipeline are implemented. The suite collects **1015 tests**: **1001 pass with zero credentials and no `.env` file**, and **14 tests skip** (5 live tests marked `live`, run with `RUN_LIVE=1`, exercise the real Neo4j store, Cypher `EXPLAIN` plan, GitHub API, and the live answer path; 8 review honesty tests skip on probe files that cite no pull requests; and 1 review test skips when it cannot count tests).
 
 The pipeline has been run end to end on the real repository `urllib3/urllib3`: ingest → extract → link → build the Neo4j graph → answer grounded `/ask` questions. The two HTTP/2 questions resolve to `src/urllib3/util/ssl_.py` and answer from the pull request #3456 and #3466 quotes; the questions that name no real entity refuse honestly. `scripts/check_live_answers.py` runs the six questions against a live server and prints every response, including each citation's quote and URL.
 
@@ -157,10 +157,15 @@ SQLite. The terms are defined by [`backend/app/services/coverage.py`](backend/ap
 
 Each `CodeEntity` stores `prs_touching`, `prs_analyzed`, `prs_noise_skipped`,
 `prs_not_analyzed` and `verified_decisions`. The `Repository` node stores the
-`scope` text (branch, commit window, ingested file paths and ingest caps),
+`scope` text (branch, commit window, PR-touched file paths and ingest caps),
 `prs_fetched`, `sources_analyzed`, `prs_noise_skipped` and `verified_decisions`.
-Refusal and partial-answer `evidence_gaps` text is built only from these stored
-facts; no response field or gate changes.
+
+`verified_decisions` is the number of **distinct decisions with `quote_verified=1`**,
+not the number of file paths they touch: one decision that governs two files is one
+decision. `sources_analyzed` is the number of **distinct sources** with a completed
+extraction run (`ok` or `no_decision`), counted once even when a source was extracted
+in more than one run. Refusal and partial-answer `evidence_gaps` text is built only
+from these stored facts; no response field or gate changes.
 
 ---
 
@@ -204,7 +209,7 @@ The test suite runs with **zero credentials and no required `.env` file**.
 
 ### Run the Phase 2 and Phase 3 tests
 
-The full suite collects **1013 tests**. It needs no credentials and no `.env` file; 999 pass out of the box, while 14 tests skip (5 marked `live` requiring `RUN_LIVE=1`, 8 on review probe files without PR references, and 1 on a review file whose tests cannot be counted).
+The full suite collects **1015 tests**. It needs no credentials and no `.env` file; 1001 pass out of the box, while 14 tests skip (5 marked `live` requiring `RUN_LIVE=1`, 8 on review probe files without PR references, and 1 on a review file whose tests cannot be counted).
 ```powershell
 .\.venv\Scripts\pytest.exe backend/tests/unit/test_phase3.py backend/tests/unit/test_extraction.py backend/tests/unit/test_linking.py backend/tests/unit/test_config_keys.py backend/tests/unit/test_noise.py -v
 ```

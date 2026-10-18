@@ -31,7 +31,22 @@ Live repository coverage (real `urllib3/urllib3` graph):
 | prs_fetched | 294 |
 | sources_analyzed | 96 |
 | prs_noise_skipped | 70 |
-| verified_decisions | 80 |
+| verified_decisions | 34 |
+
+`verified_decisions` is the number of distinct decisions with `quote_verified=1`
+(33 ACTIVE + 1 SUPERSEDED), matching the graph's Decision count. An earlier build
+summed the *paths* the decisions touch, which reported 80; the set of paths is 80,
+the decisions are 34. The count is now the size of the distinct-decision set, so the
+repository total, the module total and the walkthrough line all read 34.
+
+`sources_analyzed` is the number of distinct source ids with a completed extraction
+row (`ok` or `no_decision`) in `extraction_sources`. It is 96 today: 74 `ok` rows plus
+47 `no_decision` rows (121 completed rows) collapse to 96 distinct sources because 19
+sources were extracted in more than one run; `failed` rows (2) and sources touched
+only by an in-progress run do not count. The number is data-dependent — it grows as new
+extraction runs add completed sources — so an earlier reading of 82 reflected fewer
+completed sources at that time; the current cache yields 96 by any of the reasonable
+rules (across all versions, per version, or latest-row-per-source).
 
 ## Item 2 — refusals state what was checked
 
@@ -58,17 +73,17 @@ Live example, `src/urllib3/util/ssl_.py` (a full answer): `evidence_gap: 9 of 42
 
 ## Item 4 — tests and invariants
 
-- `backend/tests/unit/test_coverage_counts.py`: entities and Repository get the counts; a rebuild is idempotent; the fake Neo4j driver receives the properties.
+- `backend/tests/unit/test_coverage_counts.py`: entities and Repository get the counts; the Repository `verified_decisions` equals the number of distinct `quote_verified=1` decisions (a decision governing two paths, and one governing only a config key, both counted once); `sources_analyzed` counts distinct completed sources even when one source is extracted twice; a rebuild is idempotent; the fake Neo4j driver receives the properties.
 - `backend/tests/unit/test_coverage_wording.py`: cases a, b, c, not-found, the fallback when no scope is stored, and that a refusal calls no model.
 - `backend/tests/unit/test_partial_coverage_note.py`: the note appears only when something was unanalysed and does not change the answer or confidence.
 - `backend/tests/unit/test_walkthrough.py`: stage 4 prints the stored coverage and scope.
 
-Offline suite: `998 passed, 13 skipped`. Contract tests pass and `contract/openapi.json` is byte-identical (`git diff --exit-code contract/` returns 0). No response field or gate was changed.
+Offline suite: `1001 passed, 14 skipped`. Contract tests pass and `contract/openapi.json` is byte-identical (`git diff --exit-code contract/` returns 0). No response field or gate was changed.
 
 ## Item 5 — live runs
 
 - Graph after `scripts/rebuild_graph.py`: 2056 nodes / 524 relationships, urllib3 exactly 34 decisions.
-- Walkthrough: first run `EXIT=1` (it refreshes its stored baseline counts), second run `EXIT=0` with `self-check: 8/8 passed`, and the stage-4 line `coverage: 294 PRs fetched, 96 sources analyzed, 70 PRs noise-skipped, 80 verified decisions` plus the scope line above.
+- Walkthrough: first run `EXIT=1` (it refreshes its stored baseline counts), second run `EXIT=0` with `self-check: 8/8 passed`, and the stage-4 line `coverage: 294 PRs fetched, 96 sources analyzed, 70 PRs noise-skipped, 34 verified decisions` plus the scope line above.
 - Seven live scenarios (`RUN_LIVE=1 HF_HUB_OFFLINE=1`, `--timeout=900`): `1 passed` (7 scenarios) in 39.64s.
 - Four live question types (real graph, mocked model so only the wording under test is produced) printed above.
 

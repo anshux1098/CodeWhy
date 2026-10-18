@@ -59,6 +59,24 @@ def _seed_cache(path: Path) -> None:
             "affected_entities": [CONFIG], "created_at": "2024-01-01T00:00:00Z",
             "extraction_version": "v1", "content_hash": "h1", "quote_verified": True,
         })
+        # One verified decision that governs two paths. It must be counted once in the
+        # repository and module totals, not once per path it affects.
+        cache.put_decision({
+            "id": "dec_both", "source_id": "pr:urllib3/urllib3#4", "repo": REPO,
+            "summary": "Add pooling and TLS", "decision_type": "design",
+            "rationale": "Both were added together.", "state": "ACTIVE",
+            "affected_entities": [CONFIG, SSL], "created_at": "2024-01-01T00:00:00Z",
+            "extraction_version": "v1", "content_hash": "h2", "quote_verified": True,
+        })
+        # A verified decision that governs a configuration key, not a file. It still
+        # counts in the repository total even though it maps to no file path.
+        cache.put_decision({
+            "id": "dec_key", "source_id": "pr:urllib3/urllib3#5", "repo": REPO,
+            "summary": "Cap the retries", "decision_type": "design",
+            "rationale": "Retries were capped.", "state": "ACTIVE",
+            "affected_entities": ["MAX_RETRIES"], "created_at": "2024-01-01T00:00:00Z",
+            "extraction_version": "v1", "content_hash": "h3", "quote_verified": True,
+        })
         cache.put_evidence({
             "id": "ev_config", "decision_id": "dec_config",
             "source_id": "pr:urllib3/urllib3#1", "source_type": "pull_request",
@@ -86,14 +104,14 @@ def test_rebuild_stores_entity_coverage_counts(tmp_path: Path) -> None:
     assert config["prs_analyzed"] == 2
     assert config["prs_noise_skipped"] == 1
     assert config["prs_not_analyzed"] == 0
-    assert config["verified_decisions"] == 1
+    assert config["verified_decisions"] == 2
 
     ssl_node = _coverage(store, SSL)
     assert ssl_node["prs_touching"] == 2
     assert ssl_node["prs_analyzed"] == 1
     assert ssl_node["prs_noise_skipped"] == 1
     assert ssl_node["prs_not_analyzed"] == 0
-    assert ssl_node["verified_decisions"] == 0
+    assert ssl_node["verified_decisions"] == 1
 
     net = _coverage(store, NET)
     assert net["prs_touching"] == 2
@@ -118,8 +136,48 @@ def test_rebuild_stores_repository_coverage(tmp_path: Path) -> None:
     assert repo["prs_fetched"] == 5
     assert repo["sources_analyzed"] == 2
     assert repo["prs_noise_skipped"] == 2
-    assert repo["verified_decisions"] == 1
+    # dec_config, dec_both (two paths) and dec_key (a config key, no path): three.
+    assert repo["verified_decisions"] == 3
     assert "pkg/" in repo["scope"] or "file paths" in repo["scope"]
+
+
+def test_the_verified_total_counts_decisions_not_paths(tmp_path: Path) -> None:
+    cache_path = tmp_path / "cache.sqlite3"
+    _seed_cache(cache_path)
+
+    store = build_from_cache(cache_path, REPO).store
+
+    # Three verified decisions: dec_config (CONFIG), dec_both (CONFIG, SSL) and
+    # dec_key (a config key). Counting the paths they touch would give 3 as well here,
+    # but dec_both's two paths must not be counted twice, so the module total is what
+    # distinguishes the two rules.
+    repo = store.get_node(SLUG)
+    assert repo["verified_decisions"] == 3
+
+    module = store.get_node(f"module:{REPO}:pkg")
+    assert module is not None
+    # dec_config and dec_both govern files under pkg; counting paths would give 3
+    # (CONFIG twice). The distinct decisions are 2.
+    assert module["verified_decisions"] == 2
+
+
+def test_sources_analyzed_counts_distinct_completed_sources(tmp_path: Path) -> None:
+    cache_path = tmp_path / "cache.sqlite3"
+    with SqliteCache(cache_path) as cache:
+        for number in (1, 2):
+            cache.put_raw("pr", REPO, str(number), {
+                "number": number, "title": "t", "body": "b", "files": [CONFIG],
+            })
+        cache.record_extraction_source(REPO, "pr:urllib3/urllib3#1", "v1", "ok", "run1", decisions=1)
+        # The same source recorded again in a later run must not be counted twice.
+        cache.record_extraction_source(REPO, "pr:urllib3/urllib3#1", "v1", "ok", "run2", decisions=1)
+        cache.record_extraction_source(REPO, "pr:urllib3/urllib3#2", "v1", "no_decision", "run1")
+        cache.record_extraction_source(REPO, "pr:urllib3/urllib3#3", "v1", "failed", "run1")
+
+    store = build_from_cache(cache_path, REPO).store
+
+    repo = store.get_node(SLUG)
+    assert repo["sources_analyzed"] == 2
 
 
 def test_coverage_counts_are_identical_across_two_rebuilds(tmp_path: Path) -> None:

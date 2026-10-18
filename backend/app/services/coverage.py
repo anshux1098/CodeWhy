@@ -45,7 +45,19 @@ class Coverage:
     pr_ids: set[str] = field(default_factory=set)
     analyzed: set[str] = field(default_factory=set)
     noise: set[str] = field(default_factory=set)
-    verified_by_path: dict[str, int] = field(default_factory=dict)
+    #: Every verified decision id for the repository, including ones that govern only
+    #: a configuration key and so map to no file path.
+    verified: set[str] = field(default_factory=set)
+    #: Verified decision ids per file path. A set, so a decision that governs two
+    #: paths under one module is still one decision.
+    verified_by_path: dict[str, set[str]] = field(default_factory=dict)
+
+    def verified_ids(self, paths: Sequence[str]) -> set[str]:
+        """The distinct verified decisions governing any of `paths`."""
+        found: set[str] = set()
+        for path in paths:
+            found |= self.verified_by_path.get(path, set())
+        return found
 
     def counts_for(self, paths: Sequence[str]) -> dict[str, int]:
         """Count coverage for one entity, given the paths that identify it.
@@ -59,13 +71,12 @@ class Coverage:
             touched |= self.touched.get(path, set())
         analyzed = touched & self.analyzed
         noise = touched & self.noise
-        verified = sum(self.verified_by_path.get(path, 0) for path in paths)
         return {
             "prs_touching": len(touched),
             "prs_analyzed": len(analyzed),
             "prs_noise_skipped": len(noise),
             "prs_not_analyzed": len(touched - analyzed - noise),
-            "verified_decisions": verified,
+            "verified_decisions": len(self.verified_ids(paths)),
         }
 
 
@@ -92,9 +103,11 @@ def compute_coverage(cache: Any, repo: str) -> Coverage:
     for decision in cache.decisions_for_repo(repo):
         if not decision["quote_verified"]:
             continue
+        decision_id = str(decision["id"])
+        covered.verified.add(decision_id)
         for name in _loads(decision["affected_entities"]):
             if "/" in name:
-                covered.verified_by_path[name] = covered.verified_by_path.get(name, 0) + 1
+                covered.verified_by_path.setdefault(name, set()).add(decision_id)
     return covered
 
 
@@ -112,13 +125,12 @@ def module_counts(coverage: Coverage, module: str, file_paths: Sequence[str]) ->
 
 def repository_counts(cache: Any, repo: str, coverage: Coverage) -> dict[str, Any]:
     """Stored on the Repository node: scope and repository-wide totals."""
-    verified = sum(coverage.verified_by_path.values())
     return {
         "scope": scope_text(cache, repo, coverage),
         "prs_fetched": len(coverage.pr_ids),
         "sources_analyzed": len(coverage.analyzed),
         "prs_noise_skipped": len(coverage.noise & coverage.pr_ids),
-        "verified_decisions": verified,
+        "verified_decisions": len(coverage.verified),
     }
 
 
