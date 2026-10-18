@@ -276,7 +276,7 @@ def rebuild_graph(
             "created_at": c["created_at"],
         })
 
-    decisions = cache.decisions_for_repo(repo)
+    decisions = [dict(d) for d in cache.decisions_for_repo(repo)]
     verified = [d for d in decisions if d["quote_verified"]]
     excluded_placeholders = len(decisions) - len(verified)
     if excluded_placeholders:
@@ -322,7 +322,7 @@ def rebuild_graph(
         })
 
     # 4. Links & Supersession Analysis (Phase 4)
-    link_rows = cache.links_for(repo)
+    link_rows = [dict(row) for row in cache.links_for(repo)]
     from app.services.supersession import compute_supersession_edges
     from app.services.state import compute_decision_states
 
