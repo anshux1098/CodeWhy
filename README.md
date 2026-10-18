@@ -141,6 +141,27 @@ Phase 3 builds the connected graph view and grounded retrieval pipeline:
 10. **`GraphDataSource` Integration** ([`backend/app/services/data_source.py`](backend/app/services/data_source.py)):
     - Plugs directly into the FastAPI HTTP API, toggled via `DATA_SOURCE=graph`.
 
+### Coverage: what was checked
+
+A refusal must say what the repository history was examined for, not imply that no
+history exists. The rebuild ([`scripts/rebuild_graph.py`](scripts/rebuild_graph.py))
+computes coverage from the cache and stores it in the graph, so the API never reads
+SQLite. The terms are defined by [`backend/app/services/coverage.py`](backend/app/services/coverage.py):
+
+- **touched**: PRs (non-noise and noise) whose changed files include the entity path.
+- **analyzed**: sources with a completed extraction run (`ok` or `no_decision`),
+  whether or not a verified decision came out of it.
+- **noise-skipped**: sources removed by the noise filter.
+- **not analyzed**: touched PRs that were neither analyzed nor noise-skipped.
+- **verified decision**: `quote_verified=1`.
+
+Each `CodeEntity` stores `prs_touching`, `prs_analyzed`, `prs_noise_skipped`,
+`prs_not_analyzed` and `verified_decisions`. The `Repository` node stores the
+`scope` text (branch, commit window, ingested file paths and ingest caps),
+`prs_fetched`, `sources_analyzed`, `prs_noise_skipped` and `verified_decisions`.
+Refusal and partial-answer `evidence_gaps` text is built only from these stored
+facts; no response field or gate changes.
+
 ---
 
 ## Installation & Setup

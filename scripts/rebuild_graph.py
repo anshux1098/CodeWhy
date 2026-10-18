@@ -26,6 +26,12 @@ from app.graph.ids import (
     to_api_id,
 )
 from app.providers.embeddings import get_embedding_provider
+from app.services.coverage import (
+    compute_coverage,
+    entity_counts,
+    module_counts,
+    repository_counts,
+)
 from app.services.noise import label_repository_noise
 from app.stores.graph_store import BaseGraphStore, get_graph_store
 from app.stores.sqlite_cache import SqliteCache
@@ -212,6 +218,23 @@ def rebuild_graph(
     # forms for this repository only; other repositories in the same database stay.
     store.delete_repository((slug, repo))
 
+    # Noise labels are additive metadata on the source records. Every stored pull
+    # request is assessed and its labels persisted, so a consumer can flag — never
+    # drop — an automated or generated change. They must be recomputed before the
+    # coverage counts so a rule change is reflected in `prs_noise_skipped`.
+    noise = label_repository_noise(cache, repo)
+    logger.info(
+        "Labelled noise: %d of %d pull requests flagged (%s).",
+        noise["noisy"],
+        noise["assessed"],
+        ", ".join(f"{reason}={count}" for reason, count in sorted(noise["reasons"].items())),
+    )
+
+    # Coverage is computed from the cache and stored on the graph, so the answer
+    # path can say what was checked without reading SQLite. See
+    # `app/services/coverage.py` for the touched/analyzed/noise-skipped definitions.
+    coverage = compute_coverage(cache, repo)
+
     # 1. Repository node. Its id is the slug the API addresses it by; every other
     #    node carries the same slug as its `repo` property so a lookup matches.
     parts = repo.split("/")
@@ -226,6 +249,7 @@ def rebuild_graph(
         "url": f"https://github.com/{repo}",
         "default_branch": "main",
         "created_at": "2026-01-01T00:00:00Z",
+        **repository_counts(cache, repo, coverage),
     })
 
     # 2. Source nodes. The links table names commits, pull requests, issues and
@@ -280,6 +304,7 @@ def rebuild_graph(
             "path": c["file_path"],
             "entity_type": "ConfigKey",
             "created_at": c["created_at"],
+            **entity_counts(coverage, c["file_path"]),
         })
 
     decisions = [dict(d) for d in cache.decisions_for_repo(repo)]
@@ -313,10 +338,12 @@ def rebuild_graph(
             "path": path,
             "entity_type": "File",
             "created_at": "",
+            **entity_counts(coverage, path),
         })
         module = get_module_for_path(path)
         if module:
             module_names.add(module)
+    ordered_paths = sorted(file_paths)
     for module in sorted(module_names):
         store.merge_node("CodeEntity", {
             "id": f"module:{repo}:{module}",
@@ -325,6 +352,7 @@ def rebuild_graph(
             "path": module,
             "entity_type": "Module",
             "created_at": "",
+            **module_counts(coverage, module, ordered_paths),
         })
 
     # 4. Links & Supersession Analysis (Phase 4)
@@ -390,6 +418,7 @@ def rebuild_graph(
                 "path": ent_name,
                 "entity_type": "File" if "/" in ent_name else "ConfigKey",
                 "created_at": d["created_at"],
+                **entity_counts(coverage, ent_name),
             })
             store.merge_relationship("GOVERNS", dec_id, ent_id)
 
@@ -457,17 +486,6 @@ def rebuild_graph(
                     "evaluated_at": s_edge.evaluated_at,
                 },
             )
-
-    # Noise labels are additive metadata on the source records. Every stored pull
-    # request is assessed and its labels persisted, so a consumer can flag — never
-    # drop — an automated or generated change.
-    noise = label_repository_noise(cache, repo)
-    logger.info(
-        "Labelled noise: %d of %d pull requests flagged (%s).",
-        noise["noisy"],
-        noise["assessed"],
-        ", ".join(f"{reason}={count}" for reason, count in sorted(noise["reasons"].items())),
-    )
 
     # Measured, not accumulated.
     counts = graph_state(store, excluded_placeholders=excluded_placeholders)
