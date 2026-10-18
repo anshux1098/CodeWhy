@@ -10,6 +10,7 @@ back in an error, that text is masked before it reaches stdout.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -244,7 +245,13 @@ def connect_embeddings() -> bool:
         return report("Embeddings", False, f"{detail} (expected 384)")
     if settings.data_source == "graph" and not semantic:
         return report("Embeddings", False, f"{detail} (real embeddings required for DATA_SOURCE=graph)")
-    return report("Embeddings", True, detail)
+    ok = report("Embeddings", True, detail)
+    if semantic and not os.environ.get("HF_HUB_OFFLINE"):
+        print(
+            "  note: the embedding model is now cached; set HF_HUB_OFFLINE=1 "
+            "to keep later runs offline"
+        )
+    return ok
 
 
 def main(argv: list[str] | None = None) -> int:
