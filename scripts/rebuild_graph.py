@@ -256,6 +256,9 @@ def rebuild_graph(
     #    documents as endpoints, so each has to exist as a node or the edge is
     #    dropped silently by MATCH. Text is stored on the text-bearing ones so a
     #    quote can be re-verified at answer time from the node alone.
+    #    The merge date is captured here so a decision can be dated by when its pull
+    #    request merged, rather than by when the row happened to be extracted.
+    merged_at_by_source: dict[str, str] = {}
     for row in cache.fetch_raw_objects(repo, limit=10_000_000):
         label = source_label_for(row["id"])
         if label is None:
@@ -277,6 +280,10 @@ def rebuild_graph(
         }
         if label in TEXT_BEARING_LABELS:
             properties["text"] = source_text_from_payload(payload)
+        if label == "PullRequest":
+            merged = payload.get("mergedAt") or payload.get("merged_at")
+            if merged:
+                merged_at_by_source[str(row["id"])] = str(merged)
         store.merge_node(label, properties)
 
     for commit in cache.iter_commits(repo):
@@ -386,8 +393,11 @@ def rebuild_graph(
             "supersedes": supersedes_list,
             "superseded_by": superseded_by_list,
             "rule": rule_val,
-            "recorded_at": d["created_at"],
-            "effective_at": d["created_at"],
+            # The contract names no meaning for either date, and the decision took
+            # effect when its pull request merged. `recorded_at` stays null rather
+            # than borrowing `created_at`, which is when the row was extracted.
+            "recorded_at": None,
+            "effective_at": merged_at_by_source.get(source_id),
             "ended_at": None,
             "evaluated_at": d["created_at"],
             "quote_verified": bool(d["quote_verified"]),

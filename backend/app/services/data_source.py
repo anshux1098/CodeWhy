@@ -64,6 +64,12 @@ def graph_edge_props(rel: dict) -> dict:
     return {key: value for key, value in rel.items() if key not in _GRAPH_EDGE_KEYS}
 
 
+def _clean_date(value: Any) -> Optional[str]:
+    """A stored date, or None when it is absent. An empty string is not a date."""
+    text = str(value or "").strip()
+    return text or None
+
+
 def source_ref_for(node: dict) -> SourceRef:
     """Build a SourceRef from the stored node.
 
@@ -341,6 +347,9 @@ class GraphDataSource:
             summary=node.get("summary", ""),
             rationale=node.get("rationale"),
             state=DecisionState(node.get("state", "ACTIVE")),
+            recorded_at=_clean_date(node.get("recorded_at")),
+            effective_at=_clean_date(node.get("effective_at")),
+            ended_at=_clean_date(node.get("ended_at")),
             source=source_ref_for(node),
             supersedes=node.get("supersedes") or [],
             superseded_by=node.get("superseded_by") or [],
