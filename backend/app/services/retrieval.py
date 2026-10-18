@@ -143,13 +143,17 @@ def retrieve_evidence(
         dec_id = d.get("id")
         if dec_id and dec_id in analysis.states:
             st = analysis.states[dec_id]
-            d["state"] = st.state.value
-            d["supersedes"] = st.supersedes
-            d["superseded_by"] = st.superseded_by
-            d["rule"] = st.rule
-            d["probable_superseded_by"] = st.probable_superseded_by
-            d["conflicts_with"] = st.conflicts_with
-            d["reaffirms"] = st.reaffirms
+            # The graph already persists the state computed at build time. Reusing
+            # it keeps /ask identical to /decisions/{id} even when retrieval cannot
+            # rebuild an edge from the links available to it.
+            if not d.get("state"):
+                d["state"] = st.state.value
+            d.setdefault("supersedes", st.supersedes)
+            d.setdefault("superseded_by", st.superseded_by)
+            d.setdefault("rule", st.rule)
+            d.setdefault("probable_superseded_by", st.probable_superseded_by)
+            d.setdefault("conflicts_with", st.conflicts_with)
+            d.setdefault("reaffirms", st.reaffirms)
 
     bundle.supersession_chains = analysis.supersession_chains
     bundle.chain_truncated = analysis.chain_truncated

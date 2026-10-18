@@ -172,6 +172,8 @@ pip install -e ".[embeddings]"
 ```
 
 > **Note on embeddings:** Installing `.[embeddings]` provides `sentence-transformers` for semantic similarity. Without it, the deterministic fallback embedder is used and answers are weaker.
+>
+> **Offline after the first download:** the first run that selects the local embedder downloads `all-MiniLM-L6-v2` from Hugging Face. After that download succeeds, set `$env:HF_HUB_OFFLINE="1"` before later runs to keep them offline. This is a Hugging Face environment variable, not a CodeWhy setting.
 
 ---
 

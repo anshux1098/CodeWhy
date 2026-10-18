@@ -87,6 +87,15 @@ def built(tmp_path: Path):
     return rebuild_graph.build_from_cache(cache_path, REPO)
 
 
+def test_the_build_accepts_rows_returned_by_the_cache(tmp_path: Path) -> None:
+    cache_path = tmp_path / "rows.sqlite3"
+    seed_cache(cache_path)
+
+    result = rebuild_graph.build_from_cache(cache_path, REPO)
+
+    assert result.counts["nodes"] > 0
+
+
 def test_only_a_verified_decision_is_graphed(built) -> None:
     assert built.store.get_node("dec_ok") is not None
     assert built.store.get_node("dec_bad") is None

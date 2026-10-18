@@ -182,3 +182,24 @@ def test_connect_embeddings_passes_in_fixture_mode(capsys, monkeypatch):
     assert preflight.connect_embeddings() is True
     out = capsys.readouterr().out
     assert "dim=384" in out
+
+def test_connect_embeddings_notes_hf_offline_after_first_download(capsys, monkeypatch):
+    import app.providers.embeddings as embmod
+    import scripts.preflight as preflight
+
+    class FakeSemanticEmbedder:
+        def embed_text(self, text):
+            return [0.0] * 384
+
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    monkeypatch.setattr(embmod, "SentenceTransformersProvider", FakeSemanticEmbedder)
+    monkeypatch.setattr(
+        embmod, "get_embedding_provider", lambda cfg=None: FakeSemanticEmbedder()
+    )
+    monkeypatch.setattr(
+        preflight, "settings", _make_settings(data_source="graph", offline=False)
+    )
+
+    assert preflight.connect_embeddings() is True
+    out = capsys.readouterr().out
+    assert "HF_HUB_OFFLINE=1" in out
