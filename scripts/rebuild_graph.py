@@ -321,20 +321,37 @@ def rebuild_graph(
             "created_at": "",
         })
 
-    # 4. Decisions & Evidence. Only a decision with a verified quote is graphed: a
-    #    placeholder says something changed but carries no checkable citation.
+    # 4. Links & Supersession Analysis (Phase 4)
+    link_rows = cache.links_for(repo)
+    from app.services.supersession import compute_supersession_edges
+    from app.services.state import compute_decision_states
+
+    super_edges = compute_supersession_edges(verified, links=link_rows)
+    state_analysis = compute_decision_states(verified, edges=super_edges)
+
+    # Decisions & Evidence. Only a decision with a verified quote is graphed: a
+    # placeholder says something changed but carries no checkable citation.
     logger.info("Loading %d verified decisions into graph...", len(verified))
     for d in verified:
         dec_id = d["id"]
         source_id = d["source_id"]
         embedding = embedder.embed_text(d["summary"])
+        st_res = state_analysis.states.get(dec_id)
+        computed_state = st_res.state.value if st_res else d["state"]
+        supersedes_list = st_res.supersedes if st_res else []
+        superseded_by_list = st_res.superseded_by if st_res else []
+        rule_val = st_res.rule if st_res else None
+
         store.merge_node("Decision", {
             "id": dec_id,
             "repo": slug,
             "summary": d["summary"],
             "decision_type": d["decision_type"],
             "rationale": d["rationale"],
-            "state": d["state"],
+            "state": computed_state,
+            "supersedes": supersedes_list,
+            "superseded_by": superseded_by_list,
+            "rule": rule_val,
             "recorded_at": d["created_at"],
             "effective_at": d["created_at"],
             "ended_at": None,
@@ -389,7 +406,6 @@ def rebuild_graph(
             store.merge_relationship("SUPPORTED_BY", dec_id, ev["id"])
 
     # 5. Links table (REVERTS, SUPERSEDES, PART_OF, REFERENCES, CONTAINS)
-    link_rows = cache.links_for(repo)
     logger.info("Loading %d links into graph...", len(link_rows))
 
     # A commit can name a pull request that was never ingested, so the edge would
@@ -418,6 +434,23 @@ def rebuild_graph(
                 "derivation": link["derivation_method"],
             },
         )
+
+    # Merge decision-to-decision SUPERSEDES edges computed by Phase 4
+    for s_edge in super_edges:
+        if store.get_node(s_edge.source_decision_id) and store.get_node(s_edge.target_decision_id):
+            store.merge_relationship(
+                rel_type="SUPERSEDES",
+                from_id=s_edge.source_decision_id,
+                to_id=s_edge.target_decision_id,
+                properties={
+                    "rule": s_edge.rule,
+                    "method": s_edge.method,
+                    "confidence": s_edge.confidence,
+                    "source_evidence_id": s_edge.source_evidence_id,
+                    "review_state": s_edge.review_state,
+                    "evaluated_at": s_edge.evaluated_at,
+                },
+            )
 
     # Noise labels are additive metadata on the source records. Every stored pull
     # request is assessed and its labels persisted, so a consumer can flag — never
