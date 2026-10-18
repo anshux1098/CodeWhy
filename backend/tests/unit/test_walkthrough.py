@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import sys
 
 import pytest
 
@@ -22,6 +23,8 @@ import scripts.walkthrough as walkthrough
 from app.config import Settings
 
 REPO = "acme/netclient"
+SSL = "file:acme/netclient:src/netclient/ssl_.py"
+HTTP2 = "file:acme/netclient:src/netclient/http2/connection.py"
 
 #: Sentinel values that must never appear in the output. Each is distinctive so a
 #: substring check cannot pass by accident.
@@ -322,3 +325,95 @@ def test_the_report_is_plain_text_without_ansi(walkthrough_env, capsys):
     )
 
     assert "\x1b[" not in report.read_text(encoding="utf-8")
+
+
+def _http2_store():
+    from app.stores.graph_store import InMemoryGraphStore
+
+    store = InMemoryGraphStore()
+    store.merge_node("Repository", {"id": REPO, "repo": REPO, "name": "netclient"})
+    store.merge_node("CodeEntity", {
+        "id": SSL, "repo": REPO, "name": "src/netclient/ssl_.py",
+        "path": "src/netclient/ssl_.py", "entity_type": "File",
+    })
+    # A path that happens to contain the token "http" must not win a question that
+    # only says "HTTP/2"; the decisions' own text is the real signal.
+    store.merge_node("CodeEntity", {
+        "id": HTTP2, "repo": REPO, "name": "src/netclient/http2/connection.py",
+        "path": "src/netclient/http2/connection.py", "entity_type": "File",
+    })
+    for decision_id, summary, rationale, entity_id, source_id in (
+        (
+            "dec_add", "Add HTTP/2 TLS support",
+            "HTTP/2 TLS support was added for the new client.", SSL,
+            "pr:acme/netclient#3456",
+        ),
+        (
+            "dec_revert", "Revert HTTP/2 TLS support",
+            "HTTP/2 TLS support was added and then reverted.", SSL,
+            "pr:acme/netclient#3466",
+        ),
+        (
+            "dec_port0", "Preserve an explicit port 0 in the URL",
+            "A falsy check dropped an explicit port 0 from the URL.", HTTP2,
+            "pr:acme/netclient#5101",
+        ),
+    ):
+        store.merge_node("Decision", {
+            "id": decision_id, "repo": REPO, "state": "ACTIVE",
+            "summary": summary, "rationale": rationale, "source_id": source_id,
+        })
+        store.merge_relationship("GOVERNS", decision_id, entity_id, {})
+    return store
+
+
+def test_the_walkthrough_resolves_a_text_only_question_like_the_api():
+    context = walkthrough.Context(
+        repo=REPO,
+        cache=None,
+        store=_http2_store(),
+        settings=Settings(_env_file=None, data_source="graph", offline=True),
+        reporter=walkthrough.Reporter(colour=False, stream=sys.stdout),
+        with_llm=False,
+    )
+
+    walkthrough._answer_one(
+        context, "http2-revert", "Why was HTTP/2 TLS support added and then reverted?"
+    )
+
+    text = "\n".join(context.reporter.lines)
+    assert "entity: src/netclient/ssl_.py" in text
+
+
+def test_stage_seven_describes_noise_filtering_as_wired(walkthrough_env, capsys):
+    db_path, report = walkthrough_env
+
+    walkthrough.main(
+        [
+            "--stage", "7", "--cache", str(db_path), "--out", str(report),
+            "--no-color", "--repo", REPO,
+        ],
+        store=_seeded_store(),
+        settings=Settings(_env_file=None, data_source="graph", offline=True),
+    )
+
+    text = report.read_text(encoding="utf-8")
+    assert "filtering is not wired in" not in text
+    assert "pull requests are labelled and excluded" in text
+    assert "commits are not assessed" in text
+
+
+def test_every_stage_has_a_how_to_read_it_section(walkthrough_env, capsys):
+    db_path, report = walkthrough_env
+
+    walkthrough.main(
+        [
+            "--stage", "8", "--cache", str(db_path), "--out", str(report),
+            "--no-color", "--repo", REPO,
+        ],
+        store=_seeded_store(),
+        settings=Settings(_env_file=None, data_source="graph", offline=True),
+    )
+
+    text = report.read_text(encoding="utf-8")
+    assert text.count("HOW TO READ IT:") == len(walkthrough.STAGES)

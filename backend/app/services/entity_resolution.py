@@ -358,3 +358,39 @@ def resolve_entity_from_decisions(
         reason_code="ambiguous_entity",
         error_message="The matching decisions point at more than one entity. Please name one.",
     )
+
+
+def resolve_question(
+    question: str,
+    entities: Sequence[dict[str, Any]],
+    repo: str,
+    store: Any,
+) -> ResolutionResult:
+    """Resolve a question the way the answer path does, including the text route.
+
+    The question names an entity only when the best match is a real reference (a
+    full path, an exact filename, or an exact name: ``STRONG_MATCH`` or above). A
+    weaker match is a loose token inside a path (the "HTTP" in "http2", say) and
+    must not preempt the text route. When the question names nothing, find the
+    decisions from their own text and take the entity from them. An out-of-scope
+    question, a real tie, and a named path that is simply absent are all left as
+    they are.
+
+    Both the API and the walkthrough call this, so the rule cannot drift between
+    the two.
+    """
+    resolution = resolve_entity(question, entities, repo)
+    names_an_entity = (
+        resolution.outcome == ResolutionOutcome.SUCCESS
+        and resolution.entity is not None
+        and resolution.entity.score >= STRONG_MATCH
+    )
+    if (
+        not names_an_entity
+        and resolution.reason_code != "out_of_scope"
+        and not names_an_explicit_path_or_quote(question)
+    ):
+        from_decisions = resolve_entity_from_decisions(question, store, repo)
+        if from_decisions is not None:
+            return from_decisions
+    return resolution

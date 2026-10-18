@@ -48,9 +48,8 @@ from app.providers.llm_provider import BaseLLMProvider
 from app.services.answer import generate_answer
 from app.services.entity_resolution import (
     ResolutionOutcome,
-    names_an_explicit_path_or_quote,
     resolve_entity,
-    resolve_entity_from_decisions,
+    resolve_question,
 )
 from app.services.gate import GateOutcome, evaluate_refusal_gate
 from app.services.quote_check import verify_quote
@@ -478,15 +477,7 @@ def _answer_one(ctx: Context, label: str, question: str) -> None:
     r = ctx.reporter
     store = ctx.store
     all_entities = store.search_entities(ctx.repo, "")
-    resolution = resolve_entity(question, all_entities, ctx.repo)
-    if (
-        resolution.outcome == ResolutionOutcome.REFUSAL
-        and resolution.reason_code != "out_of_scope"
-        and not names_an_explicit_path_or_quote(question)
-    ):
-        from_decisions = resolve_entity_from_decisions(question, store, ctx.repo)
-        if from_decisions is not None:
-            resolution = from_decisions
+    resolution = resolve_question(question, all_entities, ctx.repo, store)
 
     bundle = None
     if resolution.entity is not None:
@@ -598,13 +589,21 @@ def stage_confidence(ctx: Context) -> None:
 
 def stage_not_built(ctx: Context) -> None:
     r = ctx.reporter
+    excluded = len(ctx.cache.noisy_record_ids(ctx.cache_repo))
     r.line("Honest list of what this project does not do yet:")
     r.line("  - supersession history: decisions carry a state, but every one is ACTIVE")
     r.line("  - vector retrieval: the 384-dim index is created but not queried")
     r.line("  - configuration history: config keys are stored, value changes are not built")
-    r.line("  - noise filtering: labels and reasons exist, filtering is not wired in")
+    r.line(
+        f"  - noise filtering: pull requests are labelled and excluded ({excluded} now); "
+        "commits are not assessed"
+    )
     r.line("  - languages: Python and configuration files only")
     r.line(f"  - repositories: this walkthrough reads {ctx.repo}; more need a separate ingest")
+    r.line()
+    r.line("HOW TO READ IT:")
+    r.line("  Each line is a gap checked against the code, not a stored claim. A line that")
+    r.line("  names a count is reading the cache now; when a gap is closed, the line changes.")
 
 
 def stage_selfcheck(ctx: Context) -> None:
@@ -632,6 +631,10 @@ def stage_selfcheck(ctx: Context) -> None:
     r.line(f"self-check: {passed}/{len(ctx.checks)} passed")
     if not ctx.with_llm:
         r.line("LLM calls made: 0 (the model was never consulted)")
+    r.line()
+    r.line("HOW TO READ IT:")
+    r.line("  Every line is a live check over the cache and the graph, not a stored result.")
+    r.line("  Any [FAIL] means the run exits non-zero, so a report with a failure is not a pass.")
 
 
 # ---------------------------------------------------------------------------
