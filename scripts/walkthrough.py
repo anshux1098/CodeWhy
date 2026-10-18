@@ -48,9 +48,8 @@ from app.providers.llm_provider import BaseLLMProvider
 from app.services.answer import generate_answer
 from app.services.entity_resolution import (
     ResolutionOutcome,
-    names_an_explicit_path_or_quote,
     resolve_entity,
-    resolve_entity_from_decisions,
+    resolve_question,
 )
 from app.services.gate import GateOutcome, evaluate_refusal_gate
 from app.services.quote_check import verify_quote
@@ -478,15 +477,7 @@ def _answer_one(ctx: Context, label: str, question: str) -> None:
     r = ctx.reporter
     store = ctx.store
     all_entities = store.search_entities(ctx.repo, "")
-    resolution = resolve_entity(question, all_entities, ctx.repo)
-    if (
-        resolution.outcome == ResolutionOutcome.REFUSAL
-        and resolution.reason_code != "out_of_scope"
-        and not names_an_explicit_path_or_quote(question)
-    ):
-        from_decisions = resolve_entity_from_decisions(question, store, ctx.repo)
-        if from_decisions is not None:
-            resolution = from_decisions
+    resolution = resolve_question(question, all_entities, ctx.repo, store)
 
     bundle = None
     if resolution.entity is not None:

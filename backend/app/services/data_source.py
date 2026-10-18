@@ -13,13 +13,10 @@ from app.schemas.graph import GraphEdge, GraphNode, GraphResponse
 from app.schemas.repository import RepositoryCounts, RepositoryResponse
 from app.services.answer import generate_answer
 from app.services.entity_resolution import (
-    STRONG_MATCH,
     EntityCandidate,
     ResolutionOutcome,
     ResolutionResult,
-    names_an_explicit_path_or_quote,
-    resolve_entity,
-    resolve_entity_from_decisions,
+    resolve_question,
 )
 from app.services.retrieval import retrieve_evidence
 from app.stores.graph_store import BaseGraphStore, get_graph_store
@@ -276,29 +273,9 @@ class GraphDataSource:
         if request.entity_id is not None:
             resolution = self._resolve_explicit_entity(repository_id, request.entity_id)
         else:
-            resolution = resolve_entity(request.question, all_entities, repository_id)
-            # The question names an entity only when the best match is a real reference
-            # (a full path, an exact filename, or an exact name: STRONG_MATCH or above).
-            # A weaker match is a loose token inside a path (the "HTTP" in "http2",
-            # say) and must not preempt the text route. When the question names nothing,
-            # find the decisions from their own text and take the entity from them. An
-            # out-of-scope question, a real tie, and a named path that is simply absent
-            # are all left as they are.
-            names_an_entity = (
-                resolution.outcome == ResolutionOutcome.SUCCESS
-                and resolution.entity is not None
-                and resolution.entity.score >= STRONG_MATCH
+            resolution = resolve_question(
+                request.question, all_entities, repository_id, self.store
             )
-            if (
-                not names_an_entity
-                and resolution.reason_code != "out_of_scope"
-                and not names_an_explicit_path_or_quote(request.question)
-            ):
-                from_decisions = resolve_entity_from_decisions(
-                    request.question, self.store, repository_id
-                )
-                if from_decisions is not None:
-                    resolution = from_decisions
 
         bundle = None
         if resolution.entity:
