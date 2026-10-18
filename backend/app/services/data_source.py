@@ -16,7 +16,11 @@ from app.schemas.decisions import (
 )
 from app.schemas.entities import Entity, EntityListResponse
 from app.schemas.graph import GraphEdge, GraphNode, GraphResponse
-from app.schemas.repository import RepositoryCounts, RepositoryResponse
+from app.schemas.repository import (
+    RepositoryCounts,
+    RepositoryListResponse,
+    RepositoryResponse,
+)
 from app.services.answer import generate_answer
 from app.services.entity_resolution import (
     EntityCandidate,
@@ -41,6 +45,8 @@ class NotFoundError(DataSourceError):
 @runtime_checkable
 class DataSource(Protocol):
     def get_repository(self, repository_id: str) -> RepositoryResponse: ...
+
+    def list_repositories(self) -> RepositoryListResponse: ...
 
     def search_entities(self, repository_id: str, query: str) -> EntityListResponse: ...
 
@@ -84,6 +90,22 @@ def _clean_date(value: Any) -> Optional[str]:
     """A stored date, or None when it is absent. An empty string is not a date."""
     text = str(value or "").strip()
     return text or None
+
+
+def _clean_text(value: Any) -> Optional[str]:
+    """A stored string, or None when it is absent. An empty string is not a value."""
+    text = str(value or "").strip()
+    return text or None
+
+
+def _clean_int(value: Any) -> Optional[int]:
+    """A stored count as an int, or None when it is absent. Zero is a real value."""
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def source_ref_for(node: dict) -> SourceRef:
@@ -264,12 +286,10 @@ class GraphDataSource:
             ),
         )
 
-    def get_repository(self, repository_id: str) -> RepositoryResponse:
-        entities = self._require_repository(repository_id)
+    def _repository_response(self, repository_id: str, node: dict) -> RepositoryResponse:
         # Name and url come from the Repository node the build wrote, not from the id
         # string: the id is the slug the API addresses, and the real address lives on
         # the node as `url` with the raw `owner/name` in `full_name`.
-        node = self._find_node(repository_id) or {}
         raw_name = node.get("full_name") or repository_id
         return RepositoryResponse(
             id=repository_id,
@@ -281,8 +301,27 @@ class GraphDataSource:
                 pull_requests=self.store.count_nodes(repository_id, "PullRequest"),
                 commits=self.store.count_nodes(repository_id, "Commit"),
             ),
+            full_name=_clean_text(node.get("full_name")),
+            owner=_clean_text(node.get("owner")),
+            scope=_clean_text(node.get("scope")),
+            prs_fetched=_clean_int(node.get("prs_fetched")),
+            sources_analyzed=_clean_int(node.get("sources_analyzed")),
+            prs_noise_skipped=_clean_int(node.get("prs_noise_skipped")),
+            verified_decisions=_clean_int(node.get("verified_decisions")),
+            last_rebuilt_at=_clean_text(node.get("last_rebuilt_at")),
             fixture=not self.is_real,
         )
+
+    def get_repository(self, repository_id: str) -> RepositoryResponse:
+        self._require_repository(repository_id)
+        return self._repository_response(repository_id, self._find_node(repository_id) or {})
+
+    def list_repositories(self) -> RepositoryListResponse:
+        items = [
+            self._repository_response(str(node.get("id", "")), node)
+            for node in self.store.list_repositories()
+        ]
+        return RepositoryListResponse(items=items, fixture=not self.is_real)
 
     def search_entities(self, repository_id: str, query: str) -> EntityListResponse:
         raw_ents = self._require_repository(repository_id)
@@ -507,3 +546,4 @@ def get_data_source(cfg: Settings) -> DataSource:
     raise DataSourceError(
         f"DATA_SOURCE={cfg.data_source!r} is not supported. Must be 'fixture' or 'graph'."
     )
+

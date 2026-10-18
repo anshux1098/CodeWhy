@@ -18,7 +18,7 @@ from app.schemas.ask import AskResponse
 from app.schemas.decisions import DecisionDetail, DecisionListResponse
 from app.schemas.entities import EntityListResponse
 from app.schemas.graph import GraphResponse
-from app.schemas.repository import RepositoryResponse
+from app.schemas.repository import RepositoryListResponse, RepositoryResponse
 
 CONTRACT_DIR = ROOT / "contract"
 
@@ -34,6 +34,7 @@ CONTRACT_SPECS: dict[str, tuple[type[BaseModel], Optional[str]]] = {
     "decisions.json": (DecisionListResponse, None),
     "entities.json": (EntityListResponse, None),
     "repository.json": (RepositoryResponse, None),
+    "repositories.json": (RepositoryListResponse, None),
 }
 
 
@@ -48,6 +49,8 @@ def build_payload(name: str, model: type[BaseModel], question: Optional[str], so
         response = source.list_decisions(REPOSITORY_ID)
     elif name == "entities.json":
         response = source.search_entities(REPOSITORY_ID, "retry")
+    elif name == "repositories.json":
+        response = source.list_repositories()
     else:
         response = source.get_repository(REPOSITORY_ID)
     validated = model.model_validate(response.model_dump(mode="json"))

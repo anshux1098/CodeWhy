@@ -1019,6 +1019,27 @@
         "title": "RepositoryCounts",
         "type": "object"
       },
+      "RepositoryListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "fixture": {
+            "title": "Fixture",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RepositoryResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fixture"
+        ],
+        "title": "RepositoryListResponse",
+        "type": "object"
+      },
       "RepositoryResponse": {
         "additionalProperties": false,
         "properties": {
@@ -1029,17 +1050,109 @@
             "title": "Fixture",
             "type": "boolean"
           },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "last_rebuilt_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Rebuilt At"
           },
           "name": {
             "title": "Name",
             "type": "string"
           },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner"
+          },
+          "prs_fetched": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prs Fetched"
+          },
+          "prs_noise_skipped": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prs Noise Skipped"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          },
+          "sources_analyzed": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sources Analyzed"
+          },
           "url": {
             "title": "Url",
             "type": "string"
+          },
+          "verified_decisions": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified Decisions"
           }
         },
         "required": [
@@ -1270,6 +1383,27 @@
         "summary": "Configured services, without secrets",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/repositories": {
+      "get": {
+        "operationId": "list_repositories_api_v1_repositories_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositoryListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Every repository in the graph, with its ingestion status",
+        "tags": [
+          "repositories"
         ]
       }
     },

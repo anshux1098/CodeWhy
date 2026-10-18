@@ -20,7 +20,7 @@ from app.schemas.common import GRAPH_NODE_CAP, DecisionState, Outcome, ReasonCod
 from app.schemas.decisions import DecisionDetail, DecisionListItem, DecisionListResponse
 from app.schemas.entities import Candidate, Entity, EntityListResponse
 from app.schemas.graph import GraphEdge, GraphNode, GraphResponse
-from app.schemas.repository import RepositoryResponse
+from app.schemas.repository import RepositoryListResponse, RepositoryResponse
 from app.services.data_source import NotFoundError
 
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_]+")
@@ -103,6 +103,9 @@ class FixtureDataSource:
     def get_repository(self, repository_id: str) -> RepositoryResponse:
         self._require_repository(repository_id)
         return REPOSITORY
+
+    def list_repositories(self) -> RepositoryListResponse:
+        return RepositoryListResponse(items=[REPOSITORY], fixture=True)
 
     def search_entities(self, repository_id: str, query: str) -> EntityListResponse:
         self._require_repository(repository_id)

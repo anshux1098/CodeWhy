@@ -171,6 +171,11 @@ class BaseGraphStore(ABC):
         ...
 
     @abstractmethod
+    def list_repositories(self) -> list[dict[str, Any]]:
+        """Every repository in the graph, as its Repository node, ordered by id."""
+        ...
+
+    @abstractmethod
     def delete_repository(self, repo_ids: Sequence[str]) -> None:
         """Remove every node whose `repo` property is in `repo_ids`.
 
@@ -304,6 +309,14 @@ class InMemoryGraphStore(BaseGraphStore):
             for node_id, labels in self.labels.items()
             if label in labels and self.nodes.get(node_id, {}).get("repo") == repo
         )
+
+    def list_repositories(self) -> list[dict[str, Any]]:
+        nodes = [
+            dict(self.nodes[node_id])
+            for node_id, labels in self.labels.items()
+            if "Repository" in labels
+        ]
+        return sorted(nodes, key=lambda node: str(node.get("id", "")))
 
     def delete_repository(self, repo_ids: Sequence[str]) -> None:
         wanted = set(repo_ids)
@@ -848,6 +861,11 @@ class Neo4jGraphStore(BaseGraphStore):
         with self.driver.session(database=self.database) as session:
             record = session.run(query, repo=repo).single()
         return int(record["c"]) if record else 0
+
+    def list_repositories(self) -> list[dict[str, Any]]:
+        query = "MATCH (r:Repository) RETURN r ORDER BY r.id"
+        with self.driver.session(database=self.database) as session:
+            return [dict(record["r"]) for record in session.run(query)]
 
     def delete_repository(self, repo_ids: Sequence[str]) -> None:
         if not repo_ids:

@@ -14,7 +14,7 @@ from app.schemas.ask import AskResponse
 from app.schemas.decisions import DecisionDetail, DecisionListResponse
 from app.schemas.entities import EntityListResponse
 from app.schemas.graph import GraphResponse
-from app.schemas.repository import RepositoryResponse
+from app.schemas.repository import RepositoryListResponse, RepositoryResponse
 from scripts.export_contract import CONTRACT_SPECS, build_payload
 
 CONTRACT_DIR = Path(__file__).resolve().parents[3] / "contract"
@@ -31,11 +31,13 @@ EXPECTED_FILES = {
     "decisions.json": DecisionListResponse,
     "entities.json": EntityListResponse,
     "repository.json": RepositoryResponse,
+    "repositories.json": RepositoryListResponse,
 }
 
 EXPECTED_PATHS = {
     "/api/v1/health",
     "/api/v1/health/dependencies",
+    "/api/v1/repositories",
     "/api/v1/repositories/{repository_id}",
     "/api/v1/repositories/{repository_id}/entities",
     "/api/v1/repositories/{repository_id}/ask",

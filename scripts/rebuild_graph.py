@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import json
 import logging
 import sys
@@ -264,6 +265,8 @@ def rebuild_graph(
         "url": f"https://github.com/{repo}",
         "default_branch": "main",
         "created_at": "2026-01-01T00:00:00Z",
+        # When this build wrote the node, so a caller can tell how fresh the graph is.
+        "last_rebuilt_at": datetime.now(timezone.utc).isoformat(),
         **repository_counts(cache, repo, coverage),
     })
 

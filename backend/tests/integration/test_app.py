@@ -25,6 +25,7 @@ def test_openapi_lists_every_route(client) -> None:
     assert set(paths) == {
         f"{API}/health",
         f"{API}/health/dependencies",
+        f"{API}/repositories",
         f"{API}/repositories/{{repository_id}}",
         f"{API}/repositories/{{repository_id}}/entities",
         f"{API}/repositories/{{repository_id}}/ask",
@@ -67,6 +68,16 @@ def test_repository_endpoint(client) -> None:
     assert payload["id"] == REPOSITORY_ID
     assert payload["fixture"] is True
     assert payload["counts"]["decisions"] == 5
+
+
+def test_repository_list_endpoint(client) -> None:
+    payload = client.get(f"{API}/repositories").json()
+    assert payload["fixture"] is True
+    assert [item["id"] for item in payload["items"]] == [REPOSITORY_ID]
+    item = payload["items"][0]
+    assert item["name"] == "netclient"
+    assert item["counts"]["decisions"] == 5
+    assert item["verified_decisions"] is None
 
 
 def test_unknown_repository_is_404(client) -> None:
@@ -285,8 +296,11 @@ def test_repository_routes_use_a_slug_converter(client) -> None:
     from app.api.routes_repositories import router as repositories_router
 
     for route in repositories_router.routes:
-        assert "{repository_id}" in route.path_format
         assert ":path" not in route.path_format
+        # The collection route takes no id; every route that names one must use the
+        # single-segment converter so a repository id can never contain a slash.
+        if route.path_format != "/repositories":
+            assert "{repository_id}" in route.path_format
 
 
 def test_a_repository_id_containing_a_slash_is_not_accepted(client) -> None:

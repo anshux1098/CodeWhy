@@ -194,6 +194,10 @@ def test_coverage_counts_are_identical_across_two_rebuilds(tmp_path: Path) -> No
     second_repo = dict(store.get_node(SLUG))
 
     assert first_entity == second_entity
+    # The rebuild timestamp legitimately differs between the two runs; every count
+    # must not. Compare the node with that one volatile key removed.
+    first_repo.pop("last_rebuilt_at", None)
+    second_repo.pop("last_rebuilt_at", None)
     assert first_repo == second_repo
 
 
