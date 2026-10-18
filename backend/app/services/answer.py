@@ -212,8 +212,13 @@ def _no_verified_quote_response(
     gap: str,
     wording: str,
     is_real: bool,
+    store: Optional[Any] = None,
 ) -> AskResponse:
     """The shared G3-failure answer: a change is known, its rationale is not verifiable."""
+    gaps = [gap]
+    note = _partial_coverage_note(store, entity.id)
+    if note:
+        gaps.append(note)
     conf = calculate_confidence(
         directness=0.0,
         provenance=0.6,
@@ -229,10 +234,70 @@ def _no_verified_quote_response(
         entity=entity,
         decisions=decisions,
         citations=[],
-        evidence_gaps=[gap],
+        evidence_gaps=gaps,
         confidence=conf,
         fixture=not is_real,
     )
+
+
+def _coverage_node(store: Optional[Any], node_id: str) -> Optional[dict[str, Any]]:
+    if store is None or not node_id:
+        return None
+    getter = getattr(store, "get_node", None)
+    if getter is None:
+        return None
+    try:
+        return getter(node_id)
+    except Exception:  # pragma: no cover - a store that cannot answer is treated as unknown
+        return None
+
+
+def _no_decision_path_gap(store: Optional[Any], entity_id: str) -> str:
+    """Say what was checked for this entity, from the coverage stored at rebuild time.
+
+    The wording states the counts that were stored; it never claims that no history
+    exists. A graph built before coverage was stored keeps the old wording.
+    """
+    node = _coverage_node(store, entity_id)
+    if not node or "prs_touching" not in node:
+        return "No decision path connected via GOVERNS in the knowledge graph"
+    touching = int(node.get("prs_touching") or 0)
+    analyzed = int(node.get("prs_analyzed") or 0)
+    noise = int(node.get("prs_noise_skipped") or 0)
+    if touching == 0:
+        return "No PR in the ingested history touches this file."
+    if analyzed == 0:
+        return f"This file is touched by {touching} PRs but none were analyzed yet."
+    return (
+        f"{analyzed} of {touching} PRs touching this file were analyzed "
+        f"({noise} skipped as noise); no verified decision was found."
+    )
+
+
+def _entity_not_found_gap(store: Optional[Any], repository_id: Optional[str]) -> str:
+    """Report the scope that was searched, from the Repository node."""
+    node = _coverage_node(store, repository_id or "")
+    scope = node.get("scope") if node else None
+    if scope:
+        return f"This system covers {scope}; no matching file was found."
+    return "No matching file, module, or configuration key found"
+
+
+def _partial_coverage_note(store: Optional[Any], entity_id: str) -> Optional[str]:
+    """How many PRs touching this entity were not analyzed, from the stored counts.
+
+    Returns None when the entity was fully accounted for, so the note appears only
+    when there is something to disclose. The answer, outcome and confidence are not
+    changed by this note.
+    """
+    node = _coverage_node(store, entity_id)
+    if not node or "prs_not_analyzed" not in node:
+        return None
+    not_analyzed = int(node.get("prs_not_analyzed") or 0)
+    if not_analyzed <= 0:
+        return None
+    touching = int(node.get("prs_touching") or 0)
+    return f"{not_analyzed} of {touching} PRs touching this file were not analyzed."
 
 
 def _quote_still_matches_source(
@@ -275,6 +340,7 @@ def generate_answer(
     min_score: Optional[float] = None,
     store: Optional[Any] = None,
     cfg: Optional[Settings] = None,
+    repository_id: Optional[str] = None,
 ) -> AskResponse:
     """End-to-end question answering pipeline enforcing the 4-gate refusal system and citation verification."""
 
@@ -311,7 +377,7 @@ def generate_answer(
                 outcome=Outcome.REFUSAL,
                 reason_code=ReasonCode.ENTITY_NOT_FOUND,
                 answer="I could not find a matching code entity in the repository history for this question.",
-                evidence_gaps=["No matching file, module, or configuration key found"],
+                evidence_gaps=[_entity_not_found_gap(store, repository_id)],
                 fixture=not is_real,
             )
 
@@ -349,7 +415,7 @@ def generate_answer(
                         contradiction=0.0,
                     ),
                 ),
-                evidence_gaps=["No decision path connected via GOVERNS in the knowledge graph"],
+                evidence_gaps=[_no_decision_path_gap(store, resolution.entity.id)],
                 fixture=not is_real,
             )
 
@@ -427,6 +493,10 @@ def generate_answer(
             temporal_consistency=1.0,
             contradiction=1.0 if bundle.has_contradiction else 0.0,
         )
+        partial_gaps = ["No verbatim verified quote explaining the original rationale exists"]
+        note = _partial_coverage_note(store, resolution.entity.id)
+        if note:
+            partial_gaps.append(note)
         return AskResponse(
             outcome=Outcome.PARTIAL,
             reason_code=ReasonCode.NO_VERIFIED_QUOTE,
@@ -437,7 +507,7 @@ def generate_answer(
             entity=entity_obj,
             decisions=decisions_list,
             citations=[],  # no_verified_quote forbids citations
-            evidence_gaps=["No verbatim verified quote explaining the original rationale exists"],
+            evidence_gaps=partial_gaps,
             confidence=conf,
             fixture=not is_real,
         )
@@ -471,6 +541,7 @@ def generate_answer(
                 "the stored source."
             ),
             is_real=is_real,
+            store=store,
         )
 
     def cite(item: RetrievedEvidenceItem) -> Citation:
@@ -554,6 +625,11 @@ def generate_answer(
         store=store,
     )
 
+    answer_gaps = [] if outcome == Outcome.FULL else ["Partial evidence coverage"]
+    note = _partial_coverage_note(store, resolution.entity.id)
+    if note:
+        answer_gaps.append(note)
+
     return AskResponse(
         outcome=outcome,
         reason_code=reason_code,
@@ -561,7 +637,7 @@ def generate_answer(
         entity=entity_obj,
         decisions=decisions_list,
         citations=valid_citations,
-        evidence_gaps=[] if outcome == Outcome.FULL else ["Partial evidence coverage"],
+        evidence_gaps=answer_gaps,
         confidence=conf,
         who_to_ask=who_to_ask_list,
         code_differs_from_latest=bundle.current_value_differs if bundle else None,

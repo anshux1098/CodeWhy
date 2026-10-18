@@ -295,6 +295,7 @@ class GraphDataSource:
             is_real=self.is_real,
             min_score=self.settings.min_score,
             cfg=self.settings,
+            repository_id=repository_id,
         )
 
     def get_decision(self, decision_id: str) -> DecisionDetail:

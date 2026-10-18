@@ -709,6 +709,23 @@ class SqliteCache:
             params,
         )]
 
+    def commit_window(self, repo: str) -> dict[str, Any]:
+        """The stored commit history window: oldest and newest commit, and the count.
+
+        Used to describe what a rebuild actually analysed. Read from the commit
+        table because the history window is provenance, not a decision.
+        """
+        row = self._connection.execute(
+            "SELECT MIN(committed_at) AS oldest, MAX(committed_at) AS newest, "
+            "COUNT(*) AS commits FROM commits WHERE repo = ?",
+            (repo,),
+        ).fetchone()
+        return {
+            "oldest": row["oldest"],
+            "newest": row["newest"],
+            "commits": int(row["commits"] or 0),
+        }
+
     def iter_documents(self, repo: Optional[str] = None) -> list[dict[str, Any]]:
         """Every stored document, keyed by path."""
         where = " AND repo = ?" if repo else ""
