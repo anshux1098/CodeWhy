@@ -44,7 +44,10 @@ EXPECTED_PATHS = {
 
 
 def test_contract_directory_contains_exactly_the_expected_files() -> None:
-    assert {path.name for path in CONTRACT_DIR.glob("*.json")} == set(EXPECTED_FILES) | {"openapi.json"}
+    assert {path.name for path in CONTRACT_DIR.glob("*.json")} == set(EXPECTED_FILES) | {
+        "openapi.json",
+        "openapi.v1.json",
+    }
 
 
 @pytest.mark.parametrize(("name", "model"), sorted(EXPECTED_FILES.items()))
