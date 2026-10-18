@@ -401,3 +401,19 @@ def test_stage_seven_describes_noise_filtering_as_wired(walkthrough_env, capsys)
     assert "filtering is not wired in" not in text
     assert "pull requests are labelled and excluded" in text
     assert "commits are not assessed" in text
+
+
+def test_every_stage_has_a_how_to_read_it_section(walkthrough_env, capsys):
+    db_path, report = walkthrough_env
+
+    walkthrough.main(
+        [
+            "--stage", "8", "--cache", str(db_path), "--out", str(report),
+            "--no-color", "--repo", REPO,
+        ],
+        store=_seeded_store(),
+        settings=Settings(_env_file=None, data_source="graph", offline=True),
+    )
+
+    text = report.read_text(encoding="utf-8")
+    assert text.count("HOW TO READ IT:") == len(walkthrough.STAGES)

@@ -600,6 +600,10 @@ def stage_not_built(ctx: Context) -> None:
     )
     r.line("  - languages: Python and configuration files only")
     r.line(f"  - repositories: this walkthrough reads {ctx.repo}; more need a separate ingest")
+    r.line()
+    r.line("HOW TO READ IT:")
+    r.line("  Each line is a gap checked against the code, not a stored claim. A line that")
+    r.line("  names a count is reading the cache now; when a gap is closed, the line changes.")
 
 
 def stage_selfcheck(ctx: Context) -> None:
@@ -627,6 +631,10 @@ def stage_selfcheck(ctx: Context) -> None:
     r.line(f"self-check: {passed}/{len(ctx.checks)} passed")
     if not ctx.with_llm:
         r.line("LLM calls made: 0 (the model was never consulted)")
+    r.line()
+    r.line("HOW TO READ IT:")
+    r.line("  Every line is a live check over the cache and the graph, not a stored result.")
+    r.line("  Any [FAIL] means the run exits non-zero, so a report with a failure is not a pass.")
 
 
 # ---------------------------------------------------------------------------
