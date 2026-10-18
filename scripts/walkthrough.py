@@ -410,6 +410,17 @@ def stage_graph(ctx: Context) -> None:
     r.line(f"nodes {counts['nodes']}, relationships {counts['relationships']}")
     r.line("nodes by label: " + _counts(Counter(labels)))
     r.line("relationships by type: " + _counts(Counter(rel_types)))
+    repo_node = store.get_node(ctx.repo)
+    if repo_node and "scope" in repo_node:
+        r.line(
+            f"coverage: {repo_node.get('prs_fetched', 0)} PRs fetched, "
+            f"{repo_node.get('sources_analyzed', 0)} sources analyzed, "
+            f"{repo_node.get('prs_noise_skipped', 0)} PRs noise-skipped, "
+            f"{repo_node.get('verified_decisions', 0)} verified decisions"
+        )
+        r.line(f"  scope: {repo_node.get('scope')}")
+        r.line("  coverage counts are stored at rebuild time, so a refusal can say")
+        r.line("  what was checked without reading the cache.")
     states = store.index_states()
     if states:
         r.line("indexes: " + ", ".join(f"{name}={state}" for name, state in states.items()))

@@ -328,6 +328,42 @@ def test_the_report_is_plain_text_without_ansi(walkthrough_env, capsys):
     assert "\x1b[" not in report.read_text(encoding="utf-8")
 
 
+def _covered_store():
+    from app.stores.graph_store import InMemoryGraphStore
+
+    store = InMemoryGraphStore()
+    store.merge_node("Repository", {
+        "id": REPO, "repo": REPO, "name": "netclient",
+        "scope": "acme/netclient at branch main, commits 2024-01-01..2024-02-01, 12 ingested file paths",
+        "prs_fetched": 5, "sources_analyzed": 3, "prs_noise_skipped": 2, "verified_decisions": 1,
+    })
+    store.merge_node("CodeEntity", {
+        "id": "file:acme/netclient:src/netclient/retry.py", "repo": REPO,
+        "name": "src/netclient/retry.py", "path": "src/netclient/retry.py", "entity_type": "File",
+        "prs_touching": 5, "prs_analyzed": 3, "prs_noise_skipped": 2,
+        "prs_not_analyzed": 0, "verified_decisions": 1,
+    })
+    return store
+
+
+def test_stage_three_reports_the_stored_coverage(walkthrough_env, capsys):
+    db_path, report = walkthrough_env
+
+    code = walkthrough.main(
+        [
+            "--stage", "4", "--cache", str(db_path), "--out", str(report),
+            "--no-color", "--repo", REPO,
+        ],
+        store=_covered_store(),
+        settings=Settings(_env_file=None, data_source="graph", offline=True),
+    )
+
+    assert code == 0
+    text = report.read_text(encoding="utf-8")
+    assert "coverage: 5 PRs fetched, 3 sources analyzed, 2 PRs noise-skipped, 1 verified decisions" in text
+    assert "scope: acme/netclient at branch main" in text
+
+
 def _http2_store():
     from app.stores.graph_store import InMemoryGraphStore
 
