@@ -589,11 +589,15 @@ def stage_confidence(ctx: Context) -> None:
 
 def stage_not_built(ctx: Context) -> None:
     r = ctx.reporter
+    excluded = len(ctx.cache.noisy_record_ids(ctx.cache_repo))
     r.line("Honest list of what this project does not do yet:")
     r.line("  - supersession history: decisions carry a state, but every one is ACTIVE")
     r.line("  - vector retrieval: the 384-dim index is created but not queried")
     r.line("  - configuration history: config keys are stored, value changes are not built")
-    r.line("  - noise filtering: labels and reasons exist, filtering is not wired in")
+    r.line(
+        f"  - noise filtering: pull requests are labelled and excluded ({excluded} now); "
+        "commits are not assessed"
+    )
     r.line("  - languages: Python and configuration files only")
     r.line(f"  - repositories: this walkthrough reads {ctx.repo}; more need a separate ingest")
 

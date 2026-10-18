@@ -383,3 +383,21 @@ def test_the_walkthrough_resolves_a_text_only_question_like_the_api():
 
     text = "\n".join(context.reporter.lines)
     assert "entity: src/netclient/ssl_.py" in text
+
+
+def test_stage_seven_describes_noise_filtering_as_wired(walkthrough_env, capsys):
+    db_path, report = walkthrough_env
+
+    walkthrough.main(
+        [
+            "--stage", "7", "--cache", str(db_path), "--out", str(report),
+            "--no-color", "--repo", REPO,
+        ],
+        store=_seeded_store(),
+        settings=Settings(_env_file=None, data_source="graph", offline=True),
+    )
+
+    text = report.read_text(encoding="utf-8")
+    assert "filtering is not wired in" not in text
+    assert "pull requests are labelled and excluded" in text
+    assert "commits are not assessed" in text
