@@ -206,6 +206,12 @@ def rebuild_graph(
     # addressed by the slug while `full_name` keeps the raw `owner/name`.
     slug = to_api_id(repo)
 
+    # A rebuild replaces the repository, it does not merge into the old graph. Rows
+    # from an earlier run survive a MERGE forever, including decisions whose quote no
+    # longer verifies and source nodes from before the slug change. Clear both id
+    # forms for this repository only; other repositories in the same database stay.
+    store.delete_repository((slug, repo))
+
     # 1. Repository node. Its id is the slug the API addresses it by; every other
     #    node carries the same slug as its `repo` property so a lookup matches.
     parts = repo.split("/")

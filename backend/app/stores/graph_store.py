@@ -152,6 +152,16 @@ class BaseGraphStore(ABC):
         ...
 
     @abstractmethod
+    def delete_repository(self, repo_ids: Sequence[str]) -> None:
+        """Remove every node whose `repo` property is in `repo_ids`.
+
+        A rebuild calls this before loading so stale nodes from earlier builds cannot
+        survive. Both the API slug and the raw owner/name are passed while old graph
+        rows may use either form.
+        """
+        ...
+
+    @abstractmethod
     def get_subgraph(
         self,
         repo: str,
@@ -275,6 +285,20 @@ class InMemoryGraphStore(BaseGraphStore):
             for node_id, labels in self.labels.items()
             if label in labels and self.nodes.get(node_id, {}).get("repo") == repo
         )
+
+    def delete_repository(self, repo_ids: Sequence[str]) -> None:
+        wanted = set(repo_ids)
+        stale = {
+            node_id
+            for node_id, properties in self.nodes.items()
+            if properties.get("repo") in wanted
+        }
+        for node_id in stale:
+            self.nodes.pop(node_id, None)
+            self.labels.pop(node_id, None)
+            self.source_texts.pop(node_id, None)
+        for edge in [edge for edge in self.edges if edge[0] in stale or edge[2] in stale]:
+            self.edges.pop(edge, None)
 
     def init_schema(self) -> None:
         # In-memory stores have implicit constraints
@@ -739,6 +763,13 @@ class Neo4jGraphStore(BaseGraphStore):
         with self.driver.session(database=self.database) as session:
             record = session.run(query, repo=repo).single()
         return int(record["c"]) if record else 0
+
+    def delete_repository(self, repo_ids: Sequence[str]) -> None:
+        if not repo_ids:
+            return
+        query = "MATCH (n) WHERE n.repo IN $repo_ids DETACH DELETE n"
+        with self.driver.session(database=self.database) as session:
+            session.run(query, repo_ids=list(repo_ids))
 
     def source_text_for(self, source_id: str) -> str:
         """The corpus stored on a source node, so a quote can be re-verified.
