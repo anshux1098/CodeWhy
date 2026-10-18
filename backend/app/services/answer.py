@@ -212,8 +212,13 @@ def _no_verified_quote_response(
     gap: str,
     wording: str,
     is_real: bool,
+    store: Optional[Any] = None,
 ) -> AskResponse:
     """The shared G3-failure answer: a change is known, its rationale is not verifiable."""
+    gaps = [gap]
+    note = _partial_coverage_note(store, entity.id)
+    if note:
+        gaps.append(note)
     conf = calculate_confidence(
         directness=0.0,
         provenance=0.6,
@@ -229,7 +234,7 @@ def _no_verified_quote_response(
         entity=entity,
         decisions=decisions,
         citations=[],
-        evidence_gaps=[gap],
+        evidence_gaps=gaps,
         confidence=conf,
         fixture=not is_real,
     )
@@ -276,6 +281,23 @@ def _entity_not_found_gap(store: Optional[Any], repository_id: Optional[str]) ->
     if scope:
         return f"This system covers {scope}; no matching file was found."
     return "No matching file, module, or configuration key found"
+
+
+def _partial_coverage_note(store: Optional[Any], entity_id: str) -> Optional[str]:
+    """How many PRs touching this entity were not analyzed, from the stored counts.
+
+    Returns None when the entity was fully accounted for, so the note appears only
+    when there is something to disclose. The answer, outcome and confidence are not
+    changed by this note.
+    """
+    node = _coverage_node(store, entity_id)
+    if not node or "prs_not_analyzed" not in node:
+        return None
+    not_analyzed = int(node.get("prs_not_analyzed") or 0)
+    if not_analyzed <= 0:
+        return None
+    touching = int(node.get("prs_touching") or 0)
+    return f"{not_analyzed} of {touching} PRs touching this file were not analyzed."
 
 
 def _quote_still_matches_source(
@@ -471,6 +493,10 @@ def generate_answer(
             temporal_consistency=1.0,
             contradiction=1.0 if bundle.has_contradiction else 0.0,
         )
+        partial_gaps = ["No verbatim verified quote explaining the original rationale exists"]
+        note = _partial_coverage_note(store, resolution.entity.id)
+        if note:
+            partial_gaps.append(note)
         return AskResponse(
             outcome=Outcome.PARTIAL,
             reason_code=ReasonCode.NO_VERIFIED_QUOTE,
@@ -481,7 +507,7 @@ def generate_answer(
             entity=entity_obj,
             decisions=decisions_list,
             citations=[],  # no_verified_quote forbids citations
-            evidence_gaps=["No verbatim verified quote explaining the original rationale exists"],
+            evidence_gaps=partial_gaps,
             confidence=conf,
             fixture=not is_real,
         )
@@ -515,6 +541,7 @@ def generate_answer(
                 "the stored source."
             ),
             is_real=is_real,
+            store=store,
         )
 
     def cite(item: RetrievedEvidenceItem) -> Citation:
@@ -598,6 +625,11 @@ def generate_answer(
         store=store,
     )
 
+    answer_gaps = [] if outcome == Outcome.FULL else ["Partial evidence coverage"]
+    note = _partial_coverage_note(store, resolution.entity.id)
+    if note:
+        answer_gaps.append(note)
+
     return AskResponse(
         outcome=outcome,
         reason_code=reason_code,
@@ -605,7 +637,7 @@ def generate_answer(
         entity=entity_obj,
         decisions=decisions_list,
         citations=valid_citations,
-        evidence_gaps=[] if outcome == Outcome.FULL else ["Partial evidence coverage"],
+        evidence_gaps=answer_gaps,
         confidence=conf,
         who_to_ask=who_to_ask_list,
         code_differs_from_latest=bundle.current_value_differs if bundle else None,
