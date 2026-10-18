@@ -13,6 +13,7 @@ reads the developer's `.env` or reaches a service.
 
 from __future__ import annotations
 
+import io
 import json
 import sqlite3
 import sys
@@ -417,3 +418,65 @@ def test_every_stage_has_a_how_to_read_it_section(walkthrough_env, capsys):
 
     text = report.read_text(encoding="utf-8")
     assert text.count("HOW TO READ IT:") == len(walkthrough.STAGES)
+
+def test_stage_seven_shows_the_http2_supersession(walkthrough_env, capsys):
+    db_path, report = walkthrough_env
+    cache = walkthrough.SqliteCache(db_path)
+    add_id = "dec_6dee7648b9ef5416"
+    revert_id = "dec_ce303eb845540d38"
+    add_source = "pr:acme/netclient#3456"
+    revert_source = "pr:acme/netclient#3466"
+    for decision_id, source_id, summary, day in (
+        (add_id, add_source, "Add TLS settings required for HTTP/2", "2024-01-01"),
+        (revert_id, revert_source, "Revert the addition of TLS settings for HTTP/2", "2024-01-02"),
+    ):
+        cache.put_decision({
+            "id": decision_id, "source_id": source_id, "repo": REPO,
+            "summary": summary, "decision_type": "design", "rationale": summary,
+            "state": "ACTIVE", "affected_entities": [SSL], "source_references": [source_id],
+            "decision_date": day, "source_author": "octo",
+            "explicit_reversal_language": False, "unknown_fields": [],
+            "quote_verified": True, "reason_unstated": False,
+            "extraction_version": "v1", "content_hash": f"hash-{decision_id}",
+            "created_at": f"{day}T00:00:00+00:00",
+        })
+    for link_id, source_id, target_id, rel, derivation, metadata in (
+        (
+            "link:commit:1e94:PART_OF:pr:acme/netclient#3466",
+            "commit:1e94", revert_source, "PART_OF", "pr_reference", {},
+        ),
+        (
+            "link:commit:d480:PART_OF:pr:acme/netclient#3456",
+            "commit:d480", add_source, "PART_OF", "pr_reference", {},
+        ),
+        (
+            "link:commit:1e94:REVERTS:commit:d480",
+            "commit:1e94", "commit:d480", "REVERTS", "revert_message",
+            {"matched_text": "This reverts commit d480"},
+        ),
+    ):
+        cache.put_link({
+            "id": link_id, "repo": REPO, "source_id": source_id,
+            "source_type": "Commit", "rel_type": rel, "target_id": target_id,
+            "target_type": "Commit" if rel == "REVERTS" else "PullRequest",
+            "is_direct": 1, "derivation_method": derivation, "confidence": 1.0,
+            "metadata_json": metadata, "created_at": "2024-01-01T00:00:00+00:00",
+        })
+    cache.close()
+
+    walkthrough.main(
+        [
+            "--stage", "7", "--cache", str(db_path), "--out", str(report),
+            "--no-color", "--repo", REPO,
+        ],
+        store=_seeded_store(),
+        settings=Settings(_env_file=None, data_source="graph", offline=True),
+    )
+
+    text = report.read_text(encoding="utf-8")
+    assert "#3456" in text
+    assert "SUPERSEDED" in text
+    assert "#3466" in text
+    assert "1_revert_commit" in text
+    assert "This reverts commit d480" in text
+    assert "every one is ACTIVE" not in text

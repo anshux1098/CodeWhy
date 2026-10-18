@@ -54,6 +54,8 @@ from app.services.entity_resolution import (
 from app.services.gate import GateOutcome, evaluate_refusal_gate
 from app.services.quote_check import verify_quote
 from app.services.retrieval import retrieve_evidence
+from app.services.state import compute_decision_states
+from app.services.supersession import compute_supersession_edges
 from app.stores.graph_store import BaseGraphStore, get_graph_store
 from app.stores.sqlite_cache import SqliteCache, redact_emails, redact_secrets
 
@@ -587,11 +589,54 @@ def stage_confidence(ctx: Context) -> None:
     r.line("  and author count once, so two quotes from one thread do not inflate it.")
 
 
+def _show_supersession(ctx: Context) -> None:
+    r = ctx.reporter
+    decisions = [
+        dict(row) for row in ctx.cache.decisions_for_repo(ctx.cache_repo)
+        if row["quote_verified"]
+    ]
+    links = [dict(row) for row in ctx.cache.links_for(ctx.cache_repo)]
+    edges = compute_supersession_edges(decisions, links=links)
+    states = compute_decision_states(decisions, edges=edges)
+    target = _decision_for_number(decisions, 3456)
+    edge = next(
+        (e for e in edges if target is not None and e.target_decision_id == target["id"]),
+        None,
+    )
+    if target is None or edge is None:
+        r.line("Supersession in the stored history: no confirmed edge is stored yet.")
+        r.line()
+        return
+
+    reverter = next((d for d in decisions if d["id"] == edge.source_decision_id), None)
+    target_state = states.states[target["id"]].state.value
+    reverter_state = (
+        states.states[reverter["id"]].state.value if reverter is not None else "(unknown)"
+    )
+    link = next((row for row in links if row["id"] == edge.source_evidence_id), None)
+    matched_text = ""
+    if link is not None:
+        try:
+            matched_text = json.loads(link["metadata_json"] or "{}").get("matched_text", "")
+        except (TypeError, ValueError):
+            matched_text = ""
+
+    r.line("Supersession in the stored history:")
+    r.line(
+        f"  #3456 ({target['id']}) is {target_state} by "
+        f"#3466 ({edge.source_decision_id})."
+    )
+    r.line(f"  #3466 state: {reverter_state}")
+    r.line(f"  rule: {edge.rule}; method: {edge.method}; confidence: {edge.confidence}")
+    r.line(f"  matched text: {matched_text or '(not recorded)'}")
+    r.line()
+
+
 def stage_not_built(ctx: Context) -> None:
     r = ctx.reporter
     excluded = len(ctx.cache.noisy_record_ids(ctx.cache_repo))
+    _show_supersession(ctx)
     r.line("Honest list of what this project does not do yet:")
-    r.line("  - supersession history: decisions carry a state, but every one is ACTIVE")
     r.line("  - vector retrieval: the 384-dim index is created but not queried")
     r.line("  - configuration history: config keys are stored, value changes are not built")
     r.line(
