@@ -6,7 +6,9 @@ that quietly turns a real answer into a refusal (or leaks the system prompt) fai
 a test instead of only being noticed on the next manual run.
 
 Set RUN_LIVE=1 to run it against the live graph and the real model. It is skipped
-by default because it needs Neo4j and an LLM, and it spends real tokens.
+by default because it needs Neo4j and an LLM, and it spends real tokens. The test
+reads `.env` itself and forces `offline=False`, so RUN_LIVE=1 alone uses the real
+embedder; if that embedder is unavailable the test fails instead of skipping.
 """
 
 from __future__ import annotations
@@ -50,16 +52,26 @@ def test_live_answer_scenarios() -> None:
     if os.environ.get("RUN_LIVE") != "1":
         pytest.skip("set RUN_LIVE=1 to ask the live graph with the real model")
 
-    from app.config import settings as global_settings
+    from app.config import Settings
+    from app.providers.embeddings import (
+        SentenceTransformersProvider,
+        get_embedding_provider,
+    )
     from app.schemas.ask import AskRequest
     from app.services.answer import get_answer_system_prompt
     from app.services.data_source import GraphDataSource
 
-    global_settings.require_neo4j()
-    global_settings.require_llm()
+    live_settings = Settings(_env_file=REPO_ROOT / ".env", offline=False)
+    live_settings.require_neo4j()
+    live_settings.require_llm()
+
+    embedder = get_embedding_provider(cfg=live_settings)
+    assert isinstance(embedder, SentenceTransformersProvider), (
+        "live test needs the real embedder: install the embeddings extra and set OFFLINE=0"
+    )
 
     script = _check_script()
-    source = GraphDataSource(global_settings)
+    source = GraphDataSource(live_settings)
     try:
         for name, question, entity_id in script.QUESTIONS:
             payload = {"question": question}
