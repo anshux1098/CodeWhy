@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Final, Optional, Protocol, runtime_checkable
 
 from app.config import Settings, settings
 from app.services.errors import DataSourceError
@@ -43,6 +43,25 @@ class DataSource(Protocol):
     def get_decision(self, decision_id: str) -> DecisionDetail: ...
     def get_graph(self, repository_id: str, entity_id: str | None) -> GraphResponse: ...
 
+
+
+#: Node properties too large or too internal for a UI payload. `embedding` is a
+#: 384-float vector and `text` is a source's full corpus; `labels` is store plumbing.
+_GRAPH_DROP_PROPS: Final[frozenset[str]] = frozenset({"embedding", "text", "labels"})
+
+#: Relationship keys that are the edge itself rather than its properties. `rule` is
+#: kept in `props` as well so an edge carries its rule and method together.
+_GRAPH_EDGE_KEYS: Final[frozenset[str]] = frozenset({"from", "to", "type"})
+
+
+def graph_node_props(node: dict) -> dict:
+    """A node's properties, minus the huge or internal ones, for the /graph payload."""
+    return {key: value for key, value in node.items() if key not in _GRAPH_DROP_PROPS}
+
+
+def graph_edge_props(rel: dict) -> dict:
+    """An edge's properties, excluding the endpoints, type and the dedicated `rule`."""
+    return {key: value for key, value in rel.items() if key not in _GRAPH_EDGE_KEYS}
 
 
 def source_ref_for(node: dict) -> SourceRef:
@@ -340,22 +359,33 @@ class GraphDataSource:
             # tell the caller the entity has no history when it is not in the graph.
             raise NotFoundError(f"entity {entity_id!r} not found")
 
+        cap = self.settings.max_graph_nodes
         subgraph = self.store.get_subgraph(
             repo=repository_id,
             entity_id=entity_id,
-            node_cap=self.settings.max_graph_nodes,
+            node_cap=cap,
         )
 
         nodes: list[GraphNode] = []
         known_ids: set[str] = set()
+        # The store reports whether it stopped short of the graph it was asked for.
+        # A caller that also hits the cap here, or drops a node to the cap, is
+        # truncating too, so the flag is carried forward rather than declared false.
+        truncated = bool(subgraph.get("truncated", False))
 
         for n in subgraph.get("nodes", []):
             nid = n.get("id", n.get("login", ""))
-            if nid and nid not in known_ids and len(nodes) < self.settings.max_graph_nodes:
-                known_ids.add(nid)
-                ntype = n.get("labels", ["Node"])[0] if n.get("labels") else "Node"
-                label = n.get("name", n.get("summary", nid))
-                nodes.append(GraphNode(id=nid, label=label, type=ntype, props={}))
+            if not nid or nid in known_ids:
+                continue
+            if len(nodes) >= cap:
+                truncated = True
+                continue
+            known_ids.add(nid)
+            ntype = n.get("labels", ["Node"])[0] if n.get("labels") else "Node"
+            label = n.get("name", n.get("summary", nid))
+            nodes.append(
+                GraphNode(id=nid, label=label, type=ntype, props=graph_node_props(n))
+            )
 
         edges: list[GraphEdge] = []
         for r in subgraph.get("relationships", []):
@@ -368,13 +398,14 @@ class GraphDataSource:
                         target=tgt,
                         type=r.get("type", "CONNECTED"),
                         rule=r.get("rule"),
+                        props=graph_edge_props(r),
                     )
                 )
 
         return GraphResponse(
             nodes=nodes,
             edges=edges,
-            truncated=False,
+            truncated=truncated,
             fixture=not self.is_real,
         )
 

@@ -442,12 +442,15 @@ class InMemoryGraphStore(BaseGraphStore):
                     node_ids.add(f)
                     node_ids.add(t)
         else:
+            # Gather one past the cap so "exactly at the cap, but more existed" is
+            # distinguishable from "the graph is smaller than the cap".
             for n_id, props in self.nodes.items():
                 if props.get("repo") == repo:
                     node_ids.add(n_id)
-                if len(node_ids) >= node_cap:
+                if len(node_ids) > node_cap:
                     break
 
+        truncated = len(node_ids) > node_cap
         selected_nodes = [
             {**self.nodes[n_id], "labels": list(self.labels.get(n_id, []))}
             for n_id in list(node_ids)[:node_cap]
@@ -460,7 +463,7 @@ class InMemoryGraphStore(BaseGraphStore):
             for (f, r, t), props in self.edges.items()
             if f in active_ids and t in active_ids
         ]
-        return {"nodes": selected_nodes, "relationships": selected_edges}
+        return {"nodes": selected_nodes, "relationships": selected_edges, "truncated": truncated}
 
     def get_links_for_repo(self, repo: str) -> list[dict[str, Any]]:
         res: list[dict[str, Any]] = []
@@ -677,11 +680,15 @@ class Neo4jGraphStore(BaseGraphStore):
         node_cap: int = 80,
     ) -> dict[str, Any]:
         with self.driver.session(database=self.database) as session:
+            # Ask for one node past the cap: if it comes back, the graph held more than
+            # the cap and the response is truncated. Without the extra node an exactly
+            # full result is indistinguishable from a complete one.
+            probe_cap = node_cap + 1
             if entity_id:
                 result = session.run(
                     GET_SUBGRAPH_FOR_ENTITY,
                     entity_id=entity_id,
-                    node_cap=node_cap,
+                    node_cap=probe_cap,
                 )
             else:
                 # Seeded from the repository's Decision nodes so the view is the
@@ -689,7 +696,7 @@ class Neo4jGraphStore(BaseGraphStore):
                 result = session.run(
                     GET_SUBGRAPH_FOR_REPOSITORY,
                     repo=repo,
-                    node_cap=node_cap,
+                    node_cap=probe_cap,
                 )
             nodes: list[dict[str, Any]] = []
             seen: set[str] = set()
@@ -704,6 +711,9 @@ class Neo4jGraphStore(BaseGraphStore):
                     continue
                 seen.add(str(nid))
                 nodes.append(props)
+
+            truncated = len(nodes) > node_cap
+            nodes = nodes[:node_cap]
 
             # Edges between the returned nodes. Without this the /graph endpoint
             # rendered an empty relationship list even when the graph had them. The
@@ -726,7 +736,7 @@ class Neo4jGraphStore(BaseGraphStore):
                     if props:
                         edge.update(dict(props))
                     relationships.append(edge)
-            return {"nodes": nodes, "relationships": relationships}
+            return {"nodes": nodes, "relationships": relationships, "truncated": truncated}
 
     def node_count(self) -> int:
         with self.driver.session(database=self.database) as session:

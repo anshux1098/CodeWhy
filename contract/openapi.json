@@ -710,6 +710,11 @@
       "GraphEdge": {
         "additionalProperties": false,
         "properties": {
+          "props": {
+            "additionalProperties": true,
+            "title": "Props",
+            "type": "object"
+          },
           "rule": {
             "anyOf": [
               {

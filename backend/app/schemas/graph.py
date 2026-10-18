@@ -23,6 +23,10 @@ class GraphEdge(BaseModel):
     target: str
     type: str
     rule: str | None = None
+    # Relationship properties (for example a supersession edge's `method` and
+    # `confidence`). `rule` stays a first-class field; `props` carries the rest so a
+    # client can render an edge's provenance without a second request.
+    props: dict[str, Any] = Field(default_factory=dict)
 
 
 class GraphResponse(BaseModel):
