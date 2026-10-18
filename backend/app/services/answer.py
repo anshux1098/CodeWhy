@@ -235,6 +235,49 @@ def _no_verified_quote_response(
     )
 
 
+def _coverage_node(store: Optional[Any], node_id: str) -> Optional[dict[str, Any]]:
+    if store is None or not node_id:
+        return None
+    getter = getattr(store, "get_node", None)
+    if getter is None:
+        return None
+    try:
+        return getter(node_id)
+    except Exception:  # pragma: no cover - a store that cannot answer is treated as unknown
+        return None
+
+
+def _no_decision_path_gap(store: Optional[Any], entity_id: str) -> str:
+    """Say what was checked for this entity, from the coverage stored at rebuild time.
+
+    The wording states the counts that were stored; it never claims that no history
+    exists. A graph built before coverage was stored keeps the old wording.
+    """
+    node = _coverage_node(store, entity_id)
+    if not node or "prs_touching" not in node:
+        return "No decision path connected via GOVERNS in the knowledge graph"
+    touching = int(node.get("prs_touching") or 0)
+    analyzed = int(node.get("prs_analyzed") or 0)
+    noise = int(node.get("prs_noise_skipped") or 0)
+    if touching == 0:
+        return "No PR in the ingested history touches this file."
+    if analyzed == 0:
+        return f"This file is touched by {touching} PRs but none were analyzed yet."
+    return (
+        f"{analyzed} of {touching} PRs touching this file were analyzed "
+        f"({noise} skipped as noise); no verified decision was found."
+    )
+
+
+def _entity_not_found_gap(store: Optional[Any], repository_id: Optional[str]) -> str:
+    """Report the scope that was searched, from the Repository node."""
+    node = _coverage_node(store, repository_id or "")
+    scope = node.get("scope") if node else None
+    if scope:
+        return f"This system covers {scope}; no matching file was found."
+    return "No matching file, module, or configuration key found"
+
+
 def _quote_still_matches_source(
     item: RetrievedEvidenceItem, bundle: EvidenceBundle
 ) -> bool:
@@ -275,6 +318,7 @@ def generate_answer(
     min_score: Optional[float] = None,
     store: Optional[Any] = None,
     cfg: Optional[Settings] = None,
+    repository_id: Optional[str] = None,
 ) -> AskResponse:
     """End-to-end question answering pipeline enforcing the 4-gate refusal system and citation verification."""
 
@@ -311,7 +355,7 @@ def generate_answer(
                 outcome=Outcome.REFUSAL,
                 reason_code=ReasonCode.ENTITY_NOT_FOUND,
                 answer="I could not find a matching code entity in the repository history for this question.",
-                evidence_gaps=["No matching file, module, or configuration key found"],
+                evidence_gaps=[_entity_not_found_gap(store, repository_id)],
                 fixture=not is_real,
             )
 
@@ -349,7 +393,7 @@ def generate_answer(
                         contradiction=0.0,
                     ),
                 ),
-                evidence_gaps=["No decision path connected via GOVERNS in the knowledge graph"],
+                evidence_gaps=[_no_decision_path_gap(store, resolution.entity.id)],
                 fixture=not is_real,
             )
 
