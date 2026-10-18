@@ -10,6 +10,7 @@ Demonstrates:
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -31,7 +32,16 @@ from app.services.supersession import (
 from app.services.who_to_ask import determine_who_to_ask
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="verify_phase4.py",
+        description=(
+            "Verify Phase 4 history, supersession and who-to-ask against the "
+            "configured live graph. With no arguments it runs every check."
+        ),
+    )
+    parser.parse_args(argv)
+
     print("=" * 70)
     print("PHASE 4 VERIFICATION: History, Confidence & Who-to-Ask")
     print("=" * 70)
