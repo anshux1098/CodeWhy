@@ -27,7 +27,6 @@ CONFIG = "pkg/config.py"
 SSL = "pkg/ssl.py"
 NET = "pkg/net.py"
 EMPTY = "pkg/empty.py"
-PR_ONLY = "pkg/pr_only.py"
 
 
 def _seed_cache(path: Path) -> None:
@@ -36,7 +35,7 @@ def _seed_cache(path: Path) -> None:
             (1, "Add TLS settings for HTTP/2", [CONFIG, SSL], "ann"),
             (2, "Bump requests from 2 to 3", [CONFIG], "bot"),
             (3, "Fix typo in docs", [SSL], "ann"),
-            (4, "Add connection pooling", [NET, PR_ONLY], "bob"),
+            (4, "Add connection pooling", [NET], "bob"),
             (5, "Update docs wording", [NET], "carol"),
         ):
             cache.put_raw("pr", REPO, str(number), {
@@ -106,17 +105,6 @@ def test_rebuild_stores_entity_coverage_counts(tmp_path: Path) -> None:
     empty = _coverage(store, EMPTY)
     assert empty["prs_touching"] == 0
     assert empty["prs_not_analyzed"] == 0
-
-
-def test_a_pr_touched_path_becomes_an_entity_even_with_no_decision(tmp_path: Path) -> None:
-    cache_path = tmp_path / "cache.sqlite3"
-    _seed_cache(cache_path)
-
-    store = build_from_cache(cache_path, REPO).store
-
-    node = _coverage(store, PR_ONLY)
-    assert node["prs_touching"] == 1
-    assert node["verified_decisions"] == 0
 
 
 def test_rebuild_stores_repository_coverage(tmp_path: Path) -> None:

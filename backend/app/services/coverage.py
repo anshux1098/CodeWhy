@@ -114,7 +114,7 @@ def repository_counts(cache: Any, repo: str, coverage: Coverage) -> dict[str, An
     """Stored on the Repository node: scope and repository-wide totals."""
     verified = sum(coverage.verified_by_path.values())
     return {
-        "scope": scope_text(cache, repo, coverage),
+        "scope": scope_text(cache, repo),
         "prs_fetched": len(coverage.pr_ids),
         "sources_analyzed": len(coverage.analyzed),
         "prs_noise_skipped": len(coverage.noise & coverage.pr_ids),
@@ -122,7 +122,7 @@ def repository_counts(cache: Any, repo: str, coverage: Coverage) -> dict[str, An
     }
 
 
-def scope_text(cache: Any, repo: str, coverage: Optional["Coverage"] = None) -> str:
+def scope_text(cache: Any, repo: str) -> str:
     """What a rebuild analysed, from the cache's own provenance rows."""
     branch = "the ingested branch"
     caps: list[str] = []
@@ -143,10 +143,10 @@ def scope_text(cache: Any, repo: str, coverage: Optional["Coverage"] = None) -> 
     window = cache.commit_window(repo)
     oldest = (window.get("oldest") or "")[:10] or "unknown"
     newest = (window.get("newest") or "")[:10] or "unknown"
-    touched = len(coverage.touched) if coverage is not None else len(cache.iter_commit_files(repo))
+    paths = len(cache.iter_commit_files(repo))
     scope = (
         f"{repo} at branch {branch}, commits {oldest}..{newest}, "
-        f"{touched} file paths touched by the fetched pull requests"
+        f"{paths} ingested file paths"
     )
     if caps:
         scope += "; ingest caps: " + ", ".join(sorted(set(caps)))
