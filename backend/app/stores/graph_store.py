@@ -209,6 +209,14 @@ class BaseGraphStore(ABC):
         """
         return {}
 
+    def get_links_for_repo(self, repo: str) -> list[dict[str, Any]]:
+        """Fetch relationship links for a repository."""
+        return []
+
+    def get_people_for_entity(self, repo: str, entity_id: str) -> list[dict[str, Any]]:
+        """Fetch people associated with the repository / entity."""
+        return []
+
     @abstractmethod
     def close(self) -> None:
         """Release underlying connections."""
@@ -428,8 +436,27 @@ class InMemoryGraphStore(BaseGraphStore):
             for (f, r, t), props in self.edges.items()
             if f in active_ids and t in active_ids
         ]
-
         return {"nodes": selected_nodes, "relationships": selected_edges}
+
+    def get_links_for_repo(self, repo: str) -> list[dict[str, Any]]:
+        res: list[dict[str, Any]] = []
+        for (from_id, rel_type, to_id), props in self.edges.items():
+            res.append({
+                "source_id": from_id,
+                "rel_type": rel_type,
+                "target_id": to_id,
+                **props,
+            })
+        return res
+
+    def get_people_for_entity(self, repo: str, entity_id: str) -> list[dict[str, Any]]:
+        people: list[dict[str, Any]] = []
+        for node_id, labels in self.labels.items():
+            if "Person" in labels:
+                p = self.nodes.get(node_id)
+                if p:
+                    people.append(p)
+        return people
 
     def close(self) -> None:
         pass
@@ -734,6 +761,32 @@ class Neo4jGraphStore(BaseGraphStore):
                 str(record["name"]): str(record["state"])
                 for record in session.run(query)
             }
+
+    def get_links_for_repo(self, repo: str) -> list[dict[str, Any]]:
+        cql = (
+            "MATCH (s)-[r]->(t) "
+            "WHERE (s.repo = $repo OR t.repo = $repo) "
+            "AND type(r) IN ['REVERTS', 'SUPERSEDES', 'PART_OF', 'REFERENCES', 'CONTAINS'] "
+            "RETURN s.id AS source_id, type(r) AS rel_type, t.id AS target_id, properties(r) AS props"
+        )
+        with self.driver.session(database=self.database) as session:
+            result = session.run(cql, repo=repo)
+            items: list[dict[str, Any]] = []
+            for record in result:
+                item = {
+                    "source_id": record["source_id"],
+                    "rel_type": record["rel_type"],
+                    "target_id": record["target_id"],
+                }
+                item.update(record.get("props") or {})
+                items.append(item)
+            return items
+
+    def get_people_for_entity(self, repo: str, entity_id: str) -> list[dict[str, Any]]:
+        cql = "MATCH (p:Person) RETURN properties(p) AS props LIMIT 100"
+        with self.driver.session(database=self.database) as session:
+            result = session.run(cql)
+            return [dict(record["props"]) for record in result]
 
     def close(self) -> None:
         self.driver.close()
