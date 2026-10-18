@@ -326,6 +326,10 @@ def rebuild_graph(
         for ent_name in json.loads(d["affected_entities"] or "[]"):
             if "/" in ent_name:
                 file_paths.add(ent_name)
+    # Every path the fetched pull requests touched becomes a file entity, even when
+    # no decision was extracted for it. Without the node the graph could not say
+    # "this file was touched but not analysed", which is the honest refusal.
+    file_paths.update(coverage.touched)
 
     from app.services.linking import get_module_for_path
 
