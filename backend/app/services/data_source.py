@@ -7,7 +7,13 @@ from app.config import Settings, settings
 from app.services.errors import DataSourceError
 from app.providers.llm_provider import get_llm_provider
 from app.schemas.common import CitationKind, DecisionState, EntityType, SourceType
-from app.schemas.decisions import Citation, DecisionDetail, SourceRef
+from app.schemas.decisions import (
+    Citation,
+    DecisionDetail,
+    DecisionListItem,
+    DecisionListResponse,
+    SourceRef,
+)
 from app.schemas.entities import Entity, EntityListResponse
 from app.schemas.graph import GraphEdge, GraphNode, GraphResponse
 from app.schemas.repository import RepositoryCounts, RepositoryResponse
@@ -41,6 +47,16 @@ class DataSource(Protocol):
     def ask(self, repository_id: str, request: AskRequest) -> AskResponse: ...
 
     def get_decision(self, decision_id: str) -> DecisionDetail: ...
+
+    def list_decisions(
+        self,
+        repository_id: str,
+        entity_id: str | None = None,
+        state: DecisionState | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> DecisionListResponse: ...
+
     def get_graph(self, repository_id: str, entity_id: str | None) -> GraphResponse: ...
 
 
@@ -358,6 +374,51 @@ class GraphDataSource:
             conflicts_with=node.get("conflicts_with") or [],
             reaffirms=node.get("reaffirms") or [],
             citations=citations,
+            fixture=not self.is_real,
+        )
+
+    def list_decisions(
+        self,
+        repository_id: str,
+        entity_id: str | None = None,
+        state: DecisionState | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> DecisionListResponse:
+        self._require_repository(repository_id)
+        result = self.store.list_decisions(
+            repository_id,
+            entity_id=entity_id,
+            state=state.value if state is not None else None,
+            limit=limit,
+            offset=offset,
+        )
+        items: list[DecisionListItem] = []
+        for node in result["items"]:
+            try:
+                source_url = source_ref_for(node).url
+            except DataSourceError:
+                # A row whose source cannot be reconstructed is still listed; only its
+                # link is absent. Dropping the row would hide a decision that exists.
+                source_url = None
+            items.append(
+                DecisionListItem(
+                    id=node.get("id", ""),
+                    summary=node.get("summary", ""),
+                    state=DecisionState(node.get("state", "ACTIVE")),
+                    date=_clean_date(node.get("effective_at")),
+                    source_url=source_url,
+                    entities=[str(e) for e in (node.get("entities") or [])],
+                    supersedes=node.get("supersedes") or [],
+                    superseded_by=node.get("superseded_by") or [],
+                    rule=node.get("rule"),
+                )
+            )
+        return DecisionListResponse(
+            items=items,
+            total=result["total"],
+            limit=limit,
+            offset=offset,
             fixture=not self.is_real,
         )
 

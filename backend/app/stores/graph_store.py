@@ -7,10 +7,12 @@ from typing import Any, Optional, Sequence
 
 from app.config import Settings, settings
 from app.graph.queries import (
+    COUNT_DECISIONS_FOR_REPOSITORY,
     GET_DECISIONS_GOVERNING_ENTITY,
     GET_ENTITIES_FOR_DECISION,
     GET_SUBGRAPH_FOR_ENTITY,
     GET_SUBGRAPH_FOR_REPOSITORY,
+    LIST_DECISIONS_FOR_REPOSITORY,
     SEARCH_DECISIONS_BY_SUMMARY,
     SEARCH_DECISIONS_BY_TEXT,
 )
@@ -144,6 +146,23 @@ class BaseGraphStore(ABC):
     @abstractmethod
     def get_entities_for_decision(self, decision_id: str) -> list[dict[str, Any]]:
         """The code entities a decision GOVERNS."""
+        ...
+
+    @abstractmethod
+    def list_decisions(
+        self,
+        repo: str,
+        entity_id: Optional[str] = None,
+        state: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """A repository's decisions, newest first, filtered and paged.
+
+        Returns `{"items": [node, ...], "total": int}` where `total` counts every
+        match before `limit`/`offset`. Each item carries an `entities` list of the
+        code-entity ids the decision GOVERNS. Undated decisions sort last.
+        """
         ...
 
     @abstractmethod
@@ -427,6 +446,37 @@ class InMemoryGraphStore(BaseGraphStore):
                     evidence.append(dict(node))
         return evidence
 
+    def list_decisions(
+        self,
+        repo: str,
+        entity_id: Optional[str] = None,
+        state: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        items: list[dict[str, Any]] = []
+        for node_id, props in self.nodes.items():
+            if "Decision" not in self.labels.get(node_id, set()):
+                continue
+            if props.get("repo") != repo:
+                continue
+            if state is not None and props.get("state") != state:
+                continue
+            entity_ids = [
+                e.get("id") for e in self.get_entities_for_decision(node_id) if e.get("id")
+            ]
+            if entity_id is not None and entity_id not in entity_ids:
+                continue
+            items.append({**props, "entities": entity_ids})
+        # Sort by id first so the newest-first sort (which is stable) leaves equal
+        # dates in id order, then put undated decisions last.
+        items.sort(key=lambda d: str(d.get("id", "")))
+        items.sort(
+            key=lambda d: (d.get("effective_at") is not None, d.get("effective_at") or ""),
+            reverse=True,
+        )
+        return {"items": items[offset : offset + limit], "total": len(items)}
+
     def get_subgraph(
         self,
         repo: str,
@@ -672,6 +722,31 @@ class Neo4jGraphStore(BaseGraphStore):
         )
         with self.driver.session(database=self.database) as session:
             return [dict(record["ev"]) for record in session.run(query, decision_id=decision_id)]
+
+    def list_decisions(
+        self,
+        repo: str,
+        entity_id: Optional[str] = None,
+        state: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        params = {
+            "repo": repo,
+            "entity_id": entity_id,
+            "state": state,
+            "limit": limit,
+            "offset": offset,
+        }
+        with self.driver.session(database=self.database) as session:
+            total_record = session.run(COUNT_DECISIONS_FOR_REPOSITORY, **params).single()
+            total = int(total_record["total"]) if total_record is not None else 0
+            items: list[dict[str, Any]] = []
+            for record in session.run(LIST_DECISIONS_FOR_REPOSITORY, **params):
+                node = dict(record["d"])
+                node["entities"] = list(record.get("entities") or [])
+                items.append(node)
+            return {"items": items, "total": total}
 
     def get_subgraph(
         self,
