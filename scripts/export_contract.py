@@ -15,10 +15,10 @@ from app.fixtures.dataset import EXAMPLE_QUESTIONS, REPOSITORY_ID
 from app.fixtures.source import FixtureDataSource
 from app.main import create_app
 from app.schemas.ask import AskResponse
-from app.schemas.decisions import DecisionDetail
+from app.schemas.decisions import DecisionDetail, DecisionListResponse
 from app.schemas.entities import EntityListResponse
 from app.schemas.graph import GraphResponse
-from app.schemas.repository import RepositoryResponse
+from app.schemas.repository import RepositoryListResponse, RepositoryResponse
 
 CONTRACT_DIR = ROOT / "contract"
 
@@ -31,8 +31,10 @@ CONTRACT_SPECS: dict[str, tuple[type[BaseModel], Optional[str]]] = {
     "ask_out_of_scope.json": (AskResponse, EXAMPLE_QUESTIONS["out_of_scope"]["question"]),
     "graph.json": (GraphResponse, None),
     "decision.json": (DecisionDetail, None),
+    "decisions.json": (DecisionListResponse, None),
     "entities.json": (EntityListResponse, None),
     "repository.json": (RepositoryResponse, None),
+    "repositories.json": (RepositoryListResponse, None),
 }
 
 
@@ -43,8 +45,12 @@ def build_payload(name: str, model: type[BaseModel], question: Optional[str], so
         response = source.get_graph(REPOSITORY_ID, None)
     elif name == "decision.json":
         response = source.get_decision("dec_77")
+    elif name == "decisions.json":
+        response = source.list_decisions(REPOSITORY_ID)
     elif name == "entities.json":
         response = source.search_entities(REPOSITORY_ID, "retry")
+    elif name == "repositories.json":
+        response = source.list_repositories()
     else:
         response = source.get_repository(REPOSITORY_ID)
     validated = model.model_validate(response.model_dump(mode="json"))

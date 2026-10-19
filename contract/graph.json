@@ -1,168 +1,196 @@
 {
   "edges": [
     {
+      "props": {},
       "rule": null,
       "source": "acme-netclient",
       "target": "module:netclient",
       "type": "CONTAINS"
     },
     {
+      "props": {},
       "rule": null,
       "source": "module:netclient",
       "target": "file:netclient/config.py",
       "type": "CONTAINS"
     },
     {
+      "props": {},
       "rule": null,
       "source": "module:netclient",
       "target": "file:netclient/retry.py",
       "type": "CONTAINS"
     },
     {
+      "props": {},
       "rule": null,
       "source": "file:netclient/config.py",
       "target": "key:MAX_RETRIES",
       "type": "CONTAINS"
     },
     {
+      "props": {},
       "rule": null,
       "source": "file:netclient/config.py",
       "target": "key:_PAD_BYTES",
       "type": "CONTAINS"
     },
     {
+      "props": {},
       "rule": null,
       "source": "file:netclient/config.py",
       "target": "key:RETRY_BACKOFF_MS",
       "type": "CONTAINS"
     },
     {
+      "props": {},
       "rule": null,
       "source": "dec_41",
       "target": "key:MAX_RETRIES",
       "type": "GOVERNS"
     },
     {
+      "props": {},
       "rule": null,
       "source": "dec_77",
       "target": "key:MAX_RETRIES",
       "type": "GOVERNS"
     },
     {
+      "props": {},
       "rule": null,
       "source": "dec_90",
       "target": "key:MAX_RETRIES",
       "type": "GOVERNS"
     },
     {
+      "props": {},
       "rule": null,
       "source": "dec_55",
       "target": "key:RETRY_BACKOFF_MS",
       "type": "GOVERNS"
     },
     {
+      "props": {},
       "rule": null,
       "source": "dec_104",
       "target": "file:netclient/retry.py",
       "type": "GOVERNS"
     },
     {
+      "props": {},
       "rule": "1_revert_commit",
       "source": "dec_90",
       "target": "dec_77",
       "type": "SUPERSEDES"
     },
     {
+      "props": {},
       "rule": "2_config_key_changed",
       "source": "dec_77",
       "target": "dec_41",
       "type": "SUPERSEDES"
     },
     {
+      "props": {},
       "rule": null,
       "source": "dec_41",
       "target": "pr:41",
       "type": "DECIDED_IN"
     },
     {
+      "props": {},
       "rule": null,
       "source": "dec_77",
       "target": "pr:77",
       "type": "DECIDED_IN"
     },
     {
+      "props": {},
       "rule": null,
       "source": "dec_90",
       "target": "pr:90",
       "type": "DECIDED_IN"
     },
     {
+      "props": {},
       "rule": null,
       "source": "dec_55",
       "target": "pr:55",
       "type": "DECIDED_IN"
     },
     {
+      "props": {},
       "rule": null,
       "source": "dec_104",
       "target": "pr:104",
       "type": "DECIDED_IN"
     },
     {
+      "props": {},
       "rule": null,
       "source": "dec_41",
       "target": "ev:cit_41",
       "type": "SUPPORTED_BY"
     },
     {
+      "props": {},
       "rule": null,
       "source": "dec_77",
       "target": "ev:cit_77",
       "type": "SUPPORTED_BY"
     },
     {
+      "props": {},
       "rule": null,
       "source": "dec_90",
       "target": "ev:cit_90",
       "type": "SUPPORTED_BY"
     },
     {
+      "props": {},
       "rule": null,
       "source": "dec_55",
       "target": "ev:cit_55",
       "type": "SUPPORTED_BY"
     },
     {
+      "props": {},
       "rule": null,
       "source": "person:priya",
       "target": "pr:41",
       "type": "AUTHORED"
     },
     {
+      "props": {},
       "rule": null,
       "source": "person:marco",
       "target": "pr:77",
       "type": "AUTHORED"
     },
     {
+      "props": {},
       "rule": null,
       "source": "person:lena",
       "target": "pr:90",
       "type": "AUTHORED"
     },
     {
+      "props": {},
       "rule": null,
       "source": "person:tom",
       "target": "pr:55",
       "type": "AUTHORED"
     },
     {
+      "props": {},
       "rule": null,
       "source": "person:tom",
       "target": "pr:104",
       "type": "AUTHORED"
     },
     {
+      "props": {},
       "rule": null,
       "source": "person:lena",
       "target": "pr:77",

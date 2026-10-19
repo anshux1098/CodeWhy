@@ -1,16 +1,26 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Final, Optional, Protocol, runtime_checkable
 
 from app.config import Settings, settings
 from app.services.errors import DataSourceError
 from app.providers.llm_provider import get_llm_provider
 from app.schemas.common import CitationKind, DecisionState, EntityType, SourceType
-from app.schemas.decisions import Citation, DecisionDetail, SourceRef
+from app.schemas.decisions import (
+    Citation,
+    DecisionDetail,
+    DecisionListItem,
+    DecisionListResponse,
+    SourceRef,
+)
 from app.schemas.entities import Entity, EntityListResponse
 from app.schemas.graph import GraphEdge, GraphNode, GraphResponse
-from app.schemas.repository import RepositoryCounts, RepositoryResponse
+from app.schemas.repository import (
+    RepositoryCounts,
+    RepositoryListResponse,
+    RepositoryResponse,
+)
 from app.services.answer import generate_answer
 from app.services.entity_resolution import (
     EntityCandidate,
@@ -36,13 +46,66 @@ class NotFoundError(DataSourceError):
 class DataSource(Protocol):
     def get_repository(self, repository_id: str) -> RepositoryResponse: ...
 
+    def list_repositories(self) -> RepositoryListResponse: ...
+
     def search_entities(self, repository_id: str, query: str) -> EntityListResponse: ...
 
     def ask(self, repository_id: str, request: AskRequest) -> AskResponse: ...
 
     def get_decision(self, decision_id: str) -> DecisionDetail: ...
+
+    def list_decisions(
+        self,
+        repository_id: str,
+        entity_id: str | None = None,
+        state: DecisionState | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> DecisionListResponse: ...
+
     def get_graph(self, repository_id: str, entity_id: str | None) -> GraphResponse: ...
 
+
+
+#: Node properties too large or too internal for a UI payload. `embedding` is a
+#: 384-float vector and `text` is a source's full corpus; `labels` is store plumbing.
+_GRAPH_DROP_PROPS: Final[frozenset[str]] = frozenset({"embedding", "text", "labels"})
+
+#: Relationship keys that are the edge itself rather than its properties. `rule` is
+#: kept in `props` as well so an edge carries its rule and method together.
+_GRAPH_EDGE_KEYS: Final[frozenset[str]] = frozenset({"from", "to", "type"})
+
+
+def graph_node_props(node: dict) -> dict:
+    """A node's properties, minus the huge or internal ones, for the /graph payload."""
+    return {key: value for key, value in node.items() if key not in _GRAPH_DROP_PROPS}
+
+
+def graph_edge_props(rel: dict) -> dict:
+    """An edge's properties, excluding the endpoints, type and the dedicated `rule`."""
+    return {key: value for key, value in rel.items() if key not in _GRAPH_EDGE_KEYS}
+
+
+def _clean_date(value: Any) -> Optional[str]:
+    """A stored date, or None when it is absent. An empty string is not a date."""
+    text = str(value or "").strip()
+    return text or None
+
+
+def _clean_text(value: Any) -> Optional[str]:
+    """A stored string, or None when it is absent. An empty string is not a value."""
+    text = str(value or "").strip()
+    return text or None
+
+
+def _clean_int(value: Any) -> Optional[int]:
+    """A stored count as an int, or None when it is absent. Zero is a real value."""
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def source_ref_for(node: dict) -> SourceRef:
@@ -223,12 +286,10 @@ class GraphDataSource:
             ),
         )
 
-    def get_repository(self, repository_id: str) -> RepositoryResponse:
-        entities = self._require_repository(repository_id)
+    def _repository_response(self, repository_id: str, node: dict) -> RepositoryResponse:
         # Name and url come from the Repository node the build wrote, not from the id
         # string: the id is the slug the API addresses, and the real address lives on
         # the node as `url` with the raw `owner/name` in `full_name`.
-        node = self._find_node(repository_id) or {}
         raw_name = node.get("full_name") or repository_id
         return RepositoryResponse(
             id=repository_id,
@@ -240,8 +301,27 @@ class GraphDataSource:
                 pull_requests=self.store.count_nodes(repository_id, "PullRequest"),
                 commits=self.store.count_nodes(repository_id, "Commit"),
             ),
+            full_name=_clean_text(node.get("full_name")),
+            owner=_clean_text(node.get("owner")),
+            scope=_clean_text(node.get("scope")),
+            prs_fetched=_clean_int(node.get("prs_fetched")),
+            sources_analyzed=_clean_int(node.get("sources_analyzed")),
+            prs_noise_skipped=_clean_int(node.get("prs_noise_skipped")),
+            verified_decisions=_clean_int(node.get("verified_decisions")),
+            last_rebuilt_at=_clean_text(node.get("last_rebuilt_at")),
             fixture=not self.is_real,
         )
+
+    def get_repository(self, repository_id: str) -> RepositoryResponse:
+        self._require_repository(repository_id)
+        return self._repository_response(repository_id, self._find_node(repository_id) or {})
+
+    def list_repositories(self) -> RepositoryListResponse:
+        items = [
+            self._repository_response(str(node.get("id", "")), node)
+            for node in self.store.list_repositories()
+        ]
+        return RepositoryListResponse(items=items, fixture=not self.is_real)
 
     def search_entities(self, repository_id: str, query: str) -> EntityListResponse:
         raw_ents = self._require_repository(repository_id)
@@ -322,6 +402,9 @@ class GraphDataSource:
             summary=node.get("summary", ""),
             rationale=node.get("rationale"),
             state=DecisionState(node.get("state", "ACTIVE")),
+            recorded_at=_clean_date(node.get("recorded_at")),
+            effective_at=_clean_date(node.get("effective_at")),
+            ended_at=_clean_date(node.get("ended_at")),
             source=source_ref_for(node),
             supersedes=node.get("supersedes") or [],
             superseded_by=node.get("superseded_by") or [],
@@ -333,6 +416,51 @@ class GraphDataSource:
             fixture=not self.is_real,
         )
 
+    def list_decisions(
+        self,
+        repository_id: str,
+        entity_id: str | None = None,
+        state: DecisionState | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> DecisionListResponse:
+        self._require_repository(repository_id)
+        result = self.store.list_decisions(
+            repository_id,
+            entity_id=entity_id,
+            state=state.value if state is not None else None,
+            limit=limit,
+            offset=offset,
+        )
+        items: list[DecisionListItem] = []
+        for node in result["items"]:
+            try:
+                source_url = source_ref_for(node).url
+            except DataSourceError:
+                # A row whose source cannot be reconstructed is still listed; only its
+                # link is absent. Dropping the row would hide a decision that exists.
+                source_url = None
+            items.append(
+                DecisionListItem(
+                    id=node.get("id", ""),
+                    summary=node.get("summary", ""),
+                    state=DecisionState(node.get("state", "ACTIVE")),
+                    date=_clean_date(node.get("effective_at")),
+                    source_url=source_url,
+                    entities=[str(e) for e in (node.get("entities") or [])],
+                    supersedes=node.get("supersedes") or [],
+                    superseded_by=node.get("superseded_by") or [],
+                    rule=node.get("rule"),
+                )
+            )
+        return DecisionListResponse(
+            items=items,
+            total=result["total"],
+            limit=limit,
+            offset=offset,
+            fixture=not self.is_real,
+        )
+
     def get_graph(self, repository_id: str, entity_id: str | None) -> GraphResponse:
         self._require_repository(repository_id)
         if entity_id is not None and self.store.get_entity(repository_id, entity_id) is None:
@@ -340,22 +468,33 @@ class GraphDataSource:
             # tell the caller the entity has no history when it is not in the graph.
             raise NotFoundError(f"entity {entity_id!r} not found")
 
+        cap = self.settings.max_graph_nodes
         subgraph = self.store.get_subgraph(
             repo=repository_id,
             entity_id=entity_id,
-            node_cap=self.settings.max_graph_nodes,
+            node_cap=cap,
         )
 
         nodes: list[GraphNode] = []
         known_ids: set[str] = set()
+        # The store reports whether it stopped short of the graph it was asked for.
+        # A caller that also hits the cap here, or drops a node to the cap, is
+        # truncating too, so the flag is carried forward rather than declared false.
+        truncated = bool(subgraph.get("truncated", False))
 
         for n in subgraph.get("nodes", []):
             nid = n.get("id", n.get("login", ""))
-            if nid and nid not in known_ids and len(nodes) < self.settings.max_graph_nodes:
-                known_ids.add(nid)
-                ntype = n.get("labels", ["Node"])[0] if n.get("labels") else "Node"
-                label = n.get("name", n.get("summary", nid))
-                nodes.append(GraphNode(id=nid, label=label, type=ntype, props={}))
+            if not nid or nid in known_ids:
+                continue
+            if len(nodes) >= cap:
+                truncated = True
+                continue
+            known_ids.add(nid)
+            ntype = n.get("labels", ["Node"])[0] if n.get("labels") else "Node"
+            label = n.get("name", n.get("summary", nid))
+            nodes.append(
+                GraphNode(id=nid, label=label, type=ntype, props=graph_node_props(n))
+            )
 
         edges: list[GraphEdge] = []
         for r in subgraph.get("relationships", []):
@@ -368,13 +507,14 @@ class GraphDataSource:
                         target=tgt,
                         type=r.get("type", "CONNECTED"),
                         rule=r.get("rule"),
+                        props=graph_edge_props(r),
                     )
                 )
 
         return GraphResponse(
             nodes=nodes,
             edges=edges,
-            truncated=False,
+            truncated=truncated,
             fixture=not self.is_real,
         )
 
@@ -406,3 +546,4 @@ def get_data_source(cfg: Settings) -> DataSource:
     raise DataSourceError(
         f"DATA_SOURCE={cfg.data_source!r} is not supported. Must be 'fixture' or 'graph'."
     )
+

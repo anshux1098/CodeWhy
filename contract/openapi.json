@@ -561,6 +561,123 @@
         "title": "DecisionDetail",
         "type": "object"
       },
+      "DecisionListItem": {
+        "additionalProperties": false,
+        "description": "One decision in a list: enough to render a row and link to the detail.\n\nKept smaller than `Decision` on purpose. A list of a repository's decisions can\nrun to hundreds of rows and the rationale, citations and evidence gaps are only\nneeded once a row is opened.",
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "entities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Entities",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "state": {
+            "$ref": "#/components/schemas/DecisionState"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "superseded_by": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Superseded By",
+            "type": "array"
+          },
+          "supersedes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Supersedes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "summary",
+          "state"
+        ],
+        "title": "DecisionListItem",
+        "type": "object"
+      },
+      "DecisionListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "fixture": {
+            "title": "Fixture",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionListItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "minimum": 0.0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "limit",
+          "offset",
+          "fixture"
+        ],
+        "title": "DecisionListResponse",
+        "type": "object"
+      },
       "DecisionState": {
         "enum": [
           "ACTIVE",
@@ -710,6 +827,11 @@
       "GraphEdge": {
         "additionalProperties": false,
         "properties": {
+          "props": {
+            "additionalProperties": true,
+            "title": "Props",
+            "type": "object"
+          },
           "rule": {
             "anyOf": [
               {
@@ -897,6 +1019,27 @@
         "title": "RepositoryCounts",
         "type": "object"
       },
+      "RepositoryListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "fixture": {
+            "title": "Fixture",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RepositoryResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fixture"
+        ],
+        "title": "RepositoryListResponse",
+        "type": "object"
+      },
       "RepositoryResponse": {
         "additionalProperties": false,
         "properties": {
@@ -907,17 +1050,109 @@
             "title": "Fixture",
             "type": "boolean"
           },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "last_rebuilt_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Rebuilt At"
           },
           "name": {
             "title": "Name",
             "type": "string"
           },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner"
+          },
+          "prs_fetched": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prs Fetched"
+          },
+          "prs_noise_skipped": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prs Noise Skipped"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          },
+          "sources_analyzed": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sources Analyzed"
+          },
           "url": {
             "title": "Url",
             "type": "string"
+          },
+          "verified_decisions": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified Decisions"
           }
         },
         "required": [
@@ -1151,6 +1386,27 @@
         ]
       }
     },
+    "/api/v1/repositories": {
+      "get": {
+        "operationId": "list_repositories_api_v1_repositories_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositoryListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Every repository in the graph, with its ingestion status",
+        "tags": [
+          "repositories"
+        ]
+      }
+    },
     "/api/v1/repositories/{repository_id}": {
       "get": {
         "operationId": "get_repository_api_v1_repositories__repository_id__get",
@@ -1260,6 +1516,117 @@
           }
         },
         "summary": "Answer a why question, or refuse with a reason code",
+        "tags": [
+          "repositories"
+        ]
+      }
+    },
+    "/api/v1/repositories/{repository_id}/decisions": {
+      "get": {
+        "operationId": "list_decisions_api_v1_repositories__repository_id__decisions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "title": "Repository Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only decisions governing this entity",
+            "in": "query",
+            "name": "entity_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only decisions governing this entity",
+              "title": "Entity Id"
+            }
+          },
+          {
+            "description": "Only decisions in this state",
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/DecisionState"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only decisions in this state",
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List a repository's decisions, newest first",
         "tags": [
           "repositories"
         ]

@@ -1,0 +1,81 @@
+{
+  "fixture": true,
+  "items": [
+    {
+      "date": "2025-01-15T17:00:00Z",
+      "entities": [
+        "file:netclient/retry.py"
+      ],
+      "id": "dec_104",
+      "rule": null,
+      "source_url": "https://github.invalid/acme/netclient/pull/104",
+      "state": "ACTIVE",
+      "summary": "Move the retry backoff helper from config.py into netclient/retry.py",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2024-08-19T14:30:00Z",
+      "entities": [
+        "key:MAX_RETRIES"
+      ],
+      "id": "dec_90",
+      "rule": "1_revert_commit",
+      "source_url": "https://github.invalid/acme/netclient/pull/90",
+      "state": "ACTIVE",
+      "summary": "Revert MAX_RETRIES to 3 after the latency fix regressed mobile battery",
+      "superseded_by": [],
+      "supersedes": [
+        "dec_77"
+      ]
+    },
+    {
+      "date": "2024-06-04T10:02:00Z",
+      "entities": [
+        "key:MAX_RETRIES"
+      ],
+      "id": "dec_77",
+      "rule": "2_config_key_changed",
+      "source_url": "https://github.invalid/acme/netclient/pull/77",
+      "state": "SUPERSEDED",
+      "summary": "Raise MAX_RETRIES to 6 to cut tail latency",
+      "superseded_by": [
+        "dec_90"
+      ],
+      "supersedes": [
+        "dec_41"
+      ]
+    },
+    {
+      "date": "2024-02-11T09:20:00Z",
+      "entities": [
+        "key:MAX_RETRIES"
+      ],
+      "id": "dec_41",
+      "rule": null,
+      "source_url": "https://github.invalid/acme/netclient/pull/41",
+      "state": "ACTIVE",
+      "summary": "Cap MAX_RETRIES at 3 to match the mobile client retry budget",
+      "superseded_by": [
+        "dec_77"
+      ],
+      "supersedes": []
+    },
+    {
+      "date": null,
+      "entities": [
+        "key:RETRY_BACKOFF_MS"
+      ],
+      "id": "dec_55",
+      "rule": null,
+      "source_url": "https://github.invalid/acme/netclient/pull/55",
+      "state": "REJECTED",
+      "summary": "Make the retry backoff delay configurable as RETRY_BACKOFF_MS",
+      "superseded_by": [],
+      "supersedes": []
+    }
+  ],
+  "limit": 50,
+  "offset": 0,
+  "total": 5
+}

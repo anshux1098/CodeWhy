@@ -60,7 +60,7 @@ def test_live_database_explains_every_query() -> None:
             for param in re.findall(r"\$(\w+)", text):
                 if param in {"tokens"}:
                     params[param] = ["x"]
-                elif param in {"node_cap", "cap", "limit"}:
+                elif param in {"node_cap", "cap", "limit", "offset"}:
                     params[param] = 10
                 else:
                     params[param] = "x"

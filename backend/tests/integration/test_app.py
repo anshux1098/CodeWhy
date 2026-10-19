@@ -25,10 +25,12 @@ def test_openapi_lists_every_route(client) -> None:
     assert set(paths) == {
         f"{API}/health",
         f"{API}/health/dependencies",
+        f"{API}/repositories",
         f"{API}/repositories/{{repository_id}}",
         f"{API}/repositories/{{repository_id}}/entities",
         f"{API}/repositories/{{repository_id}}/ask",
         f"{API}/repositories/{{repository_id}}/graph",
+        f"{API}/repositories/{{repository_id}}/decisions",
         f"{API}/decisions/{{decision_id}}",
     }
 
@@ -68,6 +70,16 @@ def test_repository_endpoint(client) -> None:
     assert payload["counts"]["decisions"] == 5
 
 
+def test_repository_list_endpoint(client) -> None:
+    payload = client.get(f"{API}/repositories").json()
+    assert payload["fixture"] is True
+    assert [item["id"] for item in payload["items"]] == [REPOSITORY_ID]
+    item = payload["items"][0]
+    assert item["name"] == "netclient"
+    assert item["counts"]["decisions"] == 5
+    assert item["verified_decisions"] is None
+
+
 def test_unknown_repository_is_404(client) -> None:
     response = client.get(f"{API}/repositories/acme/other")
     assert response.status_code == 404
@@ -81,9 +93,10 @@ def test_unknown_repository_is_404(client) -> None:
         ("GET", f"{API}/repositories/acme/other/entities?q=x", None),
         ("POST", f"{API}/repositories/acme/other/ask", {"question": "Why is MAX_RETRIES 3?"}),
         ("GET", f"{API}/repositories/{REPOSITORY_ID}/graph", None),
+        ("GET", f"{API}/repositories/acme/other/decisions", None),
         ("GET", f"{API}/decisions/dec_missing", None),
     ],
-    ids=["repository", "entities", "ask", "graph", "decision"],
+    ids=["repository", "entities", "ask", "graph", "decisions_list", "decision"],
 )
 def test_every_not_found_route_returns_the_error_response_shape(client, method, url, body) -> None:
     if url.endswith("/graph"):
@@ -117,6 +130,53 @@ def test_decision_endpoint(client) -> None:
 
 def test_unknown_decision_is_404(client) -> None:
     assert client.get(f"{API}/decisions/dec_missing").status_code == 404
+
+
+DECISIONS_URL = f"{API}/repositories/acme-netclient/decisions"
+
+
+def test_decisions_list_endpoint_orders_newest_first(client) -> None:
+    payload = client.get(DECISIONS_URL).json()
+    assert payload["fixture"] is True
+    assert payload["total"] == 5
+    assert payload["limit"] == 50 and payload["offset"] == 0
+    assert [item["id"] for item in payload["items"]] == [
+        "dec_104", "dec_90", "dec_77", "dec_41", "dec_55",
+    ]
+
+
+def test_decisions_list_items_carry_a_date_and_a_source(client) -> None:
+    item = next(i for i in client.get(DECISIONS_URL).json()["items"] if i["id"] == "dec_77")
+    assert item["date"] == "2024-06-04T10:02:00Z"
+    assert item["source_url"].endswith("/pull/77")
+    assert item["entities"] == ["key:MAX_RETRIES"]
+    assert item["supersedes"] == ["dec_41"]
+
+
+def test_decisions_list_filters_by_state(client) -> None:
+    payload = client.get(DECISIONS_URL, params={"state": "SUPERSEDED"}).json()
+    assert [item["id"] for item in payload["items"]] == ["dec_77"]
+    assert payload["total"] == 1
+
+
+def test_decisions_list_filters_by_entity(client) -> None:
+    payload = client.get(DECISIONS_URL, params={"entity_id": "file:netclient/retry.py"}).json()
+    assert {item["id"] for item in payload["items"]} == {"dec_104"}
+    assert payload["total"] == 1
+
+
+def test_decisions_list_pages_without_changing_the_total(client) -> None:
+    payload = client.get(DECISIONS_URL, params={"limit": 2, "offset": 1}).json()
+    assert payload["total"] == 5
+    assert [item["id"] for item in payload["items"]] == ["dec_90", "dec_77"]
+
+
+def test_decisions_list_rejects_an_unknown_state_with_422(client) -> None:
+    assert client.get(DECISIONS_URL, params={"state": "BOGUS"}).status_code == 422
+
+
+def test_decisions_list_rejects_a_limit_above_the_maximum(client) -> None:
+    assert client.get(DECISIONS_URL, params={"limit": 201}).status_code == 422
 
 
 def test_graph_endpoint(client) -> None:
@@ -236,8 +296,11 @@ def test_repository_routes_use_a_slug_converter(client) -> None:
     from app.api.routes_repositories import router as repositories_router
 
     for route in repositories_router.routes:
-        assert "{repository_id}" in route.path_format
         assert ":path" not in route.path_format
+        # The collection route takes no id; every route that names one must use the
+        # single-segment converter so a repository id can never contain a slash.
+        if route.path_format != "/repositories":
+            assert "{repository_id}" in route.path_format
 
 
 def test_a_repository_id_containing_a_slash_is_not_accepted(client) -> None:

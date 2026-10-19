@@ -6,6 +6,7 @@ from app.config import Settings
 from app.fixtures.dataset import (
     CITATIONS_BY_DECISION,
     DECISION_BY_ID,
+    DECISIONS,
     ENTITIES,
     ENTITY_BY_ID,
     GRAPH_EDGES,
@@ -15,11 +16,11 @@ from app.fixtures.dataset import (
     WHO_TO_ASK,
 )
 from app.schemas.ask import AskRequest, AskResponse
-from app.schemas.common import GRAPH_NODE_CAP, Outcome, ReasonCode
-from app.schemas.decisions import DecisionDetail
+from app.schemas.common import GRAPH_NODE_CAP, DecisionState, Outcome, ReasonCode
+from app.schemas.decisions import DecisionDetail, DecisionListItem, DecisionListResponse
 from app.schemas.entities import Candidate, Entity, EntityListResponse
 from app.schemas.graph import GraphEdge, GraphNode, GraphResponse
-from app.schemas.repository import RepositoryResponse
+from app.schemas.repository import RepositoryListResponse, RepositoryResponse
 from app.services.data_source import NotFoundError
 
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_]+")
@@ -63,6 +64,12 @@ NO_PATH_SIGNALS = {
 MAX_RETRIES_HISTORY = ("dec_41", "dec_77", "dec_90")
 
 
+def _clean(value: object) -> str | None:
+    """A stored value as text, or None when absent. An empty string is not a value."""
+    text = str(value or "").strip()
+    return text or None
+
+
 def _segments(label: str) -> list[str]:
     return [
         segment
@@ -97,6 +104,9 @@ class FixtureDataSource:
         self._require_repository(repository_id)
         return REPOSITORY
 
+    def list_repositories(self) -> RepositoryListResponse:
+        return RepositoryListResponse(items=[REPOSITORY], fixture=True)
+
     def search_entities(self, repository_id: str, query: str) -> EntityListResponse:
         self._require_repository(repository_id)
         needle = query.strip().lower()
@@ -115,6 +125,54 @@ class FixtureDataSource:
             citations=CITATIONS_BY_DECISION.get(decision_id, []),
             evidence_gaps=gaps,
             fixture=True,
+        )
+
+    def list_decisions(
+        self,
+        repository_id: str,
+        entity_id: str | None = None,
+        state: DecisionState | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> DecisionListResponse:
+        self._require_repository(repository_id)
+        governed: dict[str, list[str]] = {}
+        for edge in GRAPH_EDGES:
+            if edge.get("type") == "GOVERNS":
+                governed.setdefault(str(edge["source"]), []).append(str(edge["target"]))
+
+        rows: list[tuple[dict[str, object], list[str]]] = []
+        for decision in DECISIONS:
+            entities = governed.get(decision.id, [])
+            if entity_id is not None and entity_id not in entities:
+                continue
+            if state is not None and decision.state != state:
+                continue
+            rows.append((decision.model_dump(), entities))
+        # Newest first, undated last, ties in id order: the same order the graph
+        # store returns, so fixture and live lists read identically.
+        rows.sort(key=lambda row: str(row[0]["id"]))
+        rows.sort(
+            key=lambda row: (row[0]["effective_at"] is not None, row[0]["effective_at"] or ""),
+            reverse=True,
+        )
+        total = len(rows)
+        items = [
+            DecisionListItem(
+                id=str(row["id"]),
+                summary=str(row["summary"]),
+                state=DecisionState(row["state"]),
+                date=_clean(row["effective_at"]),
+                source_url=_clean((row["source"] or {}).get("url")),
+                entities=entities,
+                supersedes=list(row["supersedes"]),
+                superseded_by=list(row["superseded_by"]),
+                rule=_clean(row["rule"]),
+            )
+            for row, entities in rows[offset : offset + limit]
+        ]
+        return DecisionListResponse(
+            items=items, total=total, limit=limit, offset=offset, fixture=True
         )
 
     def get_graph(self, repository_id: str, entity_id: str | None) -> GraphResponse:

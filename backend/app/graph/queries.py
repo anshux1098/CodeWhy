@@ -56,6 +56,31 @@ MATCH (d:Decision {id: $decision_id})-[:GOVERNS]->(e:CodeEntity)
 RETURN e
 """
 
+# A page of a repository's decisions, newest first. Undated decisions sort last
+# because the live database rejects a NULLS ordering clause, so the presence of a
+# date is used as the leading sort term. `d.id` breaks ties so paging is stable.
+LIST_DECISIONS_FOR_REPOSITORY: Final[str] = """
+MATCH (d:Decision {repo: $repo})
+WHERE $state IS NULL OR d.state = $state
+OPTIONAL MATCH (d)-[:GOVERNS]->(e:CodeEntity)
+WITH d, [x IN collect(DISTINCT e.id) WHERE x IS NOT NULL] AS entities
+WHERE $entity_id IS NULL OR $entity_id IN entities
+RETURN d, entities
+ORDER BY (d.effective_at IS NULL), d.effective_at DESC, d.id
+SKIP $offset LIMIT $limit
+"""
+
+# How many decisions match the same filters, before paging. Counted separately so
+# `total` is the real number rather than the size of the returned page.
+COUNT_DECISIONS_FOR_REPOSITORY: Final[str] = """
+MATCH (d:Decision {repo: $repo})
+WHERE $state IS NULL OR d.state = $state
+OPTIONAL MATCH (d)-[:GOVERNS]->(e:CodeEntity)
+WITH d, [x IN collect(DISTINCT e.id) WHERE x IS NOT NULL] AS entities
+WHERE $entity_id IS NULL OR $entity_id IN entities
+RETURN count(d) AS total
+"""
+
 # A repository's decision graph. Seeded from the Decision nodes so the result is the
 # decisions and what they connect to, rather than an arbitrary page of nodes whose
 # edges are almost all excluded by the sample.

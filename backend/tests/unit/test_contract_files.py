@@ -11,10 +11,10 @@ from app.fixtures.dataset import REPOSITORY_ID
 from app.fixtures.source import FixtureDataSource
 from app.main import create_app
 from app.schemas.ask import AskResponse
-from app.schemas.decisions import DecisionDetail
+from app.schemas.decisions import DecisionDetail, DecisionListResponse
 from app.schemas.entities import EntityListResponse
 from app.schemas.graph import GraphResponse
-from app.schemas.repository import RepositoryResponse
+from app.schemas.repository import RepositoryListResponse, RepositoryResponse
 from scripts.export_contract import CONTRACT_SPECS, build_payload
 
 CONTRACT_DIR = Path(__file__).resolve().parents[3] / "contract"
@@ -28,23 +28,30 @@ EXPECTED_FILES = {
     "ask_out_of_scope.json": AskResponse,
     "graph.json": GraphResponse,
     "decision.json": DecisionDetail,
+    "decisions.json": DecisionListResponse,
     "entities.json": EntityListResponse,
     "repository.json": RepositoryResponse,
+    "repositories.json": RepositoryListResponse,
 }
 
 EXPECTED_PATHS = {
     "/api/v1/health",
     "/api/v1/health/dependencies",
+    "/api/v1/repositories",
     "/api/v1/repositories/{repository_id}",
     "/api/v1/repositories/{repository_id}/entities",
     "/api/v1/repositories/{repository_id}/ask",
     "/api/v1/repositories/{repository_id}/graph",
+    "/api/v1/repositories/{repository_id}/decisions",
     "/api/v1/decisions/{decision_id}",
 }
 
 
 def test_contract_directory_contains_exactly_the_expected_files() -> None:
-    assert {path.name for path in CONTRACT_DIR.glob("*.json")} == set(EXPECTED_FILES) | {"openapi.json"}
+    assert {path.name for path in CONTRACT_DIR.glob("*.json")} == set(EXPECTED_FILES) | {
+        "openapi.json",
+        "openapi.v1.json",
+    }
 
 
 @pytest.mark.parametrize(("name", "model"), sorted(EXPECTED_FILES.items()))
@@ -94,6 +101,7 @@ NOT_FOUND_PATHS = {
     "/api/v1/repositories/{repository_id}/entities",
     "/api/v1/repositories/{repository_id}/ask",
     "/api/v1/repositories/{repository_id}/graph",
+    "/api/v1/repositories/{repository_id}/decisions",
     "/api/v1/decisions/{decision_id}",
 }
 

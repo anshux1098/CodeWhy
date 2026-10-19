@@ -7,10 +7,12 @@ from typing import Any, Optional, Sequence
 
 from app.config import Settings, settings
 from app.graph.queries import (
+    COUNT_DECISIONS_FOR_REPOSITORY,
     GET_DECISIONS_GOVERNING_ENTITY,
     GET_ENTITIES_FOR_DECISION,
     GET_SUBGRAPH_FOR_ENTITY,
     GET_SUBGRAPH_FOR_REPOSITORY,
+    LIST_DECISIONS_FOR_REPOSITORY,
     SEARCH_DECISIONS_BY_SUMMARY,
     SEARCH_DECISIONS_BY_TEXT,
 )
@@ -147,8 +149,30 @@ class BaseGraphStore(ABC):
         ...
 
     @abstractmethod
+    def list_decisions(
+        self,
+        repo: str,
+        entity_id: Optional[str] = None,
+        state: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """A repository's decisions, newest first, filtered and paged.
+
+        Returns `{"items": [node, ...], "total": int}` where `total` counts every
+        match before `limit`/`offset`. Each item carries an `entities` list of the
+        code-entity ids the decision GOVERNS. Undated decisions sort last.
+        """
+        ...
+
+    @abstractmethod
     def count_nodes(self, repo: str, label: str) -> int:
         """How many nodes of a label belong to a repository."""
+        ...
+
+    @abstractmethod
+    def list_repositories(self) -> list[dict[str, Any]]:
+        """Every repository in the graph, as its Repository node, ordered by id."""
         ...
 
     @abstractmethod
@@ -285,6 +309,14 @@ class InMemoryGraphStore(BaseGraphStore):
             for node_id, labels in self.labels.items()
             if label in labels and self.nodes.get(node_id, {}).get("repo") == repo
         )
+
+    def list_repositories(self) -> list[dict[str, Any]]:
+        nodes = [
+            dict(self.nodes[node_id])
+            for node_id, labels in self.labels.items()
+            if "Repository" in labels
+        ]
+        return sorted(nodes, key=lambda node: str(node.get("id", "")))
 
     def delete_repository(self, repo_ids: Sequence[str]) -> None:
         wanted = set(repo_ids)
@@ -427,6 +459,37 @@ class InMemoryGraphStore(BaseGraphStore):
                     evidence.append(dict(node))
         return evidence
 
+    def list_decisions(
+        self,
+        repo: str,
+        entity_id: Optional[str] = None,
+        state: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        items: list[dict[str, Any]] = []
+        for node_id, props in self.nodes.items():
+            if "Decision" not in self.labels.get(node_id, set()):
+                continue
+            if props.get("repo") != repo:
+                continue
+            if state is not None and props.get("state") != state:
+                continue
+            entity_ids = [
+                e.get("id") for e in self.get_entities_for_decision(node_id) if e.get("id")
+            ]
+            if entity_id is not None and entity_id not in entity_ids:
+                continue
+            items.append({**props, "entities": entity_ids})
+        # Sort by id first so the newest-first sort (which is stable) leaves equal
+        # dates in id order, then put undated decisions last.
+        items.sort(key=lambda d: str(d.get("id", "")))
+        items.sort(
+            key=lambda d: (d.get("effective_at") is not None, d.get("effective_at") or ""),
+            reverse=True,
+        )
+        return {"items": items[offset : offset + limit], "total": len(items)}
+
     def get_subgraph(
         self,
         repo: str,
@@ -442,12 +505,15 @@ class InMemoryGraphStore(BaseGraphStore):
                     node_ids.add(f)
                     node_ids.add(t)
         else:
+            # Gather one past the cap so "exactly at the cap, but more existed" is
+            # distinguishable from "the graph is smaller than the cap".
             for n_id, props in self.nodes.items():
                 if props.get("repo") == repo:
                     node_ids.add(n_id)
-                if len(node_ids) >= node_cap:
+                if len(node_ids) > node_cap:
                     break
 
+        truncated = len(node_ids) > node_cap
         selected_nodes = [
             {**self.nodes[n_id], "labels": list(self.labels.get(n_id, []))}
             for n_id in list(node_ids)[:node_cap]
@@ -460,7 +526,7 @@ class InMemoryGraphStore(BaseGraphStore):
             for (f, r, t), props in self.edges.items()
             if f in active_ids and t in active_ids
         ]
-        return {"nodes": selected_nodes, "relationships": selected_edges}
+        return {"nodes": selected_nodes, "relationships": selected_edges, "truncated": truncated}
 
     def get_links_for_repo(self, repo: str) -> list[dict[str, Any]]:
         res: list[dict[str, Any]] = []
@@ -670,6 +736,31 @@ class Neo4jGraphStore(BaseGraphStore):
         with self.driver.session(database=self.database) as session:
             return [dict(record["ev"]) for record in session.run(query, decision_id=decision_id)]
 
+    def list_decisions(
+        self,
+        repo: str,
+        entity_id: Optional[str] = None,
+        state: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        params = {
+            "repo": repo,
+            "entity_id": entity_id,
+            "state": state,
+            "limit": limit,
+            "offset": offset,
+        }
+        with self.driver.session(database=self.database) as session:
+            total_record = session.run(COUNT_DECISIONS_FOR_REPOSITORY, **params).single()
+            total = int(total_record["total"]) if total_record is not None else 0
+            items: list[dict[str, Any]] = []
+            for record in session.run(LIST_DECISIONS_FOR_REPOSITORY, **params):
+                node = dict(record["d"])
+                node["entities"] = list(record.get("entities") or [])
+                items.append(node)
+            return {"items": items, "total": total}
+
     def get_subgraph(
         self,
         repo: str,
@@ -677,11 +768,15 @@ class Neo4jGraphStore(BaseGraphStore):
         node_cap: int = 80,
     ) -> dict[str, Any]:
         with self.driver.session(database=self.database) as session:
+            # Ask for one node past the cap: if it comes back, the graph held more than
+            # the cap and the response is truncated. Without the extra node an exactly
+            # full result is indistinguishable from a complete one.
+            probe_cap = node_cap + 1
             if entity_id:
                 result = session.run(
                     GET_SUBGRAPH_FOR_ENTITY,
                     entity_id=entity_id,
-                    node_cap=node_cap,
+                    node_cap=probe_cap,
                 )
             else:
                 # Seeded from the repository's Decision nodes so the view is the
@@ -689,7 +784,7 @@ class Neo4jGraphStore(BaseGraphStore):
                 result = session.run(
                     GET_SUBGRAPH_FOR_REPOSITORY,
                     repo=repo,
-                    node_cap=node_cap,
+                    node_cap=probe_cap,
                 )
             nodes: list[dict[str, Any]] = []
             seen: set[str] = set()
@@ -704,6 +799,9 @@ class Neo4jGraphStore(BaseGraphStore):
                     continue
                 seen.add(str(nid))
                 nodes.append(props)
+
+            truncated = len(nodes) > node_cap
+            nodes = nodes[:node_cap]
 
             # Edges between the returned nodes. Without this the /graph endpoint
             # rendered an empty relationship list even when the graph had them. The
@@ -726,7 +824,7 @@ class Neo4jGraphStore(BaseGraphStore):
                     if props:
                         edge.update(dict(props))
                     relationships.append(edge)
-            return {"nodes": nodes, "relationships": relationships}
+            return {"nodes": nodes, "relationships": relationships, "truncated": truncated}
 
     def node_count(self) -> int:
         with self.driver.session(database=self.database) as session:
@@ -763,6 +861,11 @@ class Neo4jGraphStore(BaseGraphStore):
         with self.driver.session(database=self.database) as session:
             record = session.run(query, repo=repo).single()
         return int(record["c"]) if record else 0
+
+    def list_repositories(self) -> list[dict[str, Any]]:
+        query = "MATCH (r:Repository) RETURN r ORDER BY r.id"
+        with self.driver.session(database=self.database) as session:
+            return [dict(record["r"]) for record in session.run(query)]
 
     def delete_repository(self, repo_ids: Sequence[str]) -> None:
         if not repo_ids:
