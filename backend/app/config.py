@@ -74,6 +74,10 @@ class Settings(BaseSettings):
     # store. Off by default so a misconfigured deployment cannot serve fabricated
     # answers that claim to be real.
     allow_mock_providers: bool = False
+    # When set, the startup loader reads this SQLite cache into the in-memory store
+    # so the app can serve real data without a live Neo4j instance.
+    sqlite_cache_path: str = ""
+    sqlite_repo: str = "urllib3/urllib3"
     # When true, no model weights are ever downloaded and the deterministic
     # embedding provider is used instead. The test suite sets this, because a unit
     # test that pulls a 100MB model from Hugging Face needs the network, takes
