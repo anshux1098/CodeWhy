@@ -519,6 +519,68 @@ class GraphDataSource:
         )
 
 
+def _load_sqlite_into_graph_source(source: "GraphDataSource", cfg: Settings) -> None:
+    """Populate an in-memory graph store from the SQLite cache.
+
+    Called after a GraphDataSource is built with an InMemoryGraphStore when
+    SQLITE_CACHE_PATH is set. The load runs synchronously at startup so every
+    request after the first one reads fully-populated data.
+    """
+    import logging
+    import sys
+    from pathlib import Path as _P
+    from app.stores.graph_store import InMemoryGraphStore
+
+    log = logging.getLogger(__name__)
+    if not isinstance(source.store, InMemoryGraphStore):
+        return
+    if not cfg.sqlite_cache_path:
+        return
+
+    cache_path = _P(cfg.sqlite_cache_path)
+    if not cache_path.is_absolute() and not cache_path.exists():
+        # The server often runs from backend/ while the cache lives at the repo root.
+        # Try resolving the path relative to the repository root (parent of this file's
+        # backend/app/services/ directory, going up three parents to get to repo root).
+        repo_root = _P(__file__).resolve().parent.parent.parent.parent
+        candidate = repo_root / cfg.sqlite_cache_path
+        if candidate.exists():
+            cache_path = candidate
+    if not cache_path.exists():
+        log.warning("SQLITE_CACHE_PATH=%s does not exist; skipping SQLite load", cache_path)
+        return
+
+    import sqlite3
+    try:
+        con = sqlite3.connect(cache_path)
+        cur = con.cursor()
+        repos = [r[0] for r in cur.execute("SELECT DISTINCT repo FROM commits WHERE repo IS NOT NULL").fetchall()]
+        con.close()
+    except Exception:
+        repos = [cfg.sqlite_repo or "urllib3/urllib3"]
+    if not repos:
+        repos = [cfg.sqlite_repo or "urllib3/urllib3"]
+
+    log.info("Loading SQLite cache %s for repos %s …", cache_path, repos)
+    try:
+        # scripts/ lives two levels above this file: backend/app/services/ -> repo root
+        scripts_dir = str(_P(__file__).resolve().parent.parent.parent.parent / "scripts")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        from rebuild_graph import rebuild_graph  # type: ignore[import-not-found]
+
+        for r in repos:
+            rebuild_graph(r, cache_path, source.store, cfg=cfg)
+        log.info(
+            "SQLite load complete: %d nodes, %d relationships across %d repos",
+            source.store.node_count(),
+            source.store.relationship_count(),
+            len(repos),
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.error("SQLite load failed: %s", exc)
+
+
 def get_data_source(cfg: Settings) -> DataSource:
     if cfg.data_source == "fixture":
         from app.fixtures.source import FixtureDataSource
@@ -541,6 +603,10 @@ def get_data_source(cfg: Settings) -> DataSource:
                 + ". Set ALLOW_MOCK_PROVIDERS=true to run against the in-memory store "
                 "and a mock LLM; every response then carries \"fixture\": true."
             )
+        # When the store is in-memory and a SQLite cache is configured, pre-populate
+        # it now so the first request already has data. This path is only taken once
+        # because deps.py caches the data source at the process level.
+        _load_sqlite_into_graph_source(source, cfg)
         return source
 
     raise DataSourceError(

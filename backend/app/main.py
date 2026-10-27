@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import FastAPI, Request
@@ -14,7 +15,12 @@ from app.services.errors import DataSourceError
 from app.services.health import APP_VERSION
 
 API_PREFIX = "/api/v1"
-FRONTEND_ORIGIN = "http://localhost:5173"
+FRONTEND_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+]
 
 CONTRACT_NOTES = """
 Rules enforced by validators. An invalid response cannot be constructed, so a client may
@@ -56,6 +62,30 @@ Every response produced by the fixture data source carries `fixture: true`.
 """.strip()
 
 
+@asynccontextmanager
+async def _lifespan(application: FastAPI):
+    """Eagerly warm up the data source so the SQLite load happens at startup.
+
+    get_data_source() populates the InMemoryGraphStore from SQLITE_CACHE_PATH
+    the first time it is called, then deps.py caches it for the lifetime of
+    the process. Calling it here ensures the load completes before the first
+    real request arrives rather than blocking that request.
+    """
+    import logging
+    from app.api import deps as _deps
+    from app.services.data_source import get_data_source
+
+    log = logging.getLogger(__name__)
+    try:
+        cfg: Settings = application.dependency_overrides.get(get_settings, get_settings)()
+        if _deps._DATA_SOURCE is None:
+            _deps._DATA_SOURCE = get_data_source(cfg)
+            log.info("Data source initialised: %s", type(_deps._DATA_SOURCE).__name__)
+    except Exception as exc:  # noqa: BLE001
+        log.error("Startup data source init failed: %s", exc)
+    yield
+
+
 def create_app(config: Optional[Settings] = None) -> FastAPI:
     """Build the application.
 
@@ -71,12 +101,14 @@ def create_app(config: Optional[Settings] = None) -> FastAPI:
             "Phase 0 serves synthetic fixtures only; every response is flagged `fixture: true`.\n\n"
             + CONTRACT_NOTES
         ),
+        lifespan=_lifespan,
     )
     if config is not None:
         application.dependency_overrides[get_settings] = lambda: config
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=[FRONTEND_ORIGIN],
+        allow_origins=FRONTEND_ORIGINS,
+        allow_origin_regex=r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
