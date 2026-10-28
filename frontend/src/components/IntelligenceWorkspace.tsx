@@ -179,7 +179,7 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
       >
         <main className="flex-1 min-w-0 p-4 sm:p-6 space-y-4">
           {isLoading && (
-            <div className="p-8 rounded-lg bg-[#fffdf8] border border-[#d7d2c6] text-center space-y-3">
+            <div className="workbench-card rounded-lg bg-[#fffdf8] border border-[#d7d2c6] p-8 text-center space-y-3">
               <div className="w-10 h-10 rounded-full bg-[#efede5] border border-[#d7d2c6] flex items-center justify-center mx-auto text-[#617c50]">
                 <Loader2 className="w-5 h-5 animate-spin" />
               </div>
@@ -195,7 +195,7 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
           )}
 
           {error && (
-            <div className="p-4 rounded-lg bg-[#fffdf8] border border-[#da3633]/50 text-[#f85149] space-y-1.5">
+            <div className="workbench-card rounded-lg bg-[#fffdf8] border border-[var(--rose-border)] p-5 text-[#f85149] space-y-1.5">
               <div className="flex items-center gap-2 font-medium text-xs">
                 <AlertTriangle className="w-4 h-4 text-[#f85149]" />
                 <span>Backend Error</span>
@@ -205,7 +205,7 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
           )}
 
           {!isLoading && !error && !response && (
-            <div className="p-8 rounded-lg bg-[#fffdf8] border border-[#d7d2c6] text-center space-y-3">
+            <div className="workbench-card rounded-lg bg-[#fffdf8] border border-[#d7d2c6] p-9 text-center space-y-4">
               <div className="w-10 h-10 rounded-lg bg-[#efede5] text-[#617c50] border border-[#d7d2c6] flex items-center justify-center mx-auto">
                 <Terminal className="w-5 h-5" />
               </div>
@@ -224,7 +224,7 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
             <div className="space-y-4">
               {/* Full Verified Answer */}
               {response.outcome === 'full' && (
-                <div className="rounded-lg bg-[#fffdf8] border border-[#2ea043]/40 p-5 space-y-4">
+                <div className="workbench-card rounded-lg bg-[#fffdf8] border border-[#2ea043]/40 p-6 space-y-5">
                   <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[#d7d2c6] pb-3">
                     <div className="flex items-center gap-2">
                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-mono font-semibold bg-[#2ea043]/15 text-[#3fb950] border border-[#2ea043]/40">
@@ -266,7 +266,7 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
 
               {/* Partial Answer */}
               {response.outcome === 'partial' && (
-                <div className="rounded-lg bg-[#fffdf8] border border-[#d29922]/40 p-5 space-y-4">
+                <div className="workbench-card rounded-lg bg-[#fffdf8] border border-[#d29922]/40 p-6 space-y-5">
                   <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[#d7d2c6] pb-3">
                     <div className="flex items-center gap-2">
                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-mono font-semibold bg-[#d29922]/15 text-[#e3b341] border border-[#d29922]/40">
@@ -309,7 +309,7 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
 
               {/* Refusal (Honest Negative) */}
               {response.outcome === 'refusal' && response.reason_code !== 'ambiguous_entity' && (
-                <div className="rounded-lg bg-[#fffdf8] border border-[#d7d2c6] p-5 space-y-4">
+                <div className="workbench-card rounded-lg bg-[#fffdf8] border border-[#d7d2c6] p-6 space-y-5">
                   <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[#d7d2c6] pb-3">
                     <div className="flex items-center gap-2">
                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-mono font-medium bg-[#efede5] text-[#77776e] border border-[#d7d2c6]">

@@ -14,115 +14,120 @@ export const Logo: React.FC<LogoProps> = ({
   className = '',
 }) => {
   const sizeMap = {
-    sm: { icon: 24, text: 16, sub: 10 },
-    md: { icon: 32, text: 20, sub: 11 },
-    lg: { icon: 44, text: 28, sub: 13 },
-    xl: { icon: 56, text: 36, sub: 14 },
+    sm: { icon: 28, text: 16, sub: 8, rx: 7 },
+    md: { icon: 38, text: 20, sub: 9.5, rx: 10 },
+    lg: { icon: 52, text: 28, sub: 11, rx: 14 },
+    xl: { icon: 68, text: 36, sub: 13, rx: 18 },
   };
-
-  const { icon, text, sub } = sizeMap[size];
-  const gradId = `cw-grad-${size}`;
+  const { icon, text, sub, rx } = sizeMap[size];
 
   return (
-    <div className={`flex items-center gap-2.5 select-none ${className}`}>
-      {/* CW Icon — matches reference image */}
-      <div className="shrink-0 flex items-center justify-center" style={{ width: icon, height: icon }}>
+    <div className={`flex items-center gap-3 select-none ${className}`}>
+      {/* CW Squircle Emblem Mark */}
+      <div
+        className="relative shrink-0 flex items-center justify-center rounded-xl transition-transform hover:scale-[1.03]"
+        style={{
+          width: icon,
+          height: icon,
+          boxShadow: '0 4px 14px rgba(240, 68, 43, 0.22), 0 1px 3px rgba(0,0,0,0.08)',
+        }}
+      >
         <svg
           role="img"
           aria-label="CodeWhy logo"
           width={icon}
           height={icon}
-          viewBox="0 0 56 56"
+          viewBox="0 0 48 48"
           fill="none"
+          xmlns="http://www.w3.org/2000/svg"
         >
           <defs>
-            <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#f65a3b" />
-              <stop offset="100%" stopColor="#e33d28" />
+            <linearGradient id="cw-logo-c" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ff7957" />
+              <stop offset="100%" stopColor="#f0442b" />
             </linearGradient>
-            <radialGradient id={`${gradId}-bg`} cx="50%" cy="30%" r="70%">
-              <stop offset="0%" stopColor="#17314b" />
-              <stop offset="100%" stopColor="#060e20" />
-            </radialGradient>
+            <linearGradient id="cw-logo-w" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ff6b6b" />
+              <stop offset="100%" stopColor="#dc2626" />
+            </linearGradient>
           </defs>
 
-          {/* Dark rounded square background */}
-          <rect width="56" height="56" rx="13" fill={`url(#${gradId}-bg)`} />
-          <rect width="56" height="56" rx="13" fill="none" stroke={`url(#${gradId})`} strokeWidth="1.5" strokeOpacity="0.6" />
+          {/* Squircle Background Container */}
+          <rect x="1.5" y="1.5" width="45" height="45" rx={rx} fill="#111114" />
+          <rect
+            x="1.5"
+            y="1.5"
+            width="45"
+            height="45"
+            rx={rx}
+            stroke="#3b2528"
+            strokeWidth="1.2"
+            strokeOpacity="1"
+          />
 
-          {/* "C" letter — left side, cyan */}
-          <text
-            x="10"
-            y="38"
-            fontFamily="'Inter', sans-serif"
-            fontWeight="800"
-            fontSize="26"
-            fill={`url(#${gradId})`}
-          >
-            C
-          </text>
+          {/* Stylized 'C' */}
+          <path
+            d="M20 16.5C18.8 15.2 16.9 14.5 15 14.5C10.8 14.5 7.5 18 7.5 24C7.5 30 10.8 33.5 15 33.5C17.2 33.5 19.1 32.5 20.2 31"
+            stroke="url(#cw-logo-c)"
+            strokeWidth="3.6"
+            strokeLinecap="round"
+          />
 
-          {/* "W" letter — right side, slight overlap */}
-          <text
-            x="26"
-            y="38"
-            fontFamily="'Inter', sans-serif"
-            fontWeight="800"
-            fontSize="26"
-            fill={`url(#${gradId})`}
-          >
-            W
-          </text>
+          {/* Stylized 'W' */}
+          <path
+            d="M23.5 19L27 32L30.5 23L34 32L37.5 19"
+            stroke="url(#cw-logo-w)"
+            strokeWidth="3.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
 
-          {/* Accent dot — bottom right */}
-          <circle cx="47" cy="44" r="3" fill="#f59e0b" opacity="0.9" />
+          {/* Floating Insight Dots */}
+          <circle cx="30.5" cy="14" r="2.2" fill="#ef4444" />
+          <circle cx="37.5" cy="34" r="1.5" fill="#fca5a5" />
         </svg>
       </div>
 
-      {/* Brand wordmark & Tagline */}
+      {/* Typography: Project Name + Tagline */}
       {showText && (
         <div className="flex flex-col justify-center">
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0px', lineHeight: 1 }}>
+          <div
+            className="flex items-baseline tracking-tight font-extrabold"
+            style={{
+              fontFamily: "'Manrope', sans-serif",
+              fontSize: text,
+              letterSpacing: '-0.04em',
+              lineHeight: 1.1,
+            }}
+          >
+            <span style={{ color: 'var(--text)' }}>Code</span>
             <span
+              className="bg-clip-text text-transparent"
               style={{
-                fontFamily: "'Inter', sans-serif",
-                fontWeight: 800,
-                fontSize: text,
-                color: 'var(--text)',
-                letterSpacing: '-0.02em',
-                lineHeight: 1,
-              }}
-            >
-              Code
-            </span>
-            <span
-              style={{
-                fontFamily: "'Inter', sans-serif",
-                fontWeight: 800,
-                fontSize: text,
-                background: 'linear-gradient(135deg, #f65a3b 0%, #e33d28 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                letterSpacing: '-0.02em',
-                lineHeight: 1,
+                backgroundImage: 'linear-gradient(135deg, #FF6B4A 0%, #F0442B 60%, #D8321B 100%)',
               }}
             >
               Why
             </span>
+            <span
+              className="inline-block w-1.5 h-1.5 rounded-full ml-0.5 mb-0.5"
+              style={{ backgroundColor: '#F0442B' }}
+            />
           </div>
           {showTagline && (
             <span
               style={{
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "'Manrope', sans-serif",
                 fontSize: sub,
+                fontWeight: 600,
                 color: 'var(--text-subtle)',
                 marginTop: '3px',
-                letterSpacing: '0.02em',
+                letterSpacing: '0.04em',
                 lineHeight: 1,
+                textTransform: 'uppercase',
               }}
             >
-              Decision Archeology
+              Decision Intelligence
             </span>
           )}
         </div>

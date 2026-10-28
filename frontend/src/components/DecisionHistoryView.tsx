@@ -169,28 +169,27 @@ export const DecisionHistoryView: React.FC<DecisionHistoryViewProps> = ({
             {/* Filters Bar */}
             <div className="flex flex-wrap items-center justify-between gap-2.5">
               {/* State Filter Buttons */}
-              <div className="flex flex-wrap items-center gap-1 font-mono text-xs">
-                <span className="text-[11px] text-[#77776e] uppercase tracking-wider mr-1 flex items-center gap-1">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="mr-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-[#77776e]">
                   <Filter className="w-3 h-3 text-[#617c50]" /> State:
                 </span>
-                {(['ALL', 'ACTIVE', 'SUPERSEDED', 'REJECTED', 'UNRESOLVED'] as const).map((st) => (
-                  <button
-                    key={st}
-                    onClick={() => setStateFilter(st)}
-                    className={`px-2 py-0.5 rounded border transition-colors cursor-pointer flex items-center gap-1.5 ${
-                      stateFilter === st
-                        ? 'bg-[#d7d2c6] text-[#292b25] border-[#bdb8ab] font-medium'
-                        : 'bg-[#fffdf8] text-[#77776e] hover:text-[#292b25] hover:bg-[#efede5] border-[#d7d2c6]'
-                    }`}
-                  >
-                    <span>{st === 'ALL' ? 'All' : st}</span>
-                    {st !== 'ALL' && stateCounts[st] !== undefined && (
-                      <span className="text-[10px] px-1 rounded bg-[#f5f3ed] text-[#77776e]">
-                        {stateCounts[st]}
-                      </span>
-                    )}
-                  </button>
-                ))}
+                <div className="filter-segment-group" role="group" aria-label="Filter decisions by state">
+                  {(['ALL', 'ACTIVE', 'SUPERSEDED', 'REJECTED', 'UNRESOLVED'] as const).map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setStateFilter(st)}
+                      aria-pressed={stateFilter === st}
+                      data-state-filter={st}
+                      className="filter-segment cursor-pointer"
+                    >
+                      <span>{st === 'ALL' ? 'All' : st}</span>
+                      {st !== 'ALL' && stateCounts[st] !== undefined && (
+                        <span className="filter-segment-count">{stateCounts[st]}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Entity Filter Form */}

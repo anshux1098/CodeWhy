@@ -8,7 +8,6 @@ import {
   ReactFlow,
   Background,
   Controls,
-  MiniMap,
   MarkerType,
   Position,
   Handle,
@@ -19,7 +18,6 @@ import {
   type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import dagre from '@dagrejs/dagre';
 import type {
   Repository,
   GraphResponse,
@@ -60,14 +58,76 @@ import {
   GitBranch,
 } from 'lucide-react';
 
-// Dimensions for dagre layout
-const NODE_WIDTH = 240;
-const NODE_HEIGHT = 72;
+const NODE_WIDTH = 280;
+const NODE_HEIGHT = 136;
+const NODE_SPACING = 380;
+const RADIAL_SPACING = 420;
+
+function radialNodePositions(
+  nodes: RawGraphNode[],
+  edges: GraphResponse['edges'],
+  focusId?: string | null,
+): Map<string, { x: number; y: number }> {
+  const adjacency = new Map(nodes.map((node) => [node.id, new Set<string>()]));
+  for (const edge of edges) {
+    adjacency.get(edge.source)?.add(edge.target);
+    adjacency.get(edge.target)?.add(edge.source);
+  }
+
+  const degree = (id: string) => adjacency.get(id)?.size ?? 0;
+  const rootNode = nodes.find((node) => node.id === focusId)
+    ?? [...nodes].sort((a, b) => degree(b.id) - degree(a.id) || a.id.localeCompare(b.id))[0];
+  if (!rootNode) return new Map();
+  const rootId = rootNode.id;
+  const levels = new Map<string, number>([[rootId, 0]]);
+  const queue = [rootId];
+
+  for (let index = 0; index < queue.length; index += 1) {
+    const nodeId = queue[index];
+    for (const neighbor of adjacency.get(nodeId) ?? []) {
+      if (levels.has(neighbor)) continue;
+      levels.set(neighbor, (levels.get(nodeId) ?? 0) + 1);
+      queue.push(neighbor);
+    }
+  }
+
+  const maxLevel = Math.max(0, ...levels.values());
+  for (const node of nodes) {
+    if (!levels.has(node.id)) levels.set(node.id, maxLevel + 1);
+  }
+
+  const rings = new Map<number, RawGraphNode[]>();
+  for (const node of nodes) {
+    const level = levels.get(node.id) ?? 0;
+    const ring = rings.get(level) ?? [];
+    ring.push(node);
+    rings.set(level, ring);
+  }
+
+  const positions = new Map<string, { x: number; y: number }>([
+    [rootId, { x: -NODE_WIDTH / 2, y: -NODE_HEIGHT / 2 }],
+  ]);
+  for (const [level, ring] of rings) {
+    if (level === 0) continue;
+    ring.sort((a, b) => degree(b.id) - degree(a.id) || a.id.localeCompare(b.id));
+    const radius = Math.max(RADIAL_SPACING * level, ring.length * NODE_SPACING / (2 * Math.PI));
+    const offset = (level % 2) * Math.PI / Math.max(ring.length, 1);
+    ring.forEach((node, index) => {
+      const angle = (2 * Math.PI * index) / ring.length + offset;
+      positions.set(node.id, {
+        x: Math.cos(angle) * radius - NODE_WIDTH / 2,
+        y: Math.sin(angle) * radius - NODE_HEIGHT / 2,
+      });
+    });
+  }
+  return positions;
+}
 
 // Custom Node Data
 interface CustomNodeData extends Record<string, unknown> {
   raw: RawGraphNode;
   isSelected: boolean;
+  isFocus: boolean;
   onSelect: (node: RawGraphNode) => void;
   onOpenDecision?: (decisionId: string) => void;
 }
@@ -98,8 +158,8 @@ const CodeWhyGraphNode: React.FC<NodeProps<Node<CustomNodeData>>> = ({ data, sel
               : <HelpCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />;
         return {
           borderColor: isSelected ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-amber-500/60 hover:border-amber-400',
-          bg: 'bg-[#0a0410]',
-          badgeBg: 'bg-amber-500/15 text-amber-500 border-amber-500/40',
+          bg: 'bg-[#fffdf8]',
+          badgeBg: 'bg-amber-100 text-amber-900 border-amber-300',
           badgeText,
           icon,
         };
@@ -109,8 +169,8 @@ const CodeWhyGraphNode: React.FC<NodeProps<Node<CustomNodeData>>> = ({ data, sel
         if (entType === 'Module') {
           return {
             borderColor: isSelected ? 'border-emerald-400 ring-2 ring-emerald-400/40' : 'border-emerald-500/60 hover:border-emerald-400',
-            bg: 'bg-[#0a0410]',
-            badgeBg: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/40',
+            bg: 'bg-[#fffdf8]',
+            badgeBg: 'bg-emerald-100 text-emerald-900 border-emerald-300',
             badgeText: 'Module',
             icon: <Folder className="w-3.5 h-3.5 text-emerald-500 shrink-0" />,
           };
@@ -118,16 +178,16 @@ const CodeWhyGraphNode: React.FC<NodeProps<Node<CustomNodeData>>> = ({ data, sel
         if (entType === 'ConfigKey') {
           return {
             borderColor: isSelected ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-amber-500/50 hover:border-amber-400',
-            bg: 'bg-[#0a0410]',
-            badgeBg: 'bg-amber-500/15 text-amber-400 border-amber-500/40',
+            bg: 'bg-[#fffdf8]',
+            badgeBg: 'bg-amber-100 text-amber-900 border-amber-300',
             badgeText: 'ConfigKey',
             icon: <Key className="w-3.5 h-3.5 text-amber-400 shrink-0" />,
           };
         }
         return {
           borderColor: isSelected ? 'border-emerald-400 ring-2 ring-emerald-400/40' : 'border-emerald-500/60 hover:border-emerald-400',
-          bg: 'bg-[#0a0410]',
-          badgeBg: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/40',
+          bg: 'bg-[#fffdf8]',
+          badgeBg: 'bg-emerald-100 text-emerald-900 border-emerald-300',
           badgeText: 'File',
           icon: <FileCode className="w-3.5 h-3.5 text-emerald-500 shrink-0" />,
         };
@@ -135,40 +195,40 @@ const CodeWhyGraphNode: React.FC<NodeProps<Node<CustomNodeData>>> = ({ data, sel
       case 'Commit':
         return {
           borderColor: isSelected ? 'border-purple-400 ring-2 ring-purple-400/40' : 'border-purple-500/60 hover:border-purple-400',
-          bg: 'bg-[#0a0410]',
-          badgeBg: 'bg-purple-500/15 text-purple-400 border-purple-500/40',
+          bg: 'bg-[#fffdf8]',
+          badgeBg: 'bg-violet-100 text-violet-900 border-violet-300',
           badgeText: 'Commit',
           icon: <GitCommit className="w-3.5 h-3.5 text-purple-400 shrink-0" />,
         };
       case 'Repository':
         return {
           borderColor: isSelected ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-amber-500/60 hover:border-amber-400',
-          bg: 'bg-[#0a0410]',
-          badgeBg: 'bg-amber-500/15 text-amber-400 border-amber-500/40',
+          bg: 'bg-[#fffdf8]',
+          badgeBg: 'bg-amber-100 text-amber-900 border-amber-300',
           badgeText: 'Repository',
           icon: <GitBranch className="w-3.5 h-3.5 text-amber-400 shrink-0" />,
         };
       case 'PullRequest':
         return {
           borderColor: isSelected ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-amber-500/50 hover:border-amber-400',
-          bg: 'bg-[#0a0410]',
-          badgeBg: 'bg-purple-500/15 text-purple-500 border-purple-500/40',
+          bg: 'bg-[#fffdf8]',
+          badgeBg: 'bg-violet-100 text-violet-900 border-violet-300',
           badgeText: node.props?.merged === false ? 'PR (Open)' : 'PR',
           icon: <GitPullRequest className="w-3.5 h-3.5 text-purple-500 shrink-0" />,
         };
       case 'Evidence':
         return {
           borderColor: isSelected ? 'border-emerald-400 ring-2 ring-emerald-400/40' : 'border-emerald-500/50 hover:border-emerald-400',
-          bg: 'bg-[#0a0410]',
-          badgeBg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40',
+          bg: 'bg-[#fffdf8]',
+          badgeBg: 'bg-emerald-100 text-emerald-900 border-emerald-300',
           badgeText: 'Evidence',
           icon: <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0" />,
         };
       case 'Person':
         return {
           borderColor: isSelected ? 'border-rose-400 ring-2 ring-rose-400/40' : 'border-rose-500/60 hover:border-rose-400',
-          bg: 'bg-[#0a0410]',
-          badgeBg: 'bg-rose-500/15 text-rose-400 border-rose-500/40',
+          bg: 'bg-[#fffdf8]',
+          badgeBg: 'bg-rose-100 text-rose-900 border-rose-300',
           badgeText: 'Person',
           icon: <User className="w-3.5 h-3.5 text-rose-400 shrink-0" />,
         };
@@ -188,38 +248,44 @@ const CodeWhyGraphNode: React.FC<NodeProps<Node<CustomNodeData>>> = ({ data, sel
   return (
     <div
       onClick={() => data.onSelect(node)}
-      className={`w-[240px] px-3.5 py-2.5 rounded-xl border ${style.borderColor} ${style.bg} shadow-lg transition-all cursor-pointer select-none group text-left`}
+      className={`w-[280px] min-h-[136px] px-4 py-3 rounded-xl border-2 ${style.borderColor} ${style.bg} shadow-lg transition-all cursor-pointer select-none group text-left ${data.isFocus ? 'ring-2 ring-sky-500/50 shadow-xl' : ''}`}
     >
-      <Handle type="target" position={Position.Top} className="!w-2 !h-2 !bg-[#0a1424] !border-[#3b82f6]" />
+      <Handle type="target" position={Position.Left} className="!w-2.5 !h-2.5 !bg-sky-600 !border-2 !border-white" />
       
       <div className="flex items-center justify-between gap-2 mb-1">
-        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border font-semibold flex items-center gap-1 ${style.badgeBg}`}>
+        <span className={`text-[11px] font-mono px-2 py-1 rounded-md border font-semibold flex items-center gap-1 ${style.badgeBg}`}>
           {style.icon}
           <span>{style.badgeText}</span>
         </span>
 
-        <span className="text-[10px] font-mono text-[#77776e] truncate max-w-[80px]" title={node.id}>
-          {node.id.replace(/^(dec_|file:|key:|module:|person:|pr:|ev:)/, '')}
-        </span>
+        {data.isFocus ? (
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wide text-sky-800 bg-sky-100 border border-sky-300 rounded px-1.5 py-0.5">
+            Focus
+          </span>
+        ) : (
+          <span className="text-[10px] font-mono text-[#51534b] truncate max-w-[100px]" title={node.id}>
+            {node.id.replace(/^(dec_|file:|key:|module:|person:|pr:|ev:)/, '')}
+          </span>
+        )}
       </div>
 
-      <div       className="text-xs font-semibold font-mono text-[#292b25] truncate group-hover:text-amber-400 transition-colors" title={node.label}>
+      <div className="text-sm font-semibold font-mono text-[#292b25] leading-snug break-words line-clamp-2 group-hover:text-sky-800 transition-colors" title={node.label}>
         {node.label}
       </div>
 
       {node.props?.path && (
-        <div className="text-[10px] font-mono text-[#77776e] truncate mt-0.5" title={node.props.path}>
+        <div className="text-[11px] font-mono text-[#51534b] break-all line-clamp-2 mt-1" title={node.props.path}>
           {node.props.path}
         </div>
       )}
 
       {node.props?.rule && (
-        <div className="mt-1 text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-800 border border-amber-500/30 truncate inline-block">
+        <div className="mt-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 truncate inline-block">
           Rule: {node.props.rule}
         </div>
       )}
 
-      <Handle type="source" position={Position.Bottom} className="!w-2 !h-2 !bg-[#0a1424] !border-[#3b82f6]" />
+      <Handle type="source" position={Position.Right} className="!w-2.5 !h-2.5 !bg-sky-600 !border-2 !border-white" />
     </div>
   );
 };
@@ -398,51 +464,27 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
     );
   }, [graphData, visibleNodeIds]);
 
-  // Stable Dagre Layout Computation
+  // Place the focus entity at the center and connected nodes in relationship rings.
   const { layoutNodes, layoutEdges } = useMemo(() => {
     if (visibleNodesList.length === 0) {
       return { layoutNodes: [], layoutEdges: [] };
     }
 
-    const g = new dagre.graphlib.Graph();
-    g.setDefaultEdgeLabel(() => ({}));
-    g.setGraph({
-      rankdir: 'TB',
-      nodesep: visibleNodesList.length > 30 ? 90 : 60,
-      ranksep: visibleNodesList.length > 30 ? 120 : 90,
-      edgesep: visibleNodesList.length > 30 ? 40 : 30,
-      marginx: 30,
-      marginy: 30,
-    });
-
-    // Deterministic sort of nodes by id to guarantee stable layout across re-renders
     const sortedNodes = [...visibleNodesList].sort((a, b) => a.id.localeCompare(b.id));
     const sortedEdges = [...visibleEdgesList].sort((a, b) =>
       `${a.source}->${a.target}:${a.type}`.localeCompare(`${b.source}->${b.target}:${b.type}`)
     );
-
-    sortedNodes.forEach((node) => {
-      g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
-    });
-
-    sortedEdges.forEach((edge) => {
-      g.setEdge(edge.source, edge.target);
-    });
-
-    dagre.layout(g);
+    const positions = radialNodePositions(sortedNodes, sortedEdges, focusEntityId);
 
     const rfNodes: Node<CustomNodeData>[] = sortedNodes.map((node) => {
-      const pos = g.node(node.id);
       return {
         id: node.id,
         type: 'customNode',
-        position: {
-          x: pos ? pos.x - NODE_WIDTH / 2 : 0,
-          y: pos ? pos.y - NODE_HEIGHT / 2 : 0,
-        },
+        position: positions.get(node.id) ?? { x: 0, y: 0 },
         data: {
           raw: node,
           isSelected: selectedNode?.id === node.id,
+          isFocus: node.id === focusEntityId,
           onSelect: (n) => setSelectedNode(n),
           onOpenDecision: (decId) => setActiveDecisionDrawerId(decId),
         },
@@ -472,37 +514,37 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
         id: `e-${edge.source}-${edge.target}-${idx}`,
         source: edge.source,
         target: edge.target,
-        type: 'smoothstep',
+        type: 'default',
         animated: edge.type === 'SUPERSEDES',
-        label: edge.type === 'SUPERSEDES' || edge.rule ? edgeLabel : undefined,
+        label: edgeLabel,
         labelStyle: {
-          fill: 'var(--text-muted)',
-          fontSize: 9,
+          fill: '#263449',
+          fontSize: 11,
           fontFamily: 'var(--font-mono)',
           fontWeight: 600,
         },
         labelBgStyle: {
-          fill: 'var(--surface)',
-          fillOpacity: 0.85,
+          fill: '#fffdf8',
+          fillOpacity: 0.98,
         },
-        labelBgPadding: [4, 2],
-        labelBgBorderRadius: 4,
+        labelBgPadding: [7, 4],
+        labelBgBorderRadius: 6,
         style: {
           stroke: strokeColor,
-          strokeWidth: isDashed ? 2 : 1.5,
+          strokeWidth: isDashed ? 2.5 : 2,
           strokeDasharray: isDashed ? '5,5' : undefined,
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
-          width: 14,
-          height: 14,
+          width: 16,
+          height: 16,
           color: strokeColor,
         },
       };
     });
 
     return { layoutNodes: rfNodes, layoutEdges: rfEdges };
-  }, [visibleNodesList, visibleEdgesList, selectedNode]);
+  }, [visibleNodesList, visibleEdgesList, selectedNode, focusEntityId]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<CustomNodeData>>(layoutNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(layoutEdges);
@@ -527,7 +569,7 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
   }, [selectedNode, graphData]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5rem)] bg-[#f5f3ed] w-full text-[#292b25] overflow-hidden select-none">
+    <div className="flex flex-col h-[calc(100vh-4rem)] min-h-[600px] bg-[#f5f3ed] w-full text-[#292b25] overflow-hidden select-none">
       
       {/* Top Header & Context Bar */}
       <div className="border-b border-[#d7d2c6]/80 bg-[#fffdf8]/95 backdrop-blur-md px-4 sm:px-6 py-3.5 shrink-0 z-20">
@@ -547,7 +589,7 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
                 </div>
               )}
               <h1 className="text-lg font-bold font-sans text-[#292b25] tracking-tight flex items-center gap-2 pt-0.5">
-                <span>Provenance & Subgraph Architecture</span>
+                <span>Connected Knowledge Graph</span>
                 {isLoading ? (
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-[#54734f] border border-cyan-500/30 animate-pulse">
                     Querying Subgraph...
@@ -641,7 +683,7 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
                     ? 'bg-indigo-500/20 text-indigo-800 font-semibold border border-indigo-500/40'
                     : 'text-[#77776e] hover:text-[#51534b]'
                 }`}
-                title="Interactive React Flow Graph View"
+                title="Interactive connected node graph"
               >
                 <Workflow className="w-3.5 h-3.5" />
                 <span>Visual</span>
@@ -849,7 +891,7 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
       )}
 
       {/* Main Content Area: Visual Graph or Accessible List or 503 Offline State */}
-      <div className="flex-1 relative flex overflow-hidden">
+      <div className="flex-1 min-h-0 relative flex overflow-hidden">
         
         {!activeQuestion ? (
           <div className="flex-1 flex flex-col items-center justify-center p-6 text-center z-10 space-y-4">
@@ -942,7 +984,7 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
             <div className="flex items-center justify-between border-b border-[#d7d2c6] pb-3">
               <div>
                 <h2 className="text-sm font-mono font-bold uppercase text-[#292b25] tracking-wider">
-                  Accessible Graph Lineage View
+                  Accessible Node & Relationship View
                 </h2>
                 <p className="text-xs text-[#77776e] font-mono">
                   Tabular screen-reader accessible inventory of {visibleNodesList.length} visible graph nodes and {visibleEdgesList.length} relationships
@@ -1038,35 +1080,22 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
               onEdgesChange={onEdgesChange}
               nodeTypes={nodeTypes}
               fitView
-              fitViewOptions={{ padding: 0.2, maxZoom: 0.9 }}
-              minZoom={0.2}
+              fitViewOptions={{ padding: 0.08, maxZoom: 1.15 }}
+              minZoom={0.25}
               maxZoom={2.5}
-              defaultViewport={{ x: 0, y: 0, zoom: 0.85 }}
+              defaultViewport={{ x: 0, y: 0, zoom: 1 }}
               className="bg-[#f5f3ed]"
               proOptions={{ hideAttribution: true }}
             >
               <Background color="var(--border)" gap={24} size={1} />
               <Controls className="codewhy-flow-controls" />
-              <MiniMap
-                className="codewhy-flow-minimap"
-                pannable
-                zoomable
-                style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
-                nodeColor={(node) => {
-                  const rawNode = node.data.raw as RawGraphNode;
-                  if (rawNode.type === 'Decision') return 'var(--warning)';
-                  if (rawNode.type === 'CodeEntity') return 'var(--accent)';
-                  return 'var(--text-subtle)';
-                }}
-                maskColor="rgba(22, 28, 43, 0.12)"
-              />
             </ReactFlow>
           </div>
         )}
 
         {/* 4. Node Detail Inspector Slide-Over Panel */}
         {selectedNode && (
-          <aside className="w-80 sm:w-96 border-l border-[#d7d2c6] bg-[#efede5]/95 backdrop-blur-xl p-5 overflow-y-auto space-y-5 shrink-0 z-30 flex flex-col justify-between shadow-2xl">
+          <aside className="absolute right-4 top-4 bottom-4 w-80 sm:w-96 max-w-[calc(100%-2rem)] border border-[#d7d2c6] rounded-2xl bg-[#fffdf8]/95 backdrop-blur-xl p-5 overflow-y-auto space-y-5 z-30 flex flex-col justify-between shadow-2xl">
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-[#d7d2c6] pb-3">
                 <span className="text-[10px] font-mono uppercase tracking-wider text-[#77776e] flex items-center gap-1.5 font-bold">
