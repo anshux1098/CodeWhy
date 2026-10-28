@@ -87,34 +87,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className={`
           fixed lg:sticky top-16 left-0 z-40 h-[calc(100vh-4rem)] shrink-0
           border-r transition-[width,transform] duration-200 ease-in-out
-          ${isOpen ? 'translate-x-0 w-60' : '-translate-x-full lg:translate-x-0 lg:w-16'}
+          ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0 lg:w-[72px]'}
         `}
         style={{
           backgroundColor: 'var(--sidebar)',
           borderColor: 'var(--border)',
         }}
       >
-        <div className="flex h-full flex-col py-4">
+        <div className="flex h-full flex-col py-5">
           {/* Header / Toggle */}
-          <div className={`flex items-center px-3 mb-5 ${isOpen ? 'justify-between' : 'justify-center'}`}>
+          <div className={`flex items-center px-4 mb-6 ${isOpen ? 'justify-between' : 'justify-center'}`}>
             {isOpen && (
-              <span style={{ fontSize: '9px', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.15em', color: 'var(--text-subtle)' }}>
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-subtle)]">
                 Navigation
               </span>
             )}
             <button
               type="button"
               onClick={onToggle}
-              className="p-1.5 rounded-lg transition-colors cursor-pointer"
-              style={{ color: 'var(--text-subtle)', backgroundColor: 'transparent' }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--surface-hover)';
-                (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)';
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
-                (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-subtle)';
-              }}
+              className="sidebar-toggle cursor-pointer rounded-lg p-2 transition-colors"
               title={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
               aria-expanded={isOpen}
               aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
@@ -127,15 +118,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
-          {/* Nav Items — card-style with gaps */}
+          {/* Primary app navigation */}
           <nav
             aria-label="Main"
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-              padding: '0 10px',
-            }}
+            className="flex flex-col gap-2 px-3"
           >
             {NAV_ITEMS.map(({ id, label, icon: Icon, accent }) => {
               const active = currentTab === id;
@@ -150,71 +136,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }
                   }}
                   title={label}
-                  className="cursor-pointer transition-all duration-150"
+                  aria-current={active ? 'page' : undefined}
+                  data-nav-tab={id}
+                  className="sidebar-nav-button cursor-pointer"
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
                     justifyContent: isOpen ? 'flex-start' : 'center',
-                    borderRadius: '10px',
-                    padding: isOpen ? '10px 12px' : '11px',
-                    border: `1px solid ${active ? `color-mix(in srgb, ${accent} 40%, transparent)` : 'var(--border)'}`,
-                    backgroundColor: active ? `color-mix(in srgb, ${accent} 8%, transparent)` : 'transparent',
-                    boxShadow: active ? `0 0 14px color-mix(in srgb, ${accent} 12%, transparent), inset 0 0 8px color-mix(in srgb, ${accent} 8%, transparent)` : 'none',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    textAlign: 'left',
-                  }}
-                  onMouseEnter={e => {
-                    if (!active) {
-                      const el = e.currentTarget as HTMLButtonElement;
-                      el.style.borderColor = `color-mix(in srgb, ${accent} 40%, transparent)`;
-                      el.style.backgroundColor = `color-mix(in srgb, ${accent} 8%, transparent)`;
-                      el.style.boxShadow = `0 0 10px color-mix(in srgb, ${accent} 12%, transparent)`;
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    if (!active) {
-                      const el = e.currentTarget as HTMLButtonElement;
-                      el.style.borderColor = 'var(--border)';
-                      el.style.backgroundColor = 'transparent';
-                      el.style.boxShadow = 'none';
-                    }
+                    padding: isOpen ? '0 12px' : '0',
                   }}
                 >
-                  {/* Active left accent bar */}
-                  {active && (
-                    <span
-                      style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: '18%',
-                        bottom: '18%',
-                        width: '3px',
-                        borderRadius: '0 4px 4px 0',
-                        backgroundColor: accent,
-                        boxShadow: `0 0 6px ${accent}`,
-                      }}
-                    />
-                  )}
-
-                  <Icon
-                    className="w-4 h-4 shrink-0 transition-colors"
-                    style={{ color: active ? accent : 'var(--text-subtle)' }}
-                  />
+                  <span className="sidebar-nav-icon">
+                    <Icon className="h-4 w-4 shrink-0" />
+                  </span>
 
                   {isOpen && (
                     <span
-                      style={{
-                        fontSize: '12px',
-                        fontWeight: active ? 600 : 400,
-                        color: active ? accent : 'var(--sidebar-text)',
-                        fontFamily: 'sans-serif',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        transition: 'color 0.15s',
-                      }}
+                      className="truncate text-[13px] font-medium"
+                      style={{ color: active ? accent : 'var(--sidebar-text)' }}
                     >
                       {label}
                     </span>
@@ -229,11 +166,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div
               style={{
                 marginTop: 'auto',
-                padding: '12px 14px 4px',
+                padding: '16px 16px 4px',
                 borderTop: '1px solid var(--border)',
               }}
             >
-              <p style={{ fontSize: '9px', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.15em', color: 'var(--text-subtle)' }}>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
                 CodeWhy v1.0
               </p>
             </div>

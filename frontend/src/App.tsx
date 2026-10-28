@@ -10,7 +10,7 @@ import { RepositoryStatusView } from './components/RepositoryStatusView';
 import { GraphExplorerView } from './components/GraphExplorerView';
 import { FileDecisionBriefView } from './components/FileDecisionBriefView';
 import type { Repository, QuestionContext, AskResponse } from './types';
-import { fetchRepositories, fetchHealth, FALLBACK_REPOSITORIES } from './services/api';
+import { fetchRepositories, FALLBACK_REPOSITORIES } from './services/api';
 
 export function App() {
   const [currentTab, setCurrentTab] = useState<AppTab>('home');
@@ -18,8 +18,6 @@ export function App() {
   const [selectedRepo, setSelectedRepo] = useState<Repository | null>(FALLBACK_REPOSITORIES[0]);
   const [questionContext, setQuestionContext] = useState<QuestionContext | null>(null);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [latencyMs, setLatencyMs] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     const saved = localStorage.getItem('codewhy_sidebar_open');
     return saved === null ? true : saved === 'true';
@@ -120,16 +118,10 @@ export function App() {
     const route = parseUrlRoute();
 
     async function loadData() {
-      // 1. Health check
-      const healthData = await fetchHealth();
-      setIsConnected(healthData.isConnected);
-      setLatencyMs(healthData.latencyMs);
-
-      // 2. Repositories
       const repoData = await fetchRepositories();
       setRepositories(repoData.items);
 
-      // 3. Resolve active repository based on URL or saved state
+      // Resolve active repository based on URL or saved state
       if ((route.tab === 'workspace' || route.tab === 'decisions' || route.tab === 'status' || route.tab === 'graph' || route.tab === 'file') && route.repoId) {
         const foundInLoaded = repoData.items.find((r) => r.id === route.repoId);
         if (foundInLoaded) {
@@ -179,16 +171,8 @@ export function App() {
     };
     window.addEventListener('popstate', handlePopState);
 
-    // Periodic health check
-    const interval = setInterval(async () => {
-      const h = await fetchHealth();
-      setIsConnected(h.isConnected);
-      setLatencyMs(h.latencyMs);
-    }, 15000);
-
     return () => {
       window.removeEventListener('popstate', handlePopState);
-      clearInterval(interval);
     };
   }, [parseUrlRoute]);
 
@@ -229,8 +213,6 @@ export function App() {
         onSelectTab={(tab) => navigateToTab(tab)}
         selectedRepo={selectedRepo}
         onOpenRepoSelector={() => setIsSelectorOpen(true)}
-        isConnected={isConnected}
-        latencyMs={latencyMs}
       />
 
       <div className="flex flex-1 z-10 min-h-0">

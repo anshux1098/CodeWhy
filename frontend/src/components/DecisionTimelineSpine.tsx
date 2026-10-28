@@ -71,16 +71,15 @@ export const DecisionTimelineSpine: React.FC<DecisionTimelineSpineProps> = ({
         </div>
 
         {/* State Filter Buttons */}
-        <div className="flex flex-wrap items-center gap-1 text-[10px] font-mono">
+        <div className="filter-segment-group" role="group" aria-label="Filter decisions by state">
           {(['ALL', 'ACTIVE', 'SUPERSEDED', 'REJECTED', 'UNRESOLVED'] as const).map((st) => (
             <button
               key={st}
+              type="button"
               onClick={() => setFilterState(st)}
-              className={`px-2 py-0.5 rounded border transition-colors cursor-pointer ${
-                filterState === st
-                  ? 'bg-[#d7d2c6] text-[#292b25] border-[#bdb8ab] font-medium'
-                  : 'bg-[#f5f3ed] text-[#77776e] border-[#d7d2c6] hover:text-[#51534b] hover:bg-[#efede5]'
-              }`}
+              aria-pressed={filterState === st}
+              data-state-filter={st}
+              className="filter-segment cursor-pointer"
             >
               {st === 'ALL' ? 'All' : st}
             </button>

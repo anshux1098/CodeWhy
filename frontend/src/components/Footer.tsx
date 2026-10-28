@@ -31,8 +31,8 @@ export const Footer: React.FC = () => {
             <GitBranch className="w-3.5 h-3.5 text-violet-500" />
             Temporal Decision Lineage
           </span>
-          <span className="badge-cyan flex items-center gap-1.5 px-3 py-1 rounded-lg">
-            <Layers className="w-3.5 h-3.5 text-cyan-500" />
+          <span className="badge-violet flex items-center gap-1.5 px-3 py-1 rounded-lg">
+            <Layers className="w-3.5 h-3.5 text-[var(--primary)]" />
             Principled Refusal Gates
           </span>
         </div>

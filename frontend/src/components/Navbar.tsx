@@ -11,16 +11,12 @@ interface NavbarProps {
   onSelectTab: (tab: AppTab) => void;
   selectedRepo: Repository | null;
   onOpenRepoSelector: () => void;
-  isConnected: boolean;
-  latencyMs: number;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   onSelectTab,
   selectedRepo,
   onOpenRepoSelector,
-  isConnected,
-  latencyMs,
 }) => {
   return (
     <header
@@ -68,42 +64,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
           
-          {/* Health & Engine Status */}
-          <div
-            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-mono"
-            title={isConnected ? `Connected to FastAPI (${latencyMs}ms)` : 'Running in local fixture mode'}
-            style={{
-              backgroundColor: 'var(--surface-raised)',
-              borderColor: 'var(--border)',
-            }}
-          >
-            <span
-              className="inline-block h-2 w-2 rounded-full"
-              style={{
-                backgroundColor: isConnected ? '#10b981' : '#f59e0b',
-                boxShadow: isConnected ? '0 0 8px rgba(16,185,129,0.7)' : '0 0 8px rgba(245,158,11,0.7)',
-              }}
-            />
-            <span style={{ color: 'var(--text-muted)' }}>
-              {isConnected ? (
-                <span style={{ color: 'var(--text)' }}>API Live</span>
-              ) : (
-                <span className="text-amber-500">Fixture</span>
-              )}
-            </span>
-            {isConnected && (
-              <span
-                className="text-[10px] pl-1.5 border-l"
-                style={{
-                  color: 'var(--text-subtle)',
-                  borderColor: 'var(--border)',
-                }}
-              >
-                {latencyMs}ms
-              </span>
-            )}
-          </div>
-
           {/* Quick Switch Repo Button */}
           <button
             onClick={onOpenRepoSelector}

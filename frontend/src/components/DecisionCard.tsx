@@ -80,7 +80,7 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
   const config = renderStateConfig();
 
   return (
-    <div className={`rounded-lg p-4 transition-colors ${config.containerClass}`}>
+    <div className={`workbench-card rounded-xl p-5 transition-all hover:-translate-y-0.5 hover:shadow-md ${config.containerClass}`}>
       {/* Top Bar: State Badge, ID, and Source Reference */}
       <div className="flex flex-wrap items-center justify-between gap-2.5 mb-2.5">
         <div className="flex items-center gap-2">
