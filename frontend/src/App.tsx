@@ -257,6 +257,9 @@ export function App() {
         <main className="flex-1 flex flex-col min-w-0" style={{ backgroundColor: 'var(--canvas)' }}>
           {currentTab === 'home' ? (
             <Hero
+              repositories={repositories}
+              selectedRepo={selectedRepo}
+              onSelectRepo={handleSelectRepo}
               onNavigateToWorkspace={(question?: string) => {
                 if (question) setWorkspaceQuestion(question);
                 navigateToTab('workspace');

@@ -283,7 +283,7 @@
   outline-offset: 3px;
 }
 
-/* ── Backdrop SVG container ──────────────────────────────── */
+/* ── Backdrop / depth layers ─────────────────────────────── */
 .cw-landing .cw-backdrop {
   position: absolute;
   inset: 0;
@@ -297,6 +297,330 @@
   display: block;
 }
 
+.cw-landing .cw-waves { animation: cw-reveal 1.9s ease-out both; }
+
+.cw-landing .cw-particle.is-twinkling {
+  animation-name: cw-twinkle;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.cw-landing .cw-wave-path {
+  transform-box: view-box;
+  will-change: transform;
+}
+.cw-landing .cw-wave-path.is-drifting {
+  animation-name: cw-wave-drift;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+/* soft bronze pool that follows the pointer inside the wave band */
+.cw-landing .cw-wave-glow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 620px;
+  height: 620px;
+  border-radius: 50%;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    circle,
+    rgba(185, 145, 94, 0.13) 0%,
+    rgba(117, 127, 108, 0.075) 38%,
+    rgba(8, 9, 7, 0) 66%
+  );
+  transform: translate3d(-620px, -620px, 0);
+  will-change: transform, opacity;
+}
+
+/* ── Orbit: arc, dust, repository stars ──────────────────── */
+.cw-landing .cw-orbit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  animation: cw-reveal 1.5s ease-out both;
+}
+
+.cw-landing .cw-arc-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.cw-landing .cw-arc-line {
+  stroke-width: 0.9;
+  opacity: 0.2;
+}
+
+.cw-landing .cw-arc-seg {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.cw-landing .cw-arc-seg.is-selected {
+  opacity: 0.42;
+}
+
+.cw-landing .cw-arc-seg.is-hovered {
+  opacity: 0.78;
+}
+
+.cw-landing .cw-arc-light {
+  opacity: 0.75;
+}
+
+.cw-landing .cw-orbit-dust {
+  position: absolute;
+  border-radius: 50%;
+  background: #f5f3ed;
+  box-shadow: 0 0 7px rgba(245, 243, 237, 0.4);
+  transform: translate(-50%, -50%);
+  animation: cw-dust 9s ease-in-out infinite;
+}
+
+.cw-landing .cw-orbit-stars {
+  position: absolute;
+  inset: 0;
+}
+
+.cw-landing .cw-repo-star {
+  --cw-near: 0;
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cw-landing .cw-repo-star:focus-visible {
+  outline: 2px solid var(--cw-powder);
+  outline-offset: -10px;
+  border-radius: 50%;
+}
+
+.cw-landing .cw-star-halo {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(185, 145, 94, 0.4) 0%,
+    rgba(185, 145, 94, 0.12) 46%,
+    rgba(8, 9, 7, 0) 72%
+  );
+  opacity: calc(0.35 + var(--cw-near) * 0.5);
+  transform: scale(calc(0.82 + var(--cw-near) * 0.5));
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.cw-landing .cw-star-ring {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(185, 145, 94, 0.55);
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 0.45s ease, transform 0.45s ease, border-color 0.3s ease;
+}
+
+.cw-landing .cw-star-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #c9bfae;
+  box-shadow: 0 0 6px rgba(201, 191, 174, 0.35);
+  transform: scale(calc(1 + var(--cw-near) * 0.35));
+  transition: transform 0.18s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cw-landing .cw-repo-star.is-selected .cw-star-halo {
+  opacity: calc(0.55 + var(--cw-near) * 0.35);
+  transform: scale(calc(1 + var(--cw-near) * 0.32));
+  background: radial-gradient(
+    circle,
+    rgba(185, 145, 94, 0.55) 0%,
+    rgba(185, 145, 94, 0.16) 46%,
+    rgba(8, 9, 7, 0) 74%
+  );
+}
+.cw-landing .cw-repo-star.is-selected .cw-star-ring {
+  opacity: 0.9;
+  transform: scale(1);
+  box-shadow: 0 0 10px rgba(185, 145, 94, 0.22);
+}
+.cw-landing .cw-repo-star.is-selected .cw-star-dot {
+  background: #d9b784;
+  box-shadow: 0 0 9px rgba(185, 145, 94, 0.6), 0 0 2px rgba(255, 240, 214, 0.8);
+}
+.cw-landing .cw-repo-star:hover .cw-star-dot,
+.cw-landing .cw-repo-star:focus-visible .cw-star-dot {
+  background: #f0e2c9;
+  box-shadow: 0 0 12px rgba(226, 199, 155, 0.55), 0 0 3px rgba(255, 255, 255, 0.85);
+}
+.cw-landing .cw-repo-star:hover .cw-star-ring,
+.cw-landing .cw-repo-star:focus-visible .cw-star-ring {
+  border-color: rgba(226, 199, 155, 0.8);
+}
+
+/* ── Repository tooltip ──────────────────────────────────── */
+.cw-landing .cw-star-tip {
+  --cw-tip-x: -50%;
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 4px);
+  z-index: 3;
+  width: max-content;
+  min-width: 138px;
+  max-width: 220px;
+  padding: 8px 10px 9px;
+  border-radius: 8px;
+  background: rgba(10, 11, 8, 0.94);
+  border: 1px solid color-mix(in srgb, var(--cw-bronze) 32%, var(--cw-border));
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(var(--cw-tip-x), 6px);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+  pointer-events: none;
+}
+
+/* keep the tooltip inside the hero when a star sits near an edge */
+.cw-landing .cw-repo-star.is-tip-left .cw-star-tip {
+  left: 0;
+  --cw-tip-x: 0%;
+}
+.cw-landing .cw-repo-star.is-tip-right .cw-star-tip {
+  left: auto;
+  right: 0;
+  --cw-tip-x: 0%;
+}
+
+/* stars near the top of the orbit open their tooltip downward */
+.cw-landing .cw-repo-star.is-tip-below .cw-star-tip {
+  bottom: auto;
+  top: calc(100% - 2px);
+  transform: translate(var(--cw-tip-x), -6px);
+}
+
+.cw-landing .cw-repo-star:hover .cw-star-tip,
+.cw-landing .cw-repo-star:focus-visible .cw-star-tip {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(var(--cw-tip-x), 0);
+}
+
+.cw-landing .cw-repo-star.is-tip-below:hover .cw-star-tip,
+.cw-landing .cw-repo-star.is-tip-below:focus-visible .cw-star-tip {
+  transform: translate(var(--cw-tip-x), 0);
+}
+
+.cw-landing .cw-tip-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cw-text-2);
+}
+.cw-landing .cw-tip-icon {
+  width: 11px;
+  height: 11px;
+  color: var(--cw-olive);
+}
+.cw-landing .cw-tip-current {
+  margin-left: auto;
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--cw-bronze) 45%, transparent);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: #d8b98c;
+}
+.cw-landing .cw-tip-name {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cw-text);
+  word-break: break-word;
+}
+.cw-landing .cw-tip-branch {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--cw-olive);
+}
+
+/* touch devices: focus opens the tooltip, tap-hover never leaves one stuck */
+@media (hover: none) {
+  .cw-landing .cw-repo-star:hover .cw-star-tip {
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(var(--cw-tip-x), 6px);
+  }
+  .cw-landing .cw-repo-star:focus .cw-star-tip,
+  .cw-landing .cw-repo-star:focus-visible .cw-star-tip {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(var(--cw-tip-x), 0);
+  }
+}
+
+@media (pointer: coarse) {
+  .cw-landing .cw-repo-star {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* ── Motion ──────────────────────────────────────────────── */
+@keyframes cw-reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes cw-twinkle {
+  0%, 100% { opacity: 0.14; }
+  38% { opacity: 0.48; }
+  62% { opacity: 0.24; }
+}
+@keyframes cw-wave-drift {
+  from { transform: translate3d(-4px, 1.2px, 0); }
+  to { transform: translate3d(5px, -1.4px, 0); }
+}
+@keyframes cw-dust {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.85; }
+}
+
+.cw-landing .cw-hero.is-paused .cw-particle,
+.cw-landing .cw-hero.is-paused .cw-wave-path,
+.cw-landing .cw-hero.is-paused .cw-orbit-dust { animation-play-state: paused; }
+
 /* ── Focus / motion ──────────────────────────────────────── */
 .cw-landing :focus-visible {
   outline: 2px solid var(--cw-powder);
@@ -309,12 +633,26 @@
   .cw-landing .cw-cta:hover { transform: none; }
   .cw-landing .cw-cta:hover .cw-arrow { transform: none; }
   .cw-landing .cw-float { animation: none !important; }
+  .cw-landing .cw-particle,
+  .cw-landing .cw-wave-path,
+  .cw-landing .cw-orbit,
+  .cw-landing .cw-waves,
+  .cw-landing .cw-orbit-dust { animation: none !important; transition: none !important; }
+  .cw-landing .cw-arc-light { display: none; }
+  .cw-landing .cw-arc-seg { transition: none !important; }
+  .cw-landing .cw-star-halo,
+  .cw-landing .cw-star-dot,
+  .cw-landing .cw-star-ring,
+  .cw-landing .cw-star-tip { transition: none !important; }
+  .cw-landing .cw-wave-glow { display: none; }
 }
 
 @media (max-width: 768px) {
   .cw-landing .cw-hero-title { letter-spacing: -0.03em; }
   .cw-landing .cw-backdrop .cw-waves { opacity: 0.55; }
-  .cw-landing .cw-backdrop .cw-arc { opacity: 0.5; }
+  .cw-landing .cw-orbit { opacity: 0.9; }
+  .cw-landing .cw-orbit-dust { display: none; }
+  .cw-landing .cw-wave-glow { display: none; }
 }
 
 @media (max-width: 640px) {
