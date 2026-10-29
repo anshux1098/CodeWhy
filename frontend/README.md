@@ -1,32 +1,41 @@
-# React + TypeScript + Vite
+# CodeWhy Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+## Demo Mode
 
-Currently, two official plugins are available:
+The demo runs with `DATA_SOURCE=graph` and `SQLITE_CACHE_PATH` unset. The SQLite data source does not carry dates, authors, coverage counts, or full supersession lineage, so `DATA_SOURCE=graph` is the recommended mode for accurate data.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Prerequisites
 
-## React Compiler
+- Node.js >= 22.12.0 (current: v22.11.0 works with warnings)
+- pnpm 10.33.4+
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Install (fresh clone)
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+git clone <repo-url>
+cd CodeWhy/frontend
+pnpm install
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Run
+
+```bash
+pnpm dev          # Vite on 5173, proxied to 127.0.0.1:8000/api
+pnpm build        # typecheck + production build
+pnpm test         # Vitest unit tests
+pnpm lint         # oxlint
+pnpm check        # typecheck + lint + tests + build
+pnpm preview      # preview production build
+```
+
+## Backend
+
+Start the backend with:
+```bash
+DATA_SOURCE=graph python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+## Notes
+
+- `pnpm-lock.yaml` is committed; `package-lock.json` is not used.
+- The `@rolldown/binding-win32-x64-msvc` and `@oxlint/binding-win32-x64-msvc` packages are optional dependencies that may need manual installation on some systems.

@@ -10,57 +10,6 @@ import type {
   EntityListResponse,
 } from '../types';
 
-export const FALLBACK_REPOSITORIES: Repository[] = [
-  {
-    id: 'acme-netclient',
-    name: 'netclient',
-    full_name: 'acme/netclient',
-    owner: 'acme',
-    url: 'https://github.invalid/acme/netclient',
-    scope: 'HTTP & Resilient Networking Client',
-    counts: {
-      decisions: 5,
-      entities: 6,
-      pull_requests: 5,
-      commits: 9,
-    },
-    fixture: true,
-  },
-  {
-    id: 'urllib3-urllib3',
-    name: 'urllib3/urllib3',
-    full_name: 'urllib3/urllib3',
-    owner: 'urllib3',
-    url: 'https://github.com/urllib3/urllib3',
-    scope: 'HTTP Client & Connection Pool Engine',
-    counts: {
-      decisions: 48,
-      entities: 142,
-      pull_requests: 120,
-      commits: 340,
-    },
-    verified_decisions: 42,
-    prs_fetched: 120,
-    sources_analyzed: 95,
-    last_rebuilt_at: '2025-03-01T14:10:00Z',
-    fixture: false,
-  },
-  {
-    id: 'sqlalchemy-alembic',
-    name: 'sqlalchemy/alembic',
-    full_name: 'sqlalchemy/alembic',
-    owner: 'sqlalchemy',
-    url: 'https://github.com/sqlalchemy/alembic',
-    scope: 'Database Migration Tooling',
-    counts: {
-      decisions: 0,
-      entities: 0,
-      pull_requests: 0,
-      commits: 0,
-    },
-    fixture: true,
-  },
-];
 
 export interface GroundedQuestion {
   label: string;
@@ -180,67 +129,33 @@ export const GROUNDED_DEMO_QUESTIONS: Record<string, GroundedQuestion[]> = {
 };
 
 export async function fetchRepositories(): Promise<{ items: Repository[]; isLive: boolean }> {
-  try {
-    const res = await fetch('/api/v1/repositories', {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(4000),
-    });
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
-    }
-    const data = await res.json();
-    if (data && Array.isArray(data.items) && data.items.length > 0) {
-      const targetRepositories = FALLBACK_REPOSITORIES.filter((repo) =>
-        ['urllib3-urllib3', 'sqlalchemy-alembic'].includes(repo.id)
-      );
-      const items: Repository[] = data.items
-        .filter((repo: Repository) =>
-          repo.id.toLowerCase() !== 'hynek-structlog'
-          && repo.full_name?.toLowerCase() !== 'hynek/structlog'
-        )
-        .map((repo: Repository) => {
-          const target = targetRepositories.find((candidate) => candidate.id === repo.id);
-          return target
-            ? {
-                ...target,
-                ...repo,
-                name: target.full_name,
-                full_name: target.full_name,
-                owner: target.owner,
-                url: repo.url || target.url,
-              }
-            : repo;
-        });
-      for (const target of targetRepositories) {
-        if (!items.some((repo) =>
-          repo.id === target.id || repo.full_name?.toLowerCase() === target.full_name?.toLowerCase()
-        )) {
-          items.push(target);
-        }
-      }
-      return { items, isLive: true };
-    }
-    return { items: FALLBACK_REPOSITORIES, isLive: true };
-  } catch {
-    return { items: FALLBACK_REPOSITORIES, isLive: false };
+  const res = await fetch('/api/v1/repositories', {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(4000),
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
   }
+  const data = await res.json();
+  if (!data || !Array.isArray(data.items) || data.items.length === 0) {
+    throw new Error('The API returned no repositories.');
+  }
+  const items: Repository[] = data.items.filter((repo: Repository) =>
+    repo.id.toLowerCase() !== 'hynek-structlog'
+    && repo.full_name?.toLowerCase() !== 'hynek/structlog'
+  );
+  return { items, isLive: true };
 }
 
 export async function fetchRepository(repositoryId: string): Promise<Repository | null> {
-  try {
-    const res = await fetch(`/api/v1/repositories/${encodeURIComponent(repositoryId)}`, {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(4000),
-    });
-    if (!res.ok) {
-      const fallback = FALLBACK_REPOSITORIES.find((r) => r.id === repositoryId);
-      return fallback || null;
-    }
-    return await res.json();
-  } catch {
-    const fallback = FALLBACK_REPOSITORIES.find((r) => r.id === repositoryId);
-    return fallback || null;
+  const res = await fetch(`/api/v1/repositories/${encodeURIComponent(repositoryId)}`, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(4000),
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
   }
+  return await res.json();
 }
 
 export async function fetchHealth(): Promise<{ health: HealthResponse | null; latencyMs: number; isConnected: boolean }> {

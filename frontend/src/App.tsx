@@ -10,12 +10,13 @@ import { RepositoryStatusView } from './components/RepositoryStatusView';
 import { GraphExplorerView } from './components/GraphExplorerView';
 import { FileDecisionBriefView } from './components/FileDecisionBriefView';
 import type { Repository, QuestionContext, AskResponse } from './types';
-import { fetchRepositories, FALLBACK_REPOSITORIES } from './services/api';
+import { fetchRepositories } from './services/api';
 
 export function App() {
   const [currentTab, setCurrentTab] = useState<AppTab>('home');
-  const [repositories, setRepositories] = useState<Repository[]>(FALLBACK_REPOSITORIES);
-  const [selectedRepo, setSelectedRepo] = useState<Repository | null>(FALLBACK_REPOSITORIES[0]);
+  const [repositories, setRepositories] = useState<Repository[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
+  const [repoLoadError, setRepoLoadError] = useState<string | null>(null);
   const [questionContext, setQuestionContext] = useState<QuestionContext | null>(null);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -118,35 +119,44 @@ export function App() {
     const route = parseUrlRoute();
 
     async function loadData() {
-      const repoData = await fetchRepositories();
-      setRepositories(repoData.items);
-
-      // Resolve active repository based on URL or saved state
-      if ((route.tab === 'workspace' || route.tab === 'decisions' || route.tab === 'status' || route.tab === 'graph' || route.tab === 'file') && route.repoId) {
-        const foundInLoaded = repoData.items.find((r) => r.id === route.repoId);
-        if (foundInLoaded) {
-          setSelectedRepo(foundInLoaded);
+      try {
+        const repoData = await fetchRepositories();
+        if (repoData.items.length > 0) {
+          setRepositories(repoData.items);
         } else {
-          // Create stub repo for ID if not yet in list
-          setSelectedRepo({
-            id: route.repoId,
-            name: route.repoId,
-            url: `https://github.com/${route.repoId}`,
-            counts: { decisions: 0, entities: 0, pull_requests: 0, commits: 0 },
-            fixture: route.repoId === 'acme-netclient',
-          });
+          setRepoLoadError('The API returned no repositories.');
+          return;
         }
-        setCurrentTab(route.tab);
-      } else {
-        // Home page default
-        const savedRepoId = localStorage.getItem('codewhy_selected_repo');
-        const found = savedRepoId ? repoData.items.find((r) => r.id === savedRepoId) : null;
-        if (found) {
-          setSelectedRepo(found);
-        } else if (repoData.items.length > 0) {
-          setSelectedRepo(repoData.items[0]);
+
+        // Resolve active repository based on URL or saved state
+        if ((route.tab === 'workspace' || route.tab === 'decisions' || route.tab === 'status' || route.tab === 'graph' || route.tab === 'file') && route.repoId) {
+          const foundInLoaded = repoData.items.find((r) => r.id === route.repoId);
+          if (foundInLoaded) {
+            setSelectedRepo(foundInLoaded);
+          } else {
+            // Create stub repo for ID if not yet in list
+            setSelectedRepo({
+              id: route.repoId,
+              name: route.repoId,
+              url: `https://github.com/${route.repoId}`,
+              counts: { decisions: 0, entities: 0, pull_requests: 0, commits: 0 },
+              fixture: false,
+            });
+          }
+          setCurrentTab(route.tab);
+        } else {
+          // Home page default
+          const savedRepoId = localStorage.getItem('codewhy_selected_repo');
+          const found = savedRepoId ? repoData.items.find((r) => r.id === savedRepoId) : null;
+          if (found) {
+            setSelectedRepo(found);
+          } else if (repoData.items.length > 0) {
+            setSelectedRepo(repoData.items[0]);
+          }
+          setCurrentTab('home');
         }
-        setCurrentTab('home');
+      } catch (err) {
+        setRepoLoadError('The API is not reachable. Check that the backend is running.');
       }
     }
 
@@ -206,10 +216,29 @@ export function App() {
     setQuestionContext({ repositoryId: selectedRepo.id, question, response });
   };
 
+  if (repoLoadError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--canvas)] text-[var(--text)]">
+        <div className="text-center space-y-4">
+          <p className="text-lg font-semibold">{repoLoadError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 rounded bg-[var(--primary)] text-white text-sm font-medium"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex flex-col font-sans" style={{ backgroundColor: 'var(--canvas)', color: 'var(--text)' }}>
-      
+    <div
+      className={`min-h-screen flex flex-col font-sans${currentTab === 'home' ? ' cw-landing' : ''}`}
+      style={{ backgroundColor: currentTab === 'home' ? 'var(--cw-bg)' : 'var(--canvas)', color: currentTab === 'home' ? 'var(--cw-text)' : 'var(--text)' }}
+    >
       <Navbar
+        variant={currentTab === 'home' ? 'landing' : 'default'}
         onSelectTab={(tab) => navigateToTab(tab)}
         selectedRepo={selectedRepo}
         onOpenRepoSelector={() => setIsSelectorOpen(true)}
@@ -217,6 +246,7 @@ export function App() {
 
       <div className="flex flex-1 z-10 min-h-0">
         <Sidebar
+          variant={currentTab === 'home' ? 'landing' : 'default'}
           currentTab={currentTab}
           onSelectTab={(tab) => navigateToTab(tab)}
           isOpen={sidebarOpen}
@@ -227,6 +257,9 @@ export function App() {
         <main className="flex-1 flex flex-col min-w-0" style={{ backgroundColor: 'var(--canvas)' }}>
           {currentTab === 'home' ? (
             <Hero
+              repositories={repositories}
+              selectedRepo={selectedRepo}
+              onSelectRepo={handleSelectRepo}
               onNavigateToWorkspace={(question?: string) => {
                 if (question) setWorkspaceQuestion(question);
                 navigateToTab('workspace');
@@ -272,7 +305,7 @@ export function App() {
         onAddNewRepo={handleAddNewRepo}
       />
 
-      <Footer />
+      {currentTab !== 'home' && <Footer />}
     </div>
   );
 }
