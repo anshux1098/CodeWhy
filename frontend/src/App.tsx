@@ -233,8 +233,12 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col font-sans" style={{ backgroundColor: 'var(--canvas)', color: 'var(--text)' }}>
+    <div
+      className={`min-h-screen flex flex-col font-sans${currentTab === 'home' ? ' cw-landing' : ''}`}
+      style={{ backgroundColor: currentTab === 'home' ? 'var(--cw-bg)' : 'var(--canvas)', color: currentTab === 'home' ? 'var(--cw-text)' : 'var(--text)' }}
+    >
       <Navbar
+        variant={currentTab === 'home' ? 'landing' : 'default'}
         onSelectTab={(tab) => navigateToTab(tab)}
         selectedRepo={selectedRepo}
         onOpenRepoSelector={() => setIsSelectorOpen(true)}
@@ -242,6 +246,7 @@ export function App() {
 
       <div className="flex flex-1 z-10 min-h-0">
         <Sidebar
+          variant={currentTab === 'home' ? 'landing' : 'default'}
           currentTab={currentTab}
           onSelectTab={(tab) => navigateToTab(tab)}
           isOpen={sidebarOpen}
@@ -297,7 +302,7 @@ export function App() {
         onAddNewRepo={handleAddNewRepo}
       />
 
-      <Footer />
+      {currentTab !== 'home' && <Footer />}
     </div>
   );
 }
