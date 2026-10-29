@@ -280,56 +280,17 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
   repositories,
   selectedRepo,
   onSelectRepo,
-  onAddNewRepo,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'existing' | 'custom'>('existing');
-  
-  // Custom repo form state
-  const [customOwner, setCustomOwner] = useState('');
-  const [customName, setCustomName] = useState('');
-  const [customBranch, setCustomBranch] = useState('main');
-  const [customScope, setCustomScope] = useState('');
 
   if (!isOpen) return null;
 
   const filteredRepos = repositories.filter(
     (r) =>
       r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (r.scope && r.scope.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (r.owner && r.owner.toLowerCase().includes(searchQuery.toLowerCase()))
   );
-
-  const handleCreateCustomRepo = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customOwner.trim() || !customName.trim()) return;
-
-    const full_name = `${customOwner.trim()}/${customName.trim()}`;
-    const id = full_name.replace('/', '-').toLowerCase();
-
-    const newRepo: Repository = {
-      id,
-      name: full_name,
-      full_name,
-      owner: customOwner.trim(),
-      url: `https://github.com/${full_name}`,
-      scope: customScope.trim() || 'Custom Repository Target',
-      counts: {
-        decisions: 0,
-        entities: 0,
-        pull_requests: 0,
-        commits: 0,
-      },
-      verified_decisions: 0,
-      fixture: false,
-    };
-
-    if (onAddNewRepo) {
-      onAddNewRepo(newRepo);
-    }
-    onSelectRepo(newRepo);
-    onClose();
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
@@ -375,15 +336,12 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
             Available Repositories ({repositories.length})
           </button>
           <button
-            onClick={() => setActiveTab('custom')}
-            className={`py-2.5 px-3 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
-              activeTab === 'custom'
-                ? 'border-[#718d5e] text-[#292b25]'
-                : 'border-transparent text-[#77776e] hover:text-[#292b25]'
-            }`}
+            disabled
+            className="py-2.5 px-3 text-xs font-medium border-b-2 border-transparent text-[#929086] cursor-not-allowed flex items-center gap-1.5"
+            title="Repositories are ingested with scripts"
           >
             <Plus className="w-3.5 h-3.5" />
-            Add Target
+            Add Target (disabled)
           </button>
         </div>
 
@@ -492,70 +450,15 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
             </div>
           </div>
         ) : (
-          <form onSubmit={handleCreateCustomRepo} className="p-5 space-y-4 overflow-y-auto">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-mono text-[#77776e]">Repository Owner</label>
-                <input
-                  type="text"
-                  placeholder="e.g. psf"
-                  value={customOwner}
-                  onChange={(e) => setCustomOwner(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#f5f3ed] border border-[#d7d2c6] rounded text-xs font-mono text-[#292b25] placeholder-[#929086] focus:outline-none focus:border-[#718d5e]"
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-mono text-[#77776e]">Repository Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. requests"
-                  value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#f5f3ed] border border-[#d7d2c6] rounded text-xs font-mono text-[#292b25] placeholder-[#929086] focus:outline-none focus:border-[#718d5e]"
-                  required
-                />
-              </div>
+          <div className='p-5 space-y-4'>
+            <div className='rounded-lg border border-[#d7d2c6] bg-[#f5f3ed] p-4 text-xs font-mono text-[#77776e]'>
+              <p className='font-semibold text-[#292b25] mb-2'>Repositories are ingested with scripts</p>
+              <p className='mb-2'>New repositories are added by running the ingest pipeline, not through the UI.</p>
+              <code className='block bg-[#fffdf8] border border-[#d7d2c6] rounded px-3 py-2 text-[#292b25]'>
+                python -m scripts.ingest --repo owner/repo
+              </code>
             </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-mono text-[#77776e]">Default Branch</label>
-              <input
-                type="text"
-                placeholder="main"
-                value={customBranch}
-                onChange={(e) => setCustomBranch(e.target.value)}
-                className="w-full px-3 py-2 bg-[#f5f3ed] border border-[#d7d2c6] rounded text-xs font-mono text-[#292b25] placeholder-[#929086] focus:outline-none focus:border-[#718d5e]"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-mono text-[#77776e]">Target Scope / Seed Files (optional)</label>
-              <textarea
-                placeholder="e.g. src/requests/sessions.py, src/requests/adapters.py"
-                value={customScope}
-                onChange={(e) => setCustomScope(e.target.value)}
-                rows={2}
-                className="w-full px-3 py-2 bg-[#f5f3ed] border border-[#d7d2c6] rounded text-xs font-mono text-[#292b25] placeholder-[#929086] focus:outline-none focus:border-[#718d5e]"
-              />
-            </div>
-
-            <div className="pt-2 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-3.5 py-1.5 rounded bg-[#efede5] hover:bg-[#d7d2c6] text-[#51534b] text-xs font-medium transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-3.5 py-1.5 rounded bg-[#54734f] hover:bg-[#718d5e] text-white text-xs font-medium transition-colors cursor-pointer"
-              >
-                Add Target
-              </button>
-            </div>
-          </form>
+          </div>
         )}
       </div>
     </div>

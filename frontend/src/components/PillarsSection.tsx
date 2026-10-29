@@ -31,7 +31,7 @@ export const PillarsSection: React.FC = () => {
       badgeClass: 'badge-emerald',
       borderClass: 'stat-card-emerald',
       tag: 'ZERO HALLUCINATIONS',
-      title: '100% Verbatim Substring Quotes',
+      title: 'Verbatim Quote Verification',
       description:
         'Generic models invent plausible-sounding justifications for legacy patterns. CodeWhy strictly validates every quote character-by-character against original PR threads, commits, and review comments before citing it.',
       contrast: {

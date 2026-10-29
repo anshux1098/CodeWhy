@@ -804,7 +804,7 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
             <span>People {filters.Person ? '(Shown)' : '(Hidden)'}</span>
           </button>
 
-          {/* Test State Simulator Toggles */}
+{import.meta.env.DEV && (
           <div className="ml-auto flex items-center gap-2 text-[10px] text-[#77776e]">
             <span className="text-[#77776e] uppercase">Test States:</span>
             <button
@@ -828,6 +828,7 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
               {simulateTruncated ? 'Reset Ceiling' : 'Simulate Truncated'}
             </button>
           </div>
+        )}
         </div>
         )}
       </div>

@@ -25,18 +25,16 @@ export const InlineGraphViewer: React.FC<InlineGraphViewerProps> = ({
   const [filterType, setFilterType] = useState<string>('ALL');
   const [isExpanded, setIsExpanded] = useState(false);
 
-  if (!graph || !graph.nodes || graph.nodes.length === 0) {
-    return null;
-  }
-
   // Node type categories
   const nodeTypes = useMemo(() => {
+    if (!graph || !graph.nodes || graph.nodes.length === 0) return ['ALL'];
     const types = new Set(graph.nodes.map((n) => n.type));
     return ['ALL', ...Array.from(types)];
   }, [graph]);
 
   // Compute simple radial/layered layout positions for nodes
   const layout = useMemo(() => {
+    if (!graph || !graph.nodes || graph.nodes.length === 0) return { positions: {}, width: 800, height: 480 };
     const nodes = graph.nodes;
     const width = 800;
     const height = 480;
@@ -92,6 +90,10 @@ export const InlineGraphViewer: React.FC<InlineGraphViewerProps> = ({
 
     return { positions, width, height };
   }, [graph]);
+
+  if (!graph || !graph.nodes || graph.nodes.length === 0) {
+    return null;
+  }
 
   const getNodeColor = (type: string) => {
     if (type === 'Decision') {
@@ -335,3 +337,4 @@ export const InlineGraphViewer: React.FC<InlineGraphViewerProps> = ({
     </div>
   );
 };
+
