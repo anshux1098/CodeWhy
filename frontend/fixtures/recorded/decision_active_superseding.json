@@ -1,0 +1,36 @@
+{
+  "citations": [
+    {
+      "author": "pquentin",
+      "decision_id": "dec_ce303eb845540d38",
+      "id": "cit_ev_a1e7fdc6a5362528",
+      "kind": "SOURCE",
+      "quote": "Unfortunately, we realized after working on them that we can't really use those new settings. curl also does not implement them.",
+      "source_type": "PullRequest",
+      "source_url": "https://github.com/urllib3/urllib3/pull/3466",
+      "timestamp": null
+    }
+  ],
+  "conflicts_with": [],
+  "effective_at": "2024-09-03T09:10:49Z",
+  "ended_at": null,
+  "evidence_gaps": [],
+  "fixture": false,
+  "id": "dec_ce303eb845540d38",
+  "probable_superseded_by": [],
+  "rationale": "The new settings could not be used because curl also does not implement them.",
+  "reaffirms": [],
+  "recorded_at": null,
+  "rule": "1_revert_commit",
+  "source": {
+    "number": 3466,
+    "type": "PullRequest",
+    "url": "https://github.com/urllib3/urllib3/pull/3466"
+  },
+  "state": "ACTIVE",
+  "summary": "Revert the addition of TLS settings for HTTP/2",
+  "superseded_by": [],
+  "supersedes": [
+    "dec_6dee7648b9ef5416"
+  ]
+}

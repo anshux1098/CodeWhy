@@ -347,7 +347,7 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
   const urlMatch = typeof window !== 'undefined'
     ? window.location.pathname.match(/\/r\/([^/]+)/)
     : null;
-  const repoId = selectedRepo?.id || (urlMatch ? decodeURIComponent(urlMatch[1]) : 'acme-netclient');
+  const repoId = selectedRepo?.id || (urlMatch ? decodeURIComponent(urlMatch[1]) : '');
   const activeQuestion = questionContext?.repositoryId === repoId ? questionContext : null;
   const focusEntityId = activeQuestion
     ? focusSelection?.questionContext === activeQuestion

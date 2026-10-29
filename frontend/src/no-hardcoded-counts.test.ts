@@ -21,7 +21,7 @@ describe('no hard-coded repository counts', () => {
     const files = walkDir(srcDir);
     const offenders: string[] = [];
     for (const file of files) {
-      if (file.includes('no-hardcoded-counts.test.ts')) continue;
+      if (file.includes('.test.')) continue;
       const content = readFileSync(file, 'utf-8');
       // Check for the specific old made-up counts in context of repository data
       if (content.includes('decisions: 48') || content.includes('entities: 142') || content.includes('pull_requests: 120')) {

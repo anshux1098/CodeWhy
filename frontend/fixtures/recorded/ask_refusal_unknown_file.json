@@ -1,0 +1,16 @@
+{
+  "answer": "I could not find a matching code entity in the repository history for this question.",
+  "candidates": [],
+  "citations": [],
+  "code_differs_from_latest": null,
+  "confidence": null,
+  "decisions": [],
+  "entity": null,
+  "evidence_gaps": [
+    "This system covers urllib3/urllib3 at branch main, commits 2009-12-10..2026-10-01, 291 file paths touched by the fetched pull requests; ingest caps: max_ingestion_issues=100; no matching file was found."
+  ],
+  "fixture": false,
+  "outcome": "refusal",
+  "reason_code": "entity_not_found",
+  "who_to_ask": []
+}

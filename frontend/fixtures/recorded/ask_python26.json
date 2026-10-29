@@ -1,0 +1,33 @@
+{
+  "answer": "Relevant decisions exist for this entity, but the retrieved evidence does not meet the required similarity threshold to reliably assert an answer.",
+  "candidates": [],
+  "citations": [],
+  "code_differs_from_latest": null,
+  "confidence": {
+    "label": "LOW",
+    "score": 0.45,
+    "signals": {
+      "agreement": 0.4,
+      "contradiction": 0.0,
+      "directness": 0.5,
+      "provenance": 0.5,
+      "relevance": 0.5022,
+      "temporal_consistency": 1.0
+    }
+  },
+  "decisions": [],
+  "entity": {
+    "decision_count": 1,
+    "id": "file:urllib3/urllib3:src/urllib3/__init__.py",
+    "label": "src/urllib3/__init__.py",
+    "path": "src/urllib3/__init__.py",
+    "type": "File"
+  },
+  "evidence_gaps": [
+    "Evidence relevance score below MIN_SCORE threshold"
+  ],
+  "fixture": false,
+  "outcome": "refusal",
+  "reason_code": "low_score",
+  "who_to_ask": []
+}

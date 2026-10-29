@@ -5,6 +5,7 @@ interface LogoProps {
   showText?: boolean;
   showTagline?: boolean;
   className?: string;
+  variant?: 'default' | 'landing';
 }
 
 export const Logo: React.FC<LogoProps> = ({
@@ -12,6 +13,7 @@ export const Logo: React.FC<LogoProps> = ({
   showText = true,
   showTagline = true,
   className = '',
+  variant = 'default',
 }) => {
   const sizeMap = {
     sm: { icon: 28, text: 16, sub: 8, rx: 7 },
@@ -20,6 +22,62 @@ export const Logo: React.FC<LogoProps> = ({
     xl: { icon: 68, text: 36, sub: 13, rx: 18 },
   };
   const { icon, text, sub, rx } = sizeMap[size];
+
+  if (variant === 'landing') {
+    return (
+      <div className={`flex items-center gap-3 select-none ${className}`}>
+        {/* CW Squircle Emblem Mark */}
+        <div
+          className="relative shrink-0 flex items-center justify-center rounded-lg font-bold transition-transform hover:scale-[1.03]"
+          style={{
+            width: icon,
+            height: icon,
+            fontSize: Math.max(10, Math.round(text * 0.65)),
+            backgroundImage: 'linear-gradient(180deg, #14150F 0%, #0A0B08 100%)',
+            border: '1px solid color-mix(in srgb, #B9915E 52%, #292A23)',
+            color: '#F0E9DC',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4), 0 0 12px rgba(185, 145, 94, 0.15)',
+          }}
+        >
+          Cw.
+        </div>
+
+        {/* Typography: Project Name + Tagline */}
+        {showText && (
+          <div className="flex flex-col justify-center leading-none">
+            <div
+              className="flex items-baseline tracking-tight font-extrabold"
+              style={{
+                fontFamily: "'Manrope', sans-serif",
+                fontSize: text,
+                letterSpacing: '-0.04em',
+                lineHeight: 1.1,
+              }}
+            >
+              <span style={{ color: '#F5F3ED' }}>Code</span>
+              <span style={{ color: '#B9915E' }}>Why</span>
+            </div>
+            {showTagline && (
+              <span
+                style={{
+                  fontFamily: "'Manrope', sans-serif",
+                  fontSize: sub,
+                  fontWeight: 600,
+                  color: '#A5A69D',
+                  marginTop: '3px',
+                  letterSpacing: '0.04em',
+                  lineHeight: 1,
+                  textTransform: 'uppercase',
+                }}
+              >
+                Decision Intelligence
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={`flex items-center gap-3 select-none ${className}`}>

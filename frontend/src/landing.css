@@ -1,6 +1,10 @@
 /* CodeWhy landing (Overview) page — scoped under .cw-landing only. */
 
-.cw-landing {
+.cw-landing,
+.cw-investigate-page,
+.cw-decisions-page,
+.cw-file-page,
+.cw-status-page {
   --cw-header-h: 62px;
   --cw-bg: #080907;
   --cw-sidebar: #0B0C09;
@@ -21,7 +25,7 @@
 }
 
 /* ── Header (landing variant) ─────────────────────────────── */
-.cw-landing .cw-navbar-landing {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-navbar-landing {
   height: var(--cw-header-h);
   background-color: color-mix(in srgb, var(--cw-bg) 94%, transparent);
   border-bottom: 1px solid var(--cw-border);
@@ -30,7 +34,7 @@
   box-shadow: none;
 }
 
-.cw-landing .cw-brand-mark {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-brand-mark {
   width: 34px;
   height: 34px;
   border-radius: 9px;
@@ -47,20 +51,20 @@
     0 0 16px color-mix(in srgb, var(--cw-bronze) 14%, transparent);
 }
 
-.cw-landing .cw-wordmark {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-wordmark {
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1;
   color: var(--cw-text);
 }
-.cw-landing .cw-wordmark .cw-why {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-wordmark .cw-why {
   background-image: linear-gradient(180deg, #C9A776 0%, #B9915E 55%, #9C7949 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-.cw-landing .cw-eyebrow-sub {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-eyebrow-sub {
   font-size: 9.5px;
   letter-spacing: 0.16em;
   color: var(--cw-text-2);
@@ -68,7 +72,7 @@
   font-weight: 600;
 }
 
-.cw-landing .cw-repo-pill {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-repo-pill {
   background-color: var(--cw-surface);
   border: 1px solid var(--cw-border);
   color: var(--cw-text);
@@ -76,12 +80,12 @@
   font-size: 12px;
   font-family: var(--font-mono);
 }
-.cw-landing .cw-repo-pill .cw-branch {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-repo-pill .cw-branch {
   color: var(--cw-olive);
   font-weight: 600;
 }
 
-.cw-landing .cw-switch-repo {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-switch-repo {
   background-color: var(--cw-surface);
   border: 1px solid var(--cw-border);
   color: var(--cw-text);
@@ -90,13 +94,13 @@
   font-weight: 500;
   transition: border-color 0.18s ease, background-color 0.18s ease;
 }
-.cw-landing .cw-switch-repo:hover {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-switch-repo:hover {
   border-color: color-mix(in srgb, var(--cw-bronze) 45%, var(--cw-border));
   background-color: color-mix(in srgb, var(--cw-bronze) 6%, var(--cw-surface));
 }
 
 /* ── Sidebar (landing variant) ───────────────────────────── */
-.cw-landing .cw-sidebar-landing {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing {
   width: 268px;
   top: var(--cw-header-h);
   height: calc(100vh - var(--cw-header-h));
@@ -104,23 +108,23 @@
   border-right: 1px solid var(--cw-border);
 }
 
-.cw-landing .cw-sidebar-landing .cw-nav-label {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing .cw-nav-label {
   color: var(--cw-text-2);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.16em;
 }
 
-.cw-landing .cw-sidebar-landing .cw-nav-btn {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing .cw-nav-btn {
   border-radius: 10px;
   color: var(--cw-text-2);
   transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
-.cw-landing .cw-sidebar-landing .cw-nav-btn:hover {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing .cw-nav-btn:hover {
   background-color: color-mix(in srgb, var(--cw-olive) 8%, var(--cw-sidebar));
   color: var(--cw-text);
 }
-.cw-landing .cw-sidebar-landing .cw-nav-btn[aria-current="page"] {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing .cw-nav-btn[aria-current="page"] {
   background-image: linear-gradient(
     180deg,
     color-mix(in srgb, var(--cw-olive) 17%, var(--cw-sidebar)) 0%,
@@ -132,11 +136,11 @@
     inset 0 1px 0 rgba(245, 243, 237, 0.05),
     0 4px 14px rgba(0, 0, 0, 0.35);
 }
-.cw-landing .cw-sidebar-landing .cw-nav-btn[aria-current="page"] .cw-nav-icon {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing .cw-nav-btn[aria-current="page"] .cw-nav-icon {
   background-color: color-mix(in srgb, var(--cw-bronze) 16%, transparent);
   color: var(--cw-bronze);
 }
-.cw-landing .cw-sidebar-landing .cw-nav-icon {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing .cw-nav-icon {
   width: 28px;
   height: 28px;
   border-radius: 8px;
@@ -144,7 +148,7 @@
   color: var(--cw-text-2);
 }
 
-.cw-landing .cw-sidebar-landing .cw-version {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing .cw-version {
   color: var(--cw-text-2);
   font-size: 10px;
   font-weight: 600;
@@ -152,7 +156,7 @@
 }
 
 /* collapsed width */
-.cw-landing .cw-sidebar-landing.is-collapsed { width: 72px; }
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing.is-collapsed { width: 72px; }
 
 /* ── Hero ─────────────────────────────────────────────────── */
 .cw-landing .cw-hero {

@@ -1,0 +1,16 @@
+{
+  "detail": [
+    {
+      "ctx": {
+        "min_length": 3
+      },
+      "input": "ab",
+      "loc": [
+        "body",
+        "question"
+      ],
+      "msg": "String should have at least 3 characters",
+      "type": "string_too_short"
+    }
+  ]
+}
