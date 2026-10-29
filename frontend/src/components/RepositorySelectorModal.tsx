@@ -280,56 +280,17 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
   repositories,
   selectedRepo,
   onSelectRepo,
-  onAddNewRepo,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'existing' | 'custom'>('existing');
-  
-  // Custom repo form state
-  const [customOwner, setCustomOwner] = useState('');
-  const [customName, setCustomName] = useState('');
-  const [customBranch, setCustomBranch] = useState('main');
-  const [customScope, setCustomScope] = useState('');
 
   if (!isOpen) return null;
 
   const filteredRepos = repositories.filter(
     (r) =>
       r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (r.scope && r.scope.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (r.owner && r.owner.toLowerCase().includes(searchQuery.toLowerCase()))
   );
-
-  const handleCreateCustomRepo = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customOwner.trim() || !customName.trim()) return;
-
-    const full_name = `${customOwner.trim()}/${customName.trim()}`;
-    const id = full_name.replace('/', '-').toLowerCase();
-
-    const newRepo: Repository = {
-      id,
-      name: full_name,
-      full_name,
-      owner: customOwner.trim(),
-      url: `https://github.com/${full_name}`,
-      scope: customScope.trim() || 'Custom Repository Target',
-      counts: {
-        decisions: 0,
-        entities: 0,
-        pull_requests: 0,
-        commits: 0,
-      },
-      verified_decisions: 0,
-      fixture: false,
-    };
-
-    if (onAddNewRepo) {
-      onAddNewRepo(newRepo);
-    }
-    onSelectRepo(newRepo);
-    onClose();
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
@@ -499,6 +460,7 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
             </div>
           </div>
         )}
+      </div>
     </div>
   );
 };
