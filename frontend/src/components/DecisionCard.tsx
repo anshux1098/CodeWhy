@@ -153,14 +153,15 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
 
       {/* Metadata Timestamps */}
       <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-[#77776e] mt-2.5 pt-2 border-t border-[#d7d2c6]/60">
+        <span className="flex items-center gap-1">
+          <Clock className="w-3 h-3" />
+          Effective: {effective_at ? new Date(effective_at).toLocaleDateString() : 'date unknown'}
+        </span>
         {recorded_at && (
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
             Recorded: {new Date(recorded_at).toLocaleDateString()}
           </span>
-        )}
-        {effective_at && (
-          <span>Effective: {new Date(effective_at).toLocaleDateString()}</span>
         )}
         {ended_at && (
           <span className="text-[#f85149]">Ended: {new Date(ended_at).toLocaleDateString()}</span>

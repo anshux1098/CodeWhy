@@ -1,0 +1,36 @@
+{
+  "citations": [
+    {
+      "author": "mrdaybird",
+      "decision_id": "dec_6dee7648b9ef5416",
+      "id": "cit_ev_d467f1bb191c1506",
+      "kind": "SOURCE",
+      "quote": "This PR modifies `create_urllib3_context` to add TLS settings required for HTTP/2 as per RFC 9113.",
+      "source_type": "PullRequest",
+      "source_url": "https://github.com/urllib3/urllib3/pull/3456",
+      "timestamp": null
+    }
+  ],
+  "conflicts_with": [],
+  "effective_at": "2024-08-22T17:36:35Z",
+  "ended_at": null,
+  "evidence_gaps": [],
+  "fixture": false,
+  "id": "dec_6dee7648b9ef5416",
+  "probable_superseded_by": [],
+  "rationale": "This PR modifies create_urllib3_context to add TLS settings required for HTTP/2 as per RFC 9113.",
+  "reaffirms": [],
+  "recorded_at": null,
+  "rule": "1_revert_commit",
+  "source": {
+    "number": 3456,
+    "type": "PullRequest",
+    "url": "https://github.com/urllib3/urllib3/pull/3456"
+  },
+  "state": "SUPERSEDED",
+  "summary": "Modify create_urllib3_context to add TLS settings required for HTTP/2 as per RFC 9113",
+  "superseded_by": [
+    "dec_ce303eb845540d38"
+  ],
+  "supersedes": []
+}

@@ -1,0 +1,493 @@
+{
+  "fixture": false,
+  "items": [
+    {
+      "date": "2026-08-02T18:55:40Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+        "file:urllib3/urllib3:src/urllib3/http2/connection.py"
+      ],
+      "id": "dec_5ab3b9bd5ca39fde",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/5101",
+      "state": "ACTIVE",
+      "summary": "Preserve explicit port 0 in connection_from_url and HTTP/2 authority by using an explicit None check instead of a truthiness check",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2026-02-11T21:27:16Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connection.py",
+        "file:urllib3/urllib3:src/urllib3/exceptions.py",
+        "file:urllib3/urllib3:src/urllib3/fields.py",
+        "file:urllib3/urllib3:src/urllib3/poolmanager.py",
+        "file:urllib3/urllib3:src/urllib3/util/ssl_.py"
+      ],
+      "id": "dec_e1b5f1876cb27c16",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/3763",
+      "state": "ACTIVE",
+      "summary": "Switch deprecation warnings from DeprecationWarning to FutureWarning",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2024-09-03T09:10:49Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/util/ssl_.py"
+      ],
+      "id": "dec_ce303eb845540d38",
+      "rule": "1_revert_commit",
+      "source_url": "https://github.com/urllib3/urllib3/pull/3466",
+      "state": "ACTIVE",
+      "summary": "Revert the addition of TLS settings for HTTP/2",
+      "superseded_by": [],
+      "supersedes": [
+        "dec_6dee7648b9ef5416"
+      ]
+    },
+    {
+      "date": "2024-08-22T17:36:35Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/util/ssl_.py"
+      ],
+      "id": "dec_6dee7648b9ef5416",
+      "rule": "1_revert_commit",
+      "source_url": "https://github.com/urllib3/urllib3/pull/3456",
+      "state": "SUPERSEDED",
+      "summary": "Modify create_urllib3_context to add TLS settings required for HTTP/2 as per RFC 9113",
+      "superseded_by": [
+        "dec_ce303eb845540d38"
+      ],
+      "supersedes": []
+    },
+    {
+      "date": "2024-08-14T17:50:02Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connection.py"
+      ],
+      "id": "dec_bf7b6381956ef74e",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/3252",
+      "state": "ACTIVE",
+      "summary": "Fix ResourceWarning on CONNECT with Python < 3.11.4",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2023-11-23T21:33:28Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connection.py",
+        "file:urllib3/urllib3:src/urllib3/connectionpool.py"
+      ],
+      "id": "dec_705d6ef451cbec2b",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/3134",
+      "state": "ACTIVE",
+      "summary": "Enable mypy's ignore-without-code to enforce typechecking standards",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2023-10-05T20:40:59Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/util/ssl_.py"
+      ],
+      "id": "dec_04fe474d74325a07",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/3144",
+      "state": "ACTIVE",
+      "summary": "Update documentation links to use SSLContext.wrap_socket instead of the removed ssl.wrap_socket",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2023-06-02T12:40:28Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connection.py"
+      ],
+      "id": "dec_8e2113ddc1026b17",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/3055",
+      "state": "ACTIVE",
+      "summary": "Fix assert_hostname=False by checking assert_hostname before calling ssl_wrap_socket",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2021-12-07T06:20:02Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connectionpool.py"
+      ],
+      "id": "dec_1707c1f574802d08",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/2470",
+      "state": "ACTIVE",
+      "summary": "Include the connection pool size in the message when discarding connections",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2021-08-15T20:43:15Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connection.py",
+        "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+        "file:urllib3/urllib3:src/urllib3/contrib/_securetransport/bindings.py",
+        "file:urllib3/urllib3:src/urllib3/contrib/_securetransport/low_level.py",
+        "file:urllib3/urllib3:src/urllib3/contrib/pyopenssl.py",
+        "file:urllib3/urllib3:src/urllib3/contrib/securetransport.py",
+        "file:urllib3/urllib3:src/urllib3/contrib/socks.py",
+        "file:urllib3/urllib3:src/urllib3/exceptions.py",
+        "file:urllib3/urllib3:src/urllib3/response.py",
+        "file:urllib3/urllib3:src/urllib3/util/request.py",
+        "file:urllib3/urllib3:src/urllib3/util/retry.py",
+        "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+        "file:urllib3/urllib3:src/urllib3/util/timeout.py"
+      ],
+      "id": "dec_1975c2691a4117af",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/2340",
+      "state": "ACTIVE",
+      "summary": "Explicitly chain or disable exceptions using Python 3 built-in syntax",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2021-02-09T07:34:58Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connection.py",
+        "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+        "file:urllib3/urllib3:src/urllib3/exceptions.py"
+      ],
+      "id": "dec_cd30ff07d87e9ecd",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/2133",
+      "state": "ACTIVE",
+      "summary": "Add a custom exception wrapper for HTTPS proxy connection failures",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2021-02-09T06:10:59Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/__init__.py",
+        "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+        "file:urllib3/urllib3:src/urllib3/util/__init__.py",
+        "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+        "file:urllib3/urllib3:src/urllib3/util/url.py",
+        "file:urllib3/urllib3:src/urllib3/util/url.pyi"
+      ],
+      "id": "dec_5bf9c85e20b5cb14",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/2139",
+      "state": "ACTIVE",
+      "summary": "Make urllib3.util.url regular expressions private",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2020-09-28T20:11:27Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connection.py",
+        "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+        "file:urllib3/urllib3:src/urllib3/poolmanager.py",
+        "file:urllib3/urllib3:src/urllib3/util/proxy.py",
+        "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+        "file:urllib3/urllib3:src/urllib3/util/ssltransport.py"
+      ],
+      "id": "dec_47cb5a8499ed20ad",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/1923",
+      "state": "ACTIVE",
+      "summary": "Integrate SSLTransport class for TLS-in-TLS tunnels and keep forwarding mode under a flag",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2020-07-16T16:22:59Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connection.py"
+      ],
+      "id": "dec_4f5a643ea3a629e2",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/1906",
+      "state": "ACTIVE",
+      "summary": "Collapse request chunked data and framing into one send() call",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2020-03-12T08:39:40Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connection.py",
+        "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+        "file:urllib3/urllib3:src/urllib3/exceptions.py",
+        "file:urllib3/urllib3:src/urllib3/poolmanager.py"
+      ],
+      "id": "dec_e09af699b32f537c",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/1679",
+      "state": "ACTIVE",
+      "summary": "Add support for HTTPS connections to proxies",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2020-02-17T21:34:48Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connection.py"
+      ],
+      "id": "dec_3bd89dfa51c0d2a0",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/1800",
+      "state": "ACTIVE",
+      "summary": "Raise ValueError if method contains control characters",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2019-11-22T13:19:58Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connectionpool.py"
+      ],
+      "id": "dec_c636931924332bfd",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/1691",
+      "state": "ACTIVE",
+      "summary": "Add hostname to insecure connection warning",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2019-08-26T01:00:08Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connection.py",
+        "file:urllib3/urllib3:src/urllib3/fields.py",
+        "file:urllib3/urllib3:src/urllib3/filepost.py",
+        "file:urllib3/urllib3:src/urllib3/util/ssl_.py"
+      ],
+      "id": "dec_4ce7c9d1e5a57b60",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/1669",
+      "state": "ACTIVE",
+      "summary": "Updated Python version checks to correctly handle Python 4 and above instead of relying on PY3",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2019-07-26T15:42:52Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+        "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+        "file:urllib3/urllib3:src/urllib3/util/url.py"
+      ],
+      "id": "dec_374c15ea4fa9fa06",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/1647",
+      "state": "ACTIVE",
+      "summary": "Percent-encode invalid characters within auth section and remove rfc3986 as a vendored dependency",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2019-03-23T03:24:18Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connection.py",
+        "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+        "file:urllib3/urllib3:src/urllib3/response.py",
+        "file:urllib3/urllib3:src/urllib3/util/timeout.py"
+      ],
+      "id": "dec_8e6457eb4f1e4104",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/1554",
+      "state": "ACTIVE",
+      "summary": "Bump timeouts to help with CI flakiness",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2019-02-27T20:54:27Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/contrib/_securetransport/bindings.py",
+        "file:urllib3/urllib3:src/urllib3/contrib/pyopenssl.py",
+        "file:urllib3/urllib3:src/urllib3/contrib/securetransport.py",
+        "file:urllib3/urllib3:src/urllib3/util/__init__.py",
+        "file:urllib3/urllib3:src/urllib3/util/ssl_.py"
+      ],
+      "id": "dec_0a1e8c57cb7c59cf",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/1496",
+      "state": "ACTIVE",
+      "summary": "Add support for TLS 1.3 to all HTTPSConnection implementations and start testing against it",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2019-01-24T18:16:08Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connection.py"
+      ],
+      "id": "dec_c2abd7dff0d4abc3",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/1527",
+      "state": "ACTIVE",
+      "summary": "Handle httplib implementations that do not set _tunnel_host",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2019-01-22T13:17:33Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connection.py",
+        "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+        "file:urllib3/urllib3:src/urllib3/contrib/pyopenssl.py",
+        "file:urllib3/urllib3:src/urllib3/poolmanager.py",
+        "file:urllib3/urllib3:src/urllib3/util/ssl_.py"
+      ],
+      "id": "dec_bf19d791654419d7",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/1489",
+      "state": "ACTIVE",
+      "summary": "Add support for password-protected client keyfiles via key_password parameter",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2018-12-07T16:19:21Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+        "file:urllib3/urllib3:src/urllib3/util/url.py"
+      ],
+      "id": "dec_d93fcc65f36fe7a9",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/1487",
+      "state": "ACTIVE",
+      "summary": "Implement RFC 3986 URL parsing by adding the rfc3986 module",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2018-10-04T13:18:32Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/util/ssl_.py"
+      ],
+      "id": "dec_de821fd1ee45bc1e",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/1448",
+      "state": "ACTIVE",
+      "summary": "Remove leftover Python 2.6 variable set_ciphers",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2018-09-14T14:25:02Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connection.py",
+        "file:urllib3/urllib3:src/urllib3/response.py",
+        "file:urllib3/urllib3:src/urllib3/util/ssl_.py"
+      ],
+      "id": "dec_5f520b0a0b345b6a",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/1440",
+      "state": "ACTIVE",
+      "summary": "Remove unnecessary use of six.binary_type and six.b",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2018-08-24T12:52:14Z",
+      "entities": [
+        "file:urllib3/urllib3:src/urllib3/connection.py",
+        "file:urllib3/urllib3:src/urllib3/connectionpool.py"
+      ],
+      "id": "dec_e069daf125fc4556",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/1430",
+      "state": "ACTIVE",
+      "summary": "Remove Python 2.6 code to fix an installation error",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2018-04-03T17:01:39Z",
+      "entities": [],
+      "id": "dec_044a0a0aadc0c0e7",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/1356",
+      "state": "ACTIVE",
+      "summary": "Switch LifoQueue to use a collections.deque backend",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2016-02-29T20:07:27Z",
+      "entities": [],
+      "id": "dec_ae86a774e1040287",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/807",
+      "state": "ACTIVE",
+      "summary": "Clean up connections that fail inside HTTPConnectionPool.urlopen",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2016-02-22T21:14:46Z",
+      "entities": [],
+      "id": "dec_faa4780c47cc679f",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/795",
+      "state": "ACTIVE",
+      "summary": "Rewrite the server certificate to include dnsname subject alternative name fields",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2015-12-19T19:34:08Z",
+      "entities": [],
+      "id": "dec_ff1710c35b6821d6",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/762",
+      "state": "ACTIVE",
+      "summary": "Add SOCKS support via a contrib module",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2015-12-03T18:17:17Z",
+      "entities": [],
+      "id": "dec_13f6dd55b281d580",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/754",
+      "state": "ACTIVE",
+      "summary": "Define an SNIMissingWarning that fires once per run when making an HTTPS request without SNI",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": "2013-12-03T16:32:00Z",
+      "entities": [],
+      "id": "dec_425c6152a7fdfddd",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/291",
+      "state": "ACTIVE",
+      "summary": "Ensure connections are properly closed on object destruction to prevent connection leaks",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "date": null,
+      "entities": [],
+      "id": "dec_954169a03fd82f51",
+      "rule": null,
+      "source_url": "https://github.com/urllib3/urllib3/pull/391",
+      "state": "ACTIVE",
+      "summary": "Make active SSL backend accessible to users",
+      "superseded_by": [],
+      "supersedes": []
+    }
+  ],
+  "limit": 50,
+  "offset": 0,
+  "total": 34
+}

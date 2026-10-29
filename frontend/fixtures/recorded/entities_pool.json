@@ -1,0 +1,20 @@
+{
+  "entities": [
+    {
+      "decision_count": 13,
+      "id": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+      "label": "src/urllib3/connectionpool.py",
+      "path": "src/urllib3/connectionpool.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 4,
+      "id": "file:urllib3/urllib3:src/urllib3/poolmanager.py",
+      "label": "src/urllib3/poolmanager.py",
+      "path": "src/urllib3/poolmanager.py",
+      "type": "File"
+    }
+  ],
+  "fixture": false,
+  "query": "pool"
+}

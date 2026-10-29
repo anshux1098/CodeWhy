@@ -1,0 +1,20 @@
+{
+  "counts": {
+    "commits": 735,
+    "decisions": 34,
+    "entities": 24,
+    "pull_requests": 299
+  },
+  "fixture": false,
+  "full_name": "urllib3/urllib3",
+  "id": "urllib3-urllib3",
+  "last_rebuilt_at": "2026-10-18T21:18:02.432234+00:00",
+  "name": "urllib3",
+  "owner": "urllib3",
+  "prs_fetched": 294,
+  "prs_noise_skipped": 70,
+  "scope": "urllib3/urllib3 at branch main, commits 2009-12-10..2026-10-01, 291 file paths touched by the fetched pull requests; ingest caps: max_ingestion_issues=100",
+  "sources_analyzed": 96,
+  "url": "https://github.com/urllib3/urllib3",
+  "verified_decisions": 34
+}

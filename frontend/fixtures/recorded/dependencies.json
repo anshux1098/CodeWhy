@@ -1,0 +1,25 @@
+{
+  "data_source": "graph",
+  "services": [
+    {
+      "detail": "GITHUB_TOKEN is set",
+      "name": "github",
+      "status": "configured"
+    },
+    {
+      "detail": "NEO4J_URI points at neo4j+s://c337277d.databases.neo4j.io",
+      "name": "neo4j",
+      "status": "configured"
+    },
+    {
+      "detail": "LLM_API_KEY is set",
+      "name": "llm",
+      "status": "configured"
+    },
+    {
+      "detail": "local / all-MiniLM-L6-v2 (local, no credentials)",
+      "name": "embeddings",
+      "status": "configured"
+    }
+  ]
+}

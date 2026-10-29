@@ -1,0 +1,131 @@
+{
+  "answer": "src/urllib3/util/url.py was changed for several reasons across its history: to implement RFC 3986 URL parsing to align with the Python standard library, to percent-encode invalid characters (such as '@' symbols in email usernames) within the auth section for proxy users, and to make regular expressions private to protect internal APIs.",
+  "candidates": [],
+  "citations": [
+    {
+      "author": "sethmlarson",
+      "decision_id": "dec_d93fcc65f36fe7a9",
+      "id": "cit_ev_18181920b8dfc1f4",
+      "kind": "SOURCE",
+      "quote": "This brings our URL parser in-line with Python standard library parsing which all use RFC 3986.",
+      "source_type": "PullRequest",
+      "source_url": "https://github.com/urllib3/urllib3/pull/1487",
+      "timestamp": null
+    },
+    {
+      "author": "sethmlarson",
+      "decision_id": "dec_5bf9c85e20b5cb14",
+      "id": "cit_ev_c10ad05baa7ce571",
+      "kind": "SOURCE",
+      "quote": "Make all `urllib3.util.url` regular expressions private to protect our internal APIs\r\n- Change `Url` to a `typing.NamedTuple`\r\n- Removed `get_host` and `split_first` deprecated APIs\r\n- `idna` doesn't have type hints *yet*!",
+      "source_type": "PullRequest",
+      "source_url": "https://github.com/urllib3/urllib3/pull/2139",
+      "timestamp": null
+    },
+    {
+      "author": "sethmlarson",
+      "decision_id": "dec_374c15ea4fa9fa06",
+      "id": "cit_ev_95a1fd2a08d7ed1e",
+      "kind": "SOURCE",
+      "quote": "Mostly proxy users that have their email address as their \"username\" and therefore have an `@` symbol within the auth section.",
+      "source_type": "PullRequest",
+      "source_url": "https://github.com/urllib3/urllib3/pull/1647",
+      "timestamp": null
+    }
+  ],
+  "code_differs_from_latest": false,
+  "confidence": {
+    "label": "HIGH",
+    "score": 0.9166,
+    "signals": {
+      "agreement": 1.0,
+      "contradiction": 0.0,
+      "directness": 1.0,
+      "provenance": 0.8,
+      "relevance": 0.71,
+      "temporal_consistency": 1.0
+    }
+  },
+  "decisions": [
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_374c15ea4fa9fa06",
+      "probable_superseded_by": [],
+      "rationale": "Proxy users had their email address as their username containing an @ symbol, causing issues across both the library and requests issue trackers.",
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": null,
+      "source": {
+        "number": 1647,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/1647"
+      },
+      "state": "ACTIVE",
+      "summary": "Percent-encode invalid characters within auth section and remove rfc3986 as a vendored dependency",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_5bf9c85e20b5cb14",
+      "probable_superseded_by": [],
+      "rationale": null,
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": null,
+      "source": {
+        "number": 2139,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/2139"
+      },
+      "state": "ACTIVE",
+      "summary": "Make urllib3.util.url regular expressions private",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_d93fcc65f36fe7a9",
+      "probable_superseded_by": [],
+      "rationale": "This brings our URL parser in-line with Python standard library parsing which all use RFC 3986.",
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": null,
+      "source": {
+        "number": 1487,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/1487"
+      },
+      "state": "ACTIVE",
+      "summary": "Implement RFC 3986 URL parsing by adding the rfc3986 module",
+      "superseded_by": [],
+      "supersedes": []
+    }
+  ],
+  "entity": {
+    "decision_count": 3,
+    "id": "file:urllib3/urllib3:src/urllib3/util/url.py",
+    "label": "src/urllib3/util/url.py",
+    "path": "src/urllib3/util/url.py",
+    "type": "File"
+  },
+  "evidence_gaps": [
+    "7 of 16 PRs touching this file were not analyzed."
+  ],
+  "fixture": false,
+  "outcome": "full",
+  "reason_code": null,
+  "who_to_ask": [
+    {
+      "active": false,
+      "login": "sethmlarson",
+      "reason": "author"
+    }
+  ]
+}
