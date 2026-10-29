@@ -10,7 +10,10 @@
     "lint": "oxlint --max-warnings 999",
     "preview": "vite preview",
     "test": "vitest run",
-    "check": "tsc -b && oxlint --max-warnings 999 && vitest run && vite build"
+    "record:fixtures": "node scripts/run-record-fixtures.js",
+    "typegen": "openapi-typescript fixtures/recorded/openapi.json -o src/api/schema.ts",
+    "check:contract": "node scripts/check-contract-drift.js",
+    "check": "tsc -b && oxlint --max-warnings 999 && node scripts/check-contract-drift.js && vitest run && vite build"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -32,6 +35,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "jsdom": "^25.0.1",
+    "openapi-typescript": "^7.13.0",
     "oxlint": "^1.88.0",
     "typescript": "~6.0.3",
     "vite": "^8.3.4",

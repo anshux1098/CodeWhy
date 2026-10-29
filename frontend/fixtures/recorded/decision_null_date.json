@@ -1,0 +1,34 @@
+{
+  "citations": [
+    {
+      "author": "t-8ch",
+      "decision_id": "dec_954169a03fd82f51",
+      "id": "cit_ev_d5af448a49b9a346",
+      "kind": "SOURCE",
+      "quote": "This especially useful for requests users, as they get whatever gets\nautodetected without knowing what.",
+      "source_type": "PullRequest",
+      "source_url": "https://github.com/urllib3/urllib3/pull/391",
+      "timestamp": null
+    }
+  ],
+  "conflicts_with": [],
+  "effective_at": null,
+  "ended_at": null,
+  "evidence_gaps": [],
+  "fixture": false,
+  "id": "dec_954169a03fd82f51",
+  "probable_superseded_by": [],
+  "rationale": "Users get autodetected SSL backends without knowing which one is active, which is especially useful for requests users.",
+  "reaffirms": [],
+  "recorded_at": null,
+  "rule": null,
+  "source": {
+    "number": 391,
+    "type": "PullRequest",
+    "url": "https://github.com/urllib3/urllib3/pull/391"
+  },
+  "state": "ACTIVE",
+  "summary": "Make active SSL backend accessible to users",
+  "superseded_by": [],
+  "supersedes": []
+}

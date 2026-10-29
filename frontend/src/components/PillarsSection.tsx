@@ -22,7 +22,7 @@ export const PillarsSection: React.FC = () => {
         'Traditional git blame tells you who modified a line and when, but leaves the rationale completely invisible. CodeWhy unearths original pull request debates, architecture decision records (ADRs), and architectural trade-offs.',
       contrast: {
         gitBlame: 'git blame: author=alice date=2023-04-12 commit=8f9a2',
-        codeWhy: 'CodeWhy: "Decided to enforce 3-retry budget to prevent battery exhaustion in mobile clients."',
+        codeWhy: 'CodeWhy: "Preserve explicit port 0 in connection_from_url and HTTP/2 authority by using explicit None check..."',
       },
     },
     {
@@ -36,7 +36,7 @@ export const PillarsSection: React.FC = () => {
         'Generic models invent plausible-sounding justifications for legacy patterns. CodeWhy strictly validates every quote character-by-character against original PR threads, commits, and review comments before citing it.',
       contrast: {
         gitBlame: 'Generic AI: "Configured for high-throughput concurrency..." (Unverified assumption)',
-        codeWhy: 'CodeWhy: Exact character-verified quote linked directly to PR #241 comment #4.',
+        codeWhy: 'CodeWhy: Exact character-verified quote linked directly to PR #3456.',
       },
     },
     {
@@ -50,7 +50,7 @@ export const PillarsSection: React.FC = () => {
         'Software evolves. CodeWhy understands the timeline of changes: when an old decision was superseded, reverted, or revived through multi-hop Git lineage so you never rely on obsolete assumptions.',
       contrast: {
         gitBlame: 'Static search: Shows outdated commit from 2021 as active truth.',
-        codeWhy: 'CodeWhy: Marks decision as SUPERSEDED by PR #892 on 2024-03-10.',
+        codeWhy: 'CodeWhy: Marks decision as SUPERSEDED by PR #3466 (reverting PR #3456).',
       },
     },
     {

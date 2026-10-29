@@ -1,0 +1,2286 @@
+{
+  "edges": [
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_faa4780c47cc679f",
+      "target": "pr:urllib3/urllib3#795",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_ff1710c35b6821d6",
+      "target": "pr:urllib3/urllib3#762",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_044a0a0aadc0c0e7",
+      "target": "pr:urllib3/urllib3#1356",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_04fe474d74325a07",
+      "target": "pr:urllib3/urllib3#3144",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_04fe474d74325a07",
+      "target": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_0a1e8c57cb7c59cf",
+      "target": "pr:urllib3/urllib3#1496",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_0a1e8c57cb7c59cf",
+      "target": "file:urllib3/urllib3:src/urllib3/contrib/_securetransport/bindings.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_0a1e8c57cb7c59cf",
+      "target": "file:urllib3/urllib3:src/urllib3/contrib/pyopenssl.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_0a1e8c57cb7c59cf",
+      "target": "file:urllib3/urllib3:src/urllib3/contrib/securetransport.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_0a1e8c57cb7c59cf",
+      "target": "file:urllib3/urllib3:src/urllib3/util/__init__.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_0a1e8c57cb7c59cf",
+      "target": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_13f6dd55b281d580",
+      "target": "pr:urllib3/urllib3#754",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_1707c1f574802d08",
+      "target": "pr:urllib3/urllib3#2470",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_1707c1f574802d08",
+      "target": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_1975c2691a4117af",
+      "target": "pr:urllib3/urllib3#2340",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_1975c2691a4117af",
+      "target": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_1975c2691a4117af",
+      "target": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_1975c2691a4117af",
+      "target": "file:urllib3/urllib3:src/urllib3/contrib/_securetransport/bindings.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_1975c2691a4117af",
+      "target": "file:urllib3/urllib3:src/urllib3/contrib/_securetransport/low_level.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_1975c2691a4117af",
+      "target": "file:urllib3/urllib3:src/urllib3/contrib/pyopenssl.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_1975c2691a4117af",
+      "target": "file:urllib3/urllib3:src/urllib3/contrib/securetransport.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_1975c2691a4117af",
+      "target": "file:urllib3/urllib3:src/urllib3/contrib/socks.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_1975c2691a4117af",
+      "target": "file:urllib3/urllib3:src/urllib3/exceptions.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_1975c2691a4117af",
+      "target": "file:urllib3/urllib3:src/urllib3/response.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_1975c2691a4117af",
+      "target": "file:urllib3/urllib3:src/urllib3/util/request.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_1975c2691a4117af",
+      "target": "file:urllib3/urllib3:src/urllib3/util/retry.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_1975c2691a4117af",
+      "target": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_1975c2691a4117af",
+      "target": "file:urllib3/urllib3:src/urllib3/util/timeout.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_374c15ea4fa9fa06",
+      "target": "pr:urllib3/urllib3#1647",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_374c15ea4fa9fa06",
+      "target": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_374c15ea4fa9fa06",
+      "target": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_374c15ea4fa9fa06",
+      "target": "file:urllib3/urllib3:src/urllib3/util/url.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_3bd89dfa51c0d2a0",
+      "target": "pr:urllib3/urllib3#1800",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_3bd89dfa51c0d2a0",
+      "target": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_425c6152a7fdfddd",
+      "target": "pr:urllib3/urllib3#291",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_47cb5a8499ed20ad",
+      "target": "pr:urllib3/urllib3#1923",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_47cb5a8499ed20ad",
+      "target": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_47cb5a8499ed20ad",
+      "target": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_47cb5a8499ed20ad",
+      "target": "file:urllib3/urllib3:src/urllib3/poolmanager.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_47cb5a8499ed20ad",
+      "target": "file:urllib3/urllib3:src/urllib3/util/proxy.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_47cb5a8499ed20ad",
+      "target": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_47cb5a8499ed20ad",
+      "target": "file:urllib3/urllib3:src/urllib3/util/ssltransport.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_4ce7c9d1e5a57b60",
+      "target": "pr:urllib3/urllib3#1669",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_4ce7c9d1e5a57b60",
+      "target": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_4ce7c9d1e5a57b60",
+      "target": "file:urllib3/urllib3:src/urllib3/fields.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_4ce7c9d1e5a57b60",
+      "target": "file:urllib3/urllib3:src/urllib3/filepost.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_4ce7c9d1e5a57b60",
+      "target": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_4f5a643ea3a629e2",
+      "target": "pr:urllib3/urllib3#1906",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_4f5a643ea3a629e2",
+      "target": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_5ab3b9bd5ca39fde",
+      "target": "pr:urllib3/urllib3#5101",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_5ab3b9bd5ca39fde",
+      "target": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_5ab3b9bd5ca39fde",
+      "target": "file:urllib3/urllib3:src/urllib3/http2/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_5bf9c85e20b5cb14",
+      "target": "pr:urllib3/urllib3#2139",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_5bf9c85e20b5cb14",
+      "target": "file:urllib3/urllib3:src/urllib3/__init__.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_5bf9c85e20b5cb14",
+      "target": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_5bf9c85e20b5cb14",
+      "target": "file:urllib3/urllib3:src/urllib3/util/__init__.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_5bf9c85e20b5cb14",
+      "target": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_5bf9c85e20b5cb14",
+      "target": "file:urllib3/urllib3:src/urllib3/util/url.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_5bf9c85e20b5cb14",
+      "target": "file:urllib3/urllib3:src/urllib3/util/url.pyi",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_5f520b0a0b345b6a",
+      "target": "pr:urllib3/urllib3#1440",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_5f520b0a0b345b6a",
+      "target": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_5f520b0a0b345b6a",
+      "target": "file:urllib3/urllib3:src/urllib3/response.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_5f520b0a0b345b6a",
+      "target": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_6dee7648b9ef5416",
+      "target": "pr:urllib3/urllib3#3456",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_6dee7648b9ef5416",
+      "target": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_705d6ef451cbec2b",
+      "target": "pr:urllib3/urllib3#3134",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_705d6ef451cbec2b",
+      "target": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_705d6ef451cbec2b",
+      "target": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_8e2113ddc1026b17",
+      "target": "pr:urllib3/urllib3#3055",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_8e2113ddc1026b17",
+      "target": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_8e6457eb4f1e4104",
+      "target": "pr:urllib3/urllib3#1554",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_8e6457eb4f1e4104",
+      "target": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_8e6457eb4f1e4104",
+      "target": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_8e6457eb4f1e4104",
+      "target": "file:urllib3/urllib3:src/urllib3/response.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_8e6457eb4f1e4104",
+      "target": "file:urllib3/urllib3:src/urllib3/util/timeout.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_954169a03fd82f51",
+      "target": "pr:urllib3/urllib3#391",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_ae86a774e1040287",
+      "target": "pr:urllib3/urllib3#807",
+      "type": "DECIDED_IN"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_bf19d791654419d7",
+      "target": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_bf19d791654419d7",
+      "target": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_bf19d791654419d7",
+      "target": "file:urllib3/urllib3:src/urllib3/contrib/pyopenssl.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_bf19d791654419d7",
+      "target": "file:urllib3/urllib3:src/urllib3/poolmanager.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_bf19d791654419d7",
+      "target": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_bf7b6381956ef74e",
+      "target": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_c2abd7dff0d4abc3",
+      "target": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_c636931924332bfd",
+      "target": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_cd30ff07d87e9ecd",
+      "target": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_cd30ff07d87e9ecd",
+      "target": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_cd30ff07d87e9ecd",
+      "target": "file:urllib3/urllib3:src/urllib3/exceptions.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_ce303eb845540d38",
+      "target": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {
+        "confidence": 1.0,
+        "evaluated_at": "2026-10-18T21:20:23.437998+00:00",
+        "method": "commit_revert",
+        "review_state": "confirmed",
+        "rule": "1_revert_commit",
+        "source_evidence_id": "link:commit:1e94feb2a671bf28721114dfea1105a2c1f91788:REVERTS:commit:d48061505e72271116c5a33b04dbca6273f2a737"
+      },
+      "rule": "1_revert_commit",
+      "source": "dec_ce303eb845540d38",
+      "target": "dec_6dee7648b9ef5416",
+      "type": "SUPERSEDES"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_d93fcc65f36fe7a9",
+      "target": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_d93fcc65f36fe7a9",
+      "target": "file:urllib3/urllib3:src/urllib3/util/url.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_de821fd1ee45bc1e",
+      "target": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_e069daf125fc4556",
+      "target": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_e069daf125fc4556",
+      "target": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_e09af699b32f537c",
+      "target": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_e09af699b32f537c",
+      "target": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_e09af699b32f537c",
+      "target": "file:urllib3/urllib3:src/urllib3/exceptions.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_e09af699b32f537c",
+      "target": "file:urllib3/urllib3:src/urllib3/poolmanager.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_e1b5f1876cb27c16",
+      "target": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_e1b5f1876cb27c16",
+      "target": "file:urllib3/urllib3:src/urllib3/exceptions.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_e1b5f1876cb27c16",
+      "target": "file:urllib3/urllib3:src/urllib3/fields.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_e1b5f1876cb27c16",
+      "target": "file:urllib3/urllib3:src/urllib3/poolmanager.py",
+      "type": "GOVERNS"
+    },
+    {
+      "props": {},
+      "rule": null,
+      "source": "dec_e1b5f1876cb27c16",
+      "target": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+      "type": "GOVERNS"
+    }
+  ],
+  "fixture": false,
+  "nodes": [
+    {
+      "id": "dec_faa4780c47cc679f",
+      "label": "Rewrite the server certificate to include dnsname subject alternative name fields",
+      "props": {
+        "author": "Lukasa",
+        "decision_type": "Testing",
+        "effective_at": "2016-02-22T21:14:46Z",
+        "evaluated_at": "",
+        "id": "dec_faa4780c47cc679f",
+        "quote_verified": true,
+        "rationale": "This change revealed that our server certificate would raise warnings under PyOpenSSL because it had no dnsname subject alternative name fields.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#795",
+        "source_number": 795,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/795",
+        "state": "ACTIVE",
+        "summary": "Rewrite the server certificate to include dnsname subject alternative name fields",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_ff1710c35b6821d6",
+      "label": "Add SOCKS support via a contrib module",
+      "props": {
+        "author": "Lukasa",
+        "decision_type": "Architecture",
+        "effective_at": "2015-12-19T19:34:08Z",
+        "evaluated_at": "",
+        "id": "dec_ff1710c35b6821d6",
+        "quote_verified": true,
+        "rationale": "This allows us to avoid having to change too many things in the mainline of urllib3, and also ensures that it is not affected by the requirements to have tests and coverage.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#762",
+        "source_number": 762,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/762",
+        "state": "ACTIVE",
+        "summary": "Add SOCKS support via a contrib module",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_044a0a0aadc0c0e7",
+      "label": "Switch LifoQueue to use a collections.deque backend",
+      "props": {
+        "author": "sethmlarson",
+        "decision_type": "Performance",
+        "effective_at": "2018-04-03T17:01:39Z",
+        "evaluated_at": "",
+        "id": "dec_044a0a0aadc0c0e7",
+        "quote_verified": true,
+        "rationale": "Switch to using our own LifoQueue that uses a collections.deque backend which is a lot faster than a list backend.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#1356",
+        "source_number": 1356,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/1356",
+        "state": "ACTIVE",
+        "summary": "Switch LifoQueue to use a collections.deque backend",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_04fe474d74325a07",
+      "label": "Update documentation links to use SSLContext.wrap_socket instead of the removed ssl.wrap_socket",
+      "props": {
+        "author": "pquentin",
+        "decision_type": "Compatibility",
+        "effective_at": "2023-10-05T20:40:59Z",
+        "evaluated_at": "",
+        "id": "dec_04fe474d74325a07",
+        "quote_verified": true,
+        "rationale": "ssl.wrap_socket is gone in Python 3.12, requiring a link update to SSLContext.wrap_socket.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#3144",
+        "source_number": 3144,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/3144",
+        "state": "ACTIVE",
+        "summary": "Update documentation links to use SSLContext.wrap_socket instead of the removed ssl.wrap_socket",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_0a1e8c57cb7c59cf",
+      "label": "Add support for TLS 1.3 to all HTTPSConnection implementations and start testing against it",
+      "props": {
+        "author": "sethmlarson",
+        "decision_type": "Compatibility",
+        "effective_at": "2019-02-27T20:54:27Z",
+        "evaluated_at": "",
+        "id": "dec_0a1e8c57cb7c59cf",
+        "quote_verified": true,
+        "rationale": "TLS 1.3 support became available in OpenSSL 1.1.1 and Python 3.7, prompting the need to support and test against it.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#1496",
+        "source_number": 1496,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/1496",
+        "state": "ACTIVE",
+        "summary": "Add support for TLS 1.3 to all HTTPSConnection implementations and start testing against it",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_13f6dd55b281d580",
+      "label": "Define an SNIMissingWarning that fires once per run when making an HTTPS request without SNI",
+      "props": {
+        "author": "Lukasa",
+        "decision_type": "Security",
+        "effective_at": "2015-12-03T18:17:17Z",
+        "evaluated_at": "",
+        "id": "dec_13f6dd55b281d580",
+        "quote_verified": true,
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#754",
+        "source_number": 754,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/754",
+        "state": "ACTIVE",
+        "summary": "Define an SNIMissingWarning that fires once per run when making an HTTPS request without SNI",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_1707c1f574802d08",
+      "label": "Include the connection pool size in the message when discarding connections",
+      "props": {
+        "author": "Streadz",
+        "decision_type": "Operational behavior",
+        "effective_at": "2021-12-07T06:20:02Z",
+        "evaluated_at": "",
+        "id": "dec_1707c1f574802d08",
+        "quote_verified": true,
+        "rationale": "Developers were confused by the message because they mistakenly believed their pool size was sufficiently large while actually running on the default size.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#2470",
+        "source_number": 2470,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/2470",
+        "state": "ACTIVE",
+        "summary": "Include the connection pool size in the message when discarding connections",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_1975c2691a4117af",
+      "label": "Explicitly chain or disable exceptions using Python 3 built-in syntax",
+      "props": {
+        "author": "bluetech",
+        "decision_type": "Reliability",
+        "effective_at": "2021-08-15T20:43:15Z",
+        "evaluated_at": "",
+        "id": "dec_1975c2691a4117af",
+        "quote_verified": true,
+        "rationale": "Explicitly chain exceptions or disable the chaining instead of creating implicit exception handling traces that look like a bug.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#2340",
+        "source_number": 2340,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/2340",
+        "state": "ACTIVE",
+        "summary": "Explicitly chain or disable exceptions using Python 3 built-in syntax",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_374c15ea4fa9fa06",
+      "label": "Percent-encode invalid characters within auth section and remove rfc3986 as a vendored dependency",
+      "props": {
+        "author": "sethmlarson",
+        "decision_type": "Architecture",
+        "effective_at": "2019-07-26T15:42:52Z",
+        "evaluated_at": "",
+        "id": "dec_374c15ea4fa9fa06",
+        "quote_verified": true,
+        "rationale": "Proxy users had their email address as their username containing an @ symbol, causing issues across both the library and requests issue trackers.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#1647",
+        "source_number": 1647,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/1647",
+        "state": "ACTIVE",
+        "summary": "Percent-encode invalid characters within auth section and remove rfc3986 as a vendored dependency",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_3bd89dfa51c0d2a0",
+      "label": "Raise ValueError if method contains control characters",
+      "props": {
+        "author": "sethmlarson",
+        "decision_type": "Security",
+        "effective_at": "2020-02-17T21:34:48Z",
+        "evaluated_at": "",
+        "id": "dec_3bd89dfa51c0d2a0",
+        "quote_verified": true,
+        "rationale": "Protects against header injection vulnerabilities reported in BPO-39603 when attackers gain control of the request method.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#1800",
+        "source_number": 1800,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/1800",
+        "state": "ACTIVE",
+        "summary": "Raise ValueError if method contains control characters",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_425c6152a7fdfddd",
+      "label": "Ensure connections are properly closed on object destruction to prevent connection leaks",
+      "props": {
+        "author": "vincentxb",
+        "decision_type": "Reliability",
+        "effective_at": "2013-12-03T16:32:00Z",
+        "evaluated_at": "",
+        "id": "dec_425c6152a7fdfddd",
+        "quote_verified": true,
+        "rationale": "In environments involving Buildbot, Twisted, and txrequests, the number of connections in a CLOSE_WAIT state grows until reaching the maximum open files limit per process.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#291",
+        "source_number": 291,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/291",
+        "state": "ACTIVE",
+        "summary": "Ensure connections are properly closed on object destruction to prevent connection leaks",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_47cb5a8499ed20ad",
+      "label": "Integrate SSLTransport class for TLS-in-TLS tunnels and keep forwarding mode under a flag",
+      "props": {
+        "author": "jalopezsilva",
+        "decision_type": "Architecture",
+        "effective_at": "2020-09-28T20:11:27Z",
+        "evaluated_at": "",
+        "id": "dec_47cb5a8499ed20ad",
+        "quote_verified": true,
+        "rationale": "This will enable urllib3 to use HTTPS proxies with HTTPS destinations, while retaining the forwarding mode because it has been incredibly useful within corporate environments when used with trusted proxies.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#1923",
+        "source_number": 1923,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/1923",
+        "state": "ACTIVE",
+        "summary": "Integrate SSLTransport class for TLS-in-TLS tunnels and keep forwarding mode under a flag",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_4ce7c9d1e5a57b60",
+      "label": "Updated Python version checks to correctly handle Python 4 and above instead of relying on PY3",
+      "props": {
+        "author": "hugovk",
+        "decision_type": "Compatibility",
+        "effective_at": "2019-08-26T01:00:08Z",
+        "evaluated_at": "",
+        "id": "dec_4ce7c9d1e5a57b60",
+        "quote_verified": true,
+        "rationale": "Checking for Python 3+ using `if six.PY3:` will break on Python 4 because it skips the Python 3+ stuff and runs the Python 2 stuff.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#1669",
+        "source_number": 1669,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/1669",
+        "state": "ACTIVE",
+        "summary": "Updated Python version checks to correctly handle Python 4 and above instead of relying on PY3",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_4f5a643ea3a629e2",
+      "label": "Collapse request chunked data and framing into one send() call",
+      "props": {
+        "author": "sethmlarson",
+        "decision_type": "Performance",
+        "effective_at": "2020-07-16T16:22:59Z",
+        "evaluated_at": "",
+        "id": "dec_4f5a643ea3a629e2",
+        "quote_verified": true,
+        "rationale": "Looking at how urllib3 behaves with Wireshark I saw chunks and chunk framing being sent in separate TCP packets even when only a few bytes.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#1906",
+        "source_number": 1906,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/1906",
+        "state": "ACTIVE",
+        "summary": "Collapse request chunked data and framing into one send() call",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_5ab3b9bd5ca39fde",
+      "label": "Preserve explicit port 0 in connection_from_url and HTTP/2 authority by using an explicit None check instead of a truthiness check",
+      "props": {
+        "author": "nishat-06",
+        "decision_type": "Architecture",
+        "effective_at": "2026-08-02T18:55:40Z",
+        "evaluated_at": "",
+        "id": "dec_5ab3b9bd5ca39fde",
+        "quote_verified": true,
+        "rationale": "connection_from_url() and the HTTP/2 request authority build the port with a truthiness check, so an explicit :0 in the URL gets dropped and replaced by the default 80 or 443.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#5101",
+        "source_number": 5101,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/5101",
+        "state": "ACTIVE",
+        "summary": "Preserve explicit port 0 in connection_from_url and HTTP/2 authority by using an explicit None check instead of a truthiness check",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_5bf9c85e20b5cb14",
+      "label": "Make urllib3.util.url regular expressions private",
+      "props": {
+        "author": "sethmlarson",
+        "decision_type": "Architecture",
+        "effective_at": "2021-02-09T06:10:59Z",
+        "evaluated_at": "",
+        "id": "dec_5bf9c85e20b5cb14",
+        "quote_verified": true,
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#2139",
+        "source_number": 2139,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/2139",
+        "state": "ACTIVE",
+        "summary": "Make urllib3.util.url regular expressions private",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_5f520b0a0b345b6a",
+      "label": "Remove unnecessary use of six.binary_type and six.b",
+      "props": {
+        "author": "jdufresne",
+        "decision_type": "Compatibility",
+        "effective_at": "2018-09-14T14:25:02Z",
+        "evaluated_at": "",
+        "id": "dec_5f520b0a0b345b6a",
+        "quote_verified": true,
+        "rationale": "The bytes type and bytes literal are available on all supported Pythons, reducing unnecessary compatibility shims and making the code more forward compatible with Python 3.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#1440",
+        "source_number": 1440,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/1440",
+        "state": "ACTIVE",
+        "summary": "Remove unnecessary use of six.binary_type and six.b",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_6dee7648b9ef5416",
+      "label": "Modify create_urllib3_context to add TLS settings required for HTTP/2 as per RFC 9113",
+      "props": {
+        "author": "mrdaybird",
+        "decision_type": "Security",
+        "effective_at": "2024-08-22T17:36:35Z",
+        "evaluated_at": "",
+        "id": "dec_6dee7648b9ef5416",
+        "quote_verified": true,
+        "rationale": "This PR modifies create_urllib3_context to add TLS settings required for HTTP/2 as per RFC 9113.",
+        "repo": "urllib3-urllib3",
+        "rule": "1_revert_commit",
+        "source_id": "pr:urllib3/urllib3#3456",
+        "source_number": 3456,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/3456",
+        "state": "SUPERSEDED",
+        "summary": "Modify create_urllib3_context to add TLS settings required for HTTP/2 as per RFC 9113",
+        "superseded_by": [
+          "dec_ce303eb845540d38"
+        ],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_705d6ef451cbec2b",
+      "label": "Enable mypy's ignore-without-code to enforce typechecking standards",
+      "props": {
+        "author": "dimbleby",
+        "decision_type": "Other",
+        "effective_at": "2023-11-23T21:33:28Z",
+        "evaluated_at": "",
+        "id": "dec_705d6ef451cbec2b",
+        "quote_verified": true,
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#3134",
+        "source_number": 3134,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/3134",
+        "state": "ACTIVE",
+        "summary": "Enable mypy's ignore-without-code to enforce typechecking standards",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_8e2113ddc1026b17",
+      "label": "Fix assert_hostname=False by checking assert_hostname before calling ssl_wrap_socket",
+      "props": {
+        "author": "sg3-141-592",
+        "decision_type": "Security",
+        "effective_at": "2023-06-02T12:40:28Z",
+        "evaluated_at": "",
+        "id": "dec_8e2113ddc1026b17",
+        "quote_verified": true,
+        "rationale": "When assert_hostname is disabled, the SSLContext was being created with check_hostname: True and throwing an exception.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#3055",
+        "source_number": 3055,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/3055",
+        "state": "ACTIVE",
+        "summary": "Fix assert_hostname=False by checking assert_hostname before calling ssl_wrap_socket",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_8e6457eb4f1e4104",
+      "label": "Bump timeouts to help with CI flakiness",
+      "props": {
+        "author": "pquentin",
+        "decision_type": "Testing",
+        "effective_at": "2019-03-23T03:24:18Z",
+        "evaluated_at": "",
+        "id": "dec_8e6457eb4f1e4104",
+        "quote_verified": true,
+        "rationale": "Timeouts were bumped to help address CI flakiness.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#1554",
+        "source_number": 1554,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/1554",
+        "state": "ACTIVE",
+        "summary": "Bump timeouts to help with CI flakiness",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_954169a03fd82f51",
+      "label": "Make active SSL backend accessible to users",
+      "props": {
+        "author": "t-8ch",
+        "decision_type": "Architecture",
+        "evaluated_at": "",
+        "id": "dec_954169a03fd82f51",
+        "quote_verified": true,
+        "rationale": "Users get autodetected SSL backends without knowing which one is active, which is especially useful for requests users.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#391",
+        "source_number": 391,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/391",
+        "state": "ACTIVE",
+        "summary": "Make active SSL backend accessible to users",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_ae86a774e1040287",
+      "label": "Clean up connections that fail inside HTTPConnectionPool.urlopen",
+      "props": {
+        "author": "Lukasa",
+        "decision_type": "Reliability",
+        "effective_at": "2016-02-29T20:07:27Z",
+        "evaluated_at": "",
+        "id": "dec_ae86a774e1040287",
+        "quote_verified": true,
+        "rationale": "This ensures that weird gevent timeouts during connection setup correctly eliminate the connection, rather than leaking it.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#807",
+        "source_number": 807,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/807",
+        "state": "ACTIVE",
+        "summary": "Clean up connections that fail inside HTTPConnectionPool.urlopen",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_bf19d791654419d7",
+      "label": "Add support for password-protected client keyfiles via key_password parameter",
+      "props": {
+        "author": "sethmlarson",
+        "decision_type": "Configuration",
+        "effective_at": "2019-01-22T13:17:33Z",
+        "evaluated_at": "",
+        "id": "dec_bf19d791654419d7",
+        "quote_verified": true,
+        "rationale": "The standard library supports passing text or binary passwords to SSLContext, so PyOpenSSLContext and SecureTransportContext objects need to support it as well without requiring users to manually create their own SSLContext.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#1489",
+        "source_number": 1489,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/1489",
+        "state": "ACTIVE",
+        "summary": "Add support for password-protected client keyfiles via key_password parameter",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_bf7b6381956ef74e",
+      "label": "Fix ResourceWarning on CONNECT with Python < 3.11.4",
+      "props": {
+        "author": "graingert",
+        "decision_type": "Reliability",
+        "effective_at": "2024-08-14T17:50:02Z",
+        "evaluated_at": "",
+        "id": "dec_bf7b6381956ef74e",
+        "quote_verified": true,
+        "rationale": "This backports the fix from cpython issue 103472 so that the last ignored ResourceWarnings are no longer issued by urllib3.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#3252",
+        "source_number": 3252,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/3252",
+        "state": "ACTIVE",
+        "summary": "Fix ResourceWarning on CONNECT with Python < 3.11.4",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_c2abd7dff0d4abc3",
+      "label": "Handle httplib implementations that do not set _tunnel_host",
+      "props": {
+        "author": "jpevarnek",
+        "decision_type": "Compatibility",
+        "effective_at": "2019-01-24T18:16:08Z",
+        "evaluated_at": "",
+        "id": "dec_c2abd7dff0d4abc3",
+        "quote_verified": true,
+        "rationale": "Environments using a different implementation of httplib than the standard library, such as Google App Engine's urlfetch-based implementation, were broken.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#1527",
+        "source_number": 1527,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/1527",
+        "state": "ACTIVE",
+        "summary": "Handle httplib implementations that do not set _tunnel_host",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_c636931924332bfd",
+      "label": "Add hostname to insecure connection warning",
+      "props": {
+        "author": "Steltek",
+        "decision_type": "Operational behavior",
+        "effective_at": "2019-11-22T13:19:58Z",
+        "evaluated_at": "",
+        "id": "dec_c636931924332bfd",
+        "quote_verified": true,
+        "rationale": "Sometimes, you're not the one who wrote the code, or urllib3 is being used within existing software, and it will give off the 'Unverified HTTPS request' warning, leaving the end user confused and unable to trace why they are getting it.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#1691",
+        "source_number": 1691,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/1691",
+        "state": "ACTIVE",
+        "summary": "Add hostname to insecure connection warning",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_cd30ff07d87e9ecd",
+      "label": "Add a custom exception wrapper for HTTPS proxy connection failures",
+      "props": {
+        "author": "jalopezsilva",
+        "decision_type": "Architecture",
+        "effective_at": "2021-02-09T07:34:58Z",
+        "evaluated_at": "",
+        "id": "dec_cd30ff07d87e9ecd",
+        "quote_verified": true,
+        "rationale": "Connection failures to a TLS proxy are currently confusing for users and generate inconsistent errors, making diagnosis difficult.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#2133",
+        "source_number": 2133,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/2133",
+        "state": "ACTIVE",
+        "summary": "Add a custom exception wrapper for HTTPS proxy connection failures",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_ce303eb845540d38",
+      "label": "Revert the addition of TLS settings for HTTP/2",
+      "props": {
+        "author": "pquentin",
+        "decision_type": "Compatibility",
+        "effective_at": "2024-09-03T09:10:49Z",
+        "evaluated_at": "",
+        "id": "dec_ce303eb845540d38",
+        "quote_verified": true,
+        "rationale": "The new settings could not be used because curl also does not implement them.",
+        "repo": "urllib3-urllib3",
+        "rule": "1_revert_commit",
+        "source_id": "pr:urllib3/urllib3#3466",
+        "source_number": 3466,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/3466",
+        "state": "ACTIVE",
+        "summary": "Revert the addition of TLS settings for HTTP/2",
+        "superseded_by": [],
+        "supersedes": [
+          "dec_6dee7648b9ef5416"
+        ]
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_d93fcc65f36fe7a9",
+      "label": "Implement RFC 3986 URL parsing by adding the rfc3986 module",
+      "props": {
+        "author": "sethmlarson",
+        "decision_type": "Architecture",
+        "effective_at": "2018-12-07T16:19:21Z",
+        "evaluated_at": "",
+        "id": "dec_d93fcc65f36fe7a9",
+        "quote_verified": true,
+        "rationale": "This brings our URL parser in-line with Python standard library parsing which all use RFC 3986.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#1487",
+        "source_number": 1487,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/1487",
+        "state": "ACTIVE",
+        "summary": "Implement RFC 3986 URL parsing by adding the rfc3986 module",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_de821fd1ee45bc1e",
+      "label": "Remove leftover Python 2.6 variable set_ciphers",
+      "props": {
+        "author": "pquentin",
+        "decision_type": "Compatibility",
+        "effective_at": "2018-10-04T13:18:32Z",
+        "evaluated_at": "",
+        "id": "dec_de821fd1ee45bc1e",
+        "quote_verified": true,
+        "rationale": "set_ciphers is always supported in Python 2.7+, so this is no longer needed.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#1448",
+        "source_number": 1448,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/1448",
+        "state": "ACTIVE",
+        "summary": "Remove leftover Python 2.6 variable set_ciphers",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_e069daf125fc4556",
+      "label": "Remove Python 2.6 code to fix an installation error",
+      "props": {
+        "author": "pquentin",
+        "decision_type": "Compatibility",
+        "effective_at": "2018-08-24T12:52:14Z",
+        "evaluated_at": "",
+        "id": "dec_e069daf125fc4556",
+        "quote_verified": true,
+        "rationale": "This also fixes an installation error of gcp-devrel-py-tools==0.0.15, see https://github.com/GoogleCloudPlatform/python-repo-tools/issues/23 for details.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#1430",
+        "source_number": 1430,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/1430",
+        "state": "ACTIVE",
+        "summary": "Remove Python 2.6 code to fix an installation error",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_e09af699b32f537c",
+      "label": "Add support for HTTPS connections to proxies",
+      "props": {
+        "author": "jalopezsilva",
+        "decision_type": "Architecture",
+        "effective_at": "2020-03-12T08:39:40Z",
+        "evaluated_at": "",
+        "id": "dec_e09af699b32f537c",
+        "quote_verified": true,
+        "rationale": "Currently there's no way to validate the identify of the proxy you are connecting to. Proxies supporting HTTPS endpoints are becoming more common and extending support for them is necessary.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#1679",
+        "source_number": 1679,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/1679",
+        "state": "ACTIVE",
+        "summary": "Add support for HTTPS connections to proxies",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "dec_e1b5f1876cb27c16",
+      "label": "Switch deprecation warnings from DeprecationWarning to FutureWarning",
+      "props": {
+        "author": "illia-v",
+        "decision_type": "Operational behavior",
+        "effective_at": "2026-02-11T21:27:16Z",
+        "evaluated_at": "",
+        "id": "dec_e1b5f1876cb27c16",
+        "quote_verified": true,
+        "rationale": "Warnings using DeprecationWarning were not seen by most users, whereas FutureWarning should be visible by default.",
+        "repo": "urllib3-urllib3",
+        "source_id": "pr:urllib3/urllib3#3763",
+        "source_number": 3763,
+        "source_type": "PullRequest",
+        "source_url": "https://github.com/urllib3/urllib3/pull/3763",
+        "state": "ACTIVE",
+        "summary": "Switch deprecation warnings from DeprecationWarning to FutureWarning",
+        "superseded_by": [],
+        "supersedes": []
+      },
+      "type": "Decision"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+      "label": "src/urllib3/util/ssl_.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+        "name": "src/urllib3/util/ssl_.py",
+        "path": "src/urllib3/util/ssl_.py",
+        "prs_analyzed": 31,
+        "prs_noise_skipped": 4,
+        "prs_not_analyzed": 9,
+        "prs_touching": 42,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 14
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/contrib/_securetransport/bindings.py",
+      "label": "src/urllib3/contrib/_securetransport/bindings.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/contrib/_securetransport/bindings.py",
+        "name": "src/urllib3/contrib/_securetransport/bindings.py",
+        "path": "src/urllib3/contrib/_securetransport/bindings.py",
+        "prs_analyzed": 3,
+        "prs_noise_skipped": 0,
+        "prs_not_analyzed": 0,
+        "prs_touching": 3,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 2
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/contrib/pyopenssl.py",
+      "label": "src/urllib3/contrib/pyopenssl.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/contrib/pyopenssl.py",
+        "name": "src/urllib3/contrib/pyopenssl.py",
+        "path": "src/urllib3/contrib/pyopenssl.py",
+        "prs_analyzed": 9,
+        "prs_noise_skipped": 4,
+        "prs_not_analyzed": 7,
+        "prs_touching": 18,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 3
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/contrib/securetransport.py",
+      "label": "src/urllib3/contrib/securetransport.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/contrib/securetransport.py",
+        "name": "src/urllib3/contrib/securetransport.py",
+        "path": "src/urllib3/contrib/securetransport.py",
+        "prs_analyzed": 8,
+        "prs_noise_skipped": 1,
+        "prs_not_analyzed": 0,
+        "prs_touching": 8,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 2
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/util/__init__.py",
+      "label": "src/urllib3/util/__init__.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/util/__init__.py",
+        "name": "src/urllib3/util/__init__.py",
+        "path": "src/urllib3/util/__init__.py",
+        "prs_analyzed": 5,
+        "prs_noise_skipped": 0,
+        "prs_not_analyzed": 0,
+        "prs_touching": 5,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 2
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+      "label": "src/urllib3/connectionpool.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+        "name": "src/urllib3/connectionpool.py",
+        "path": "src/urllib3/connectionpool.py",
+        "prs_analyzed": 38,
+        "prs_noise_skipped": 3,
+        "prs_not_analyzed": 11,
+        "prs_touching": 51,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 13
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "label": "src/urllib3/connection.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/connection.py",
+        "name": "src/urllib3/connection.py",
+        "path": "src/urllib3/connection.py",
+        "prs_analyzed": 46,
+        "prs_noise_skipped": 7,
+        "prs_not_analyzed": 10,
+        "prs_touching": 59,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 16
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/contrib/_securetransport/low_level.py",
+      "label": "src/urllib3/contrib/_securetransport/low_level.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/contrib/_securetransport/low_level.py",
+        "name": "src/urllib3/contrib/_securetransport/low_level.py",
+        "path": "src/urllib3/contrib/_securetransport/low_level.py",
+        "prs_analyzed": 2,
+        "prs_noise_skipped": 0,
+        "prs_not_analyzed": 0,
+        "prs_touching": 2,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 1
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/contrib/socks.py",
+      "label": "src/urllib3/contrib/socks.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/contrib/socks.py",
+        "name": "src/urllib3/contrib/socks.py",
+        "path": "src/urllib3/contrib/socks.py",
+        "prs_analyzed": 5,
+        "prs_noise_skipped": 2,
+        "prs_not_analyzed": 4,
+        "prs_touching": 10,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 1
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/exceptions.py",
+      "label": "src/urllib3/exceptions.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/exceptions.py",
+        "name": "src/urllib3/exceptions.py",
+        "path": "src/urllib3/exceptions.py",
+        "prs_analyzed": 10,
+        "prs_noise_skipped": 0,
+        "prs_not_analyzed": 0,
+        "prs_touching": 10,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 4
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/response.py",
+      "label": "src/urllib3/response.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/response.py",
+        "name": "src/urllib3/response.py",
+        "path": "src/urllib3/response.py",
+        "prs_analyzed": 15,
+        "prs_noise_skipped": 3,
+        "prs_not_analyzed": 17,
+        "prs_touching": 34,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 3
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/util/request.py",
+      "label": "src/urllib3/util/request.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/util/request.py",
+        "name": "src/urllib3/util/request.py",
+        "path": "src/urllib3/util/request.py",
+        "prs_analyzed": 7,
+        "prs_noise_skipped": 2,
+        "prs_not_analyzed": 4,
+        "prs_touching": 13,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 1
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/util/retry.py",
+      "label": "src/urllib3/util/retry.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/util/retry.py",
+        "name": "src/urllib3/util/retry.py",
+        "path": "src/urllib3/util/retry.py",
+        "prs_analyzed": 3,
+        "prs_noise_skipped": 0,
+        "prs_not_analyzed": 7,
+        "prs_touching": 10,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 1
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/util/timeout.py",
+      "label": "src/urllib3/util/timeout.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/util/timeout.py",
+        "name": "src/urllib3/util/timeout.py",
+        "path": "src/urllib3/util/timeout.py",
+        "prs_analyzed": 6,
+        "prs_noise_skipped": 0,
+        "prs_not_analyzed": 0,
+        "prs_touching": 6,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 2
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/util/url.py",
+      "label": "src/urllib3/util/url.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/util/url.py",
+        "name": "src/urllib3/util/url.py",
+        "path": "src/urllib3/util/url.py",
+        "prs_analyzed": 8,
+        "prs_noise_skipped": 2,
+        "prs_not_analyzed": 7,
+        "prs_touching": 16,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 3
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/poolmanager.py",
+      "label": "src/urllib3/poolmanager.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/poolmanager.py",
+        "name": "src/urllib3/poolmanager.py",
+        "path": "src/urllib3/poolmanager.py",
+        "prs_analyzed": 13,
+        "prs_noise_skipped": 1,
+        "prs_not_analyzed": 9,
+        "prs_touching": 22,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 4
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/util/proxy.py",
+      "label": "src/urllib3/util/proxy.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/util/proxy.py",
+        "name": "src/urllib3/util/proxy.py",
+        "path": "src/urllib3/util/proxy.py",
+        "prs_analyzed": 1,
+        "prs_noise_skipped": 0,
+        "prs_not_analyzed": 0,
+        "prs_touching": 1,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 1
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/util/ssltransport.py",
+      "label": "src/urllib3/util/ssltransport.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/util/ssltransport.py",
+        "name": "src/urllib3/util/ssltransport.py",
+        "path": "src/urllib3/util/ssltransport.py",
+        "prs_analyzed": 3,
+        "prs_noise_skipped": 1,
+        "prs_not_analyzed": 3,
+        "prs_touching": 7,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 1
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/fields.py",
+      "label": "src/urllib3/fields.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/fields.py",
+        "name": "src/urllib3/fields.py",
+        "path": "src/urllib3/fields.py",
+        "prs_analyzed": 5,
+        "prs_noise_skipped": 0,
+        "prs_not_analyzed": 0,
+        "prs_touching": 5,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 2
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/filepost.py",
+      "label": "src/urllib3/filepost.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/filepost.py",
+        "name": "src/urllib3/filepost.py",
+        "path": "src/urllib3/filepost.py",
+        "prs_analyzed": 3,
+        "prs_noise_skipped": 0,
+        "prs_not_analyzed": 0,
+        "prs_touching": 3,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 1
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/http2/connection.py",
+      "label": "src/urllib3/http2/connection.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/http2/connection.py",
+        "name": "src/urllib3/http2/connection.py",
+        "path": "src/urllib3/http2/connection.py",
+        "prs_analyzed": 1,
+        "prs_noise_skipped": 0,
+        "prs_not_analyzed": 1,
+        "prs_touching": 2,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 1
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/__init__.py",
+      "label": "src/urllib3/__init__.py",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/__init__.py",
+        "name": "src/urllib3/__init__.py",
+        "path": "src/urllib3/__init__.py",
+        "prs_analyzed": 4,
+        "prs_noise_skipped": 1,
+        "prs_not_analyzed": 0,
+        "prs_touching": 4,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 1
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "file:urllib3/urllib3:src/urllib3/util/url.pyi",
+      "label": "src/urllib3/util/url.pyi",
+      "props": {
+        "created_at": "",
+        "entity_type": "File",
+        "id": "file:urllib3/urllib3:src/urllib3/util/url.pyi",
+        "name": "src/urllib3/util/url.pyi",
+        "path": "src/urllib3/util/url.pyi",
+        "prs_analyzed": 1,
+        "prs_noise_skipped": 0,
+        "prs_not_analyzed": 0,
+        "prs_touching": 1,
+        "repo": "urllib3-urllib3",
+        "verified_decisions": 1
+      },
+      "type": "CodeEntity"
+    },
+    {
+      "id": "pr:urllib3/urllib3#795",
+      "label": "pr:urllib3/urllib3#795",
+      "props": {
+        "author": "Lukasa",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#795",
+        "number": 795,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Enable PyOpenSSL testing.",
+        "url": "https://github.com/urllib3/urllib3/pull/795"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#762",
+      "label": "pr:urllib3/urllib3#762",
+      "props": {
+        "author": "Lukasa",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#762",
+        "number": 762,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Add SOCKS support via contrib module (AKA SOCKS support, take 4)",
+        "url": "https://github.com/urllib3/urllib3/pull/762"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#1356",
+      "label": "pr:urllib3/urllib3#1356",
+      "props": {
+        "author": "sethmlarson",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#1356",
+        "number": 1356,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Switch to deque LifoQueue",
+        "url": "https://github.com/urllib3/urllib3/pull/1356"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#3144",
+      "label": "pr:urllib3/urllib3#3144",
+      "props": {
+        "author": "pquentin",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#3144",
+        "number": 3144,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Fix docs build on Python 3.12",
+        "url": "https://github.com/urllib3/urllib3/pull/3144"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#1496",
+      "label": "pr:urllib3/urllib3#1496",
+      "props": {
+        "author": "sethmlarson",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#1496",
+        "number": 1496,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Add support for TLS 1.3 to all HTTPSConnection implementations",
+        "url": "https://github.com/urllib3/urllib3/pull/1496"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#754",
+      "label": "pr:urllib3/urllib3#754",
+      "props": {
+        "author": "Lukasa",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#754",
+        "number": 754,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Define an SNIMissingWarning.",
+        "url": "https://github.com/urllib3/urllib3/pull/754"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#2470",
+      "label": "pr:urllib3/urllib3#2470",
+      "props": {
+        "author": "Streadz",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#2470",
+        "number": 2470,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Mention pool size when discarding connections",
+        "url": "https://github.com/urllib3/urllib3/pull/2470"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#2340",
+      "label": "pr:urllib3/urllib3#2340",
+      "props": {
+        "author": "bluetech",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#2340",
+        "number": 2340,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Explicitly chain or don't chain exceptions",
+        "url": "https://github.com/urllib3/urllib3/pull/2340"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#1647",
+      "label": "pr:urllib3/urllib3#1647",
+      "props": {
+        "author": "sethmlarson",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#1647",
+        "number": 1647,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Percent-encode invalid characters within auth section",
+        "url": "https://github.com/urllib3/urllib3/pull/1647"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#1800",
+      "label": "pr:urllib3/urllib3#1800",
+      "props": {
+        "author": "sethmlarson",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#1800",
+        "number": 1800,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Raise ValueError if method contains control characters",
+        "url": "https://github.com/urllib3/urllib3/pull/1800"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#291",
+      "label": "pr:urllib3/urllib3#291",
+      "props": {
+        "author": "vincentxb",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#291",
+        "number": 291,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Ensure connections are properly closed on objects destruction",
+        "url": "https://github.com/urllib3/urllib3/pull/291"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#1923",
+      "label": "pr:urllib3/urllib3#1923",
+      "props": {
+        "author": "jalopezsilva",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#1923",
+        "number": 1923,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Integrate TLS-in-TLS support into urllib3",
+        "url": "https://github.com/urllib3/urllib3/pull/1923"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#1669",
+      "label": "pr:urllib3/urllib3#1669",
+      "props": {
+        "author": "hugovk",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#1669",
+        "number": 1669,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Fix for Python 4",
+        "url": "https://github.com/urllib3/urllib3/pull/1669"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#1906",
+      "label": "pr:urllib3/urllib3#1906",
+      "props": {
+        "author": "sethmlarson",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#1906",
+        "number": 1906,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Collapse request chunked data and framing into one send() call",
+        "url": "https://github.com/urllib3/urllib3/pull/1906"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#5101",
+      "label": "pr:urllib3/urllib3#5101",
+      "props": {
+        "author": "nishat-06",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#5101",
+        "number": 5101,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Preserve explicit port 0 in connection_from_url and HTTP/2 authority",
+        "url": "https://github.com/urllib3/urllib3/pull/5101"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#2139",
+      "label": "pr:urllib3/urllib3#2139",
+      "props": {
+        "author": "sethmlarson",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#2139",
+        "number": 2139,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Add types to URL parser, remove get_host() and split_first()",
+        "url": "https://github.com/urllib3/urllib3/pull/2139"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#1440",
+      "label": "pr:urllib3/urllib3#1440",
+      "props": {
+        "author": "jdufresne",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#1440",
+        "number": 1440,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Remove unnecessary use of six.binary_type and six.b",
+        "url": "https://github.com/urllib3/urllib3/pull/1440"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#3456",
+      "label": "pr:urllib3/urllib3#3456",
+      "props": {
+        "author": "mrdaybird",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#3456",
+        "number": 3456,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Add TLS settings for HTTP/2",
+        "url": "https://github.com/urllib3/urllib3/pull/3456"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#3134",
+      "label": "pr:urllib3/urllib3#3134",
+      "props": {
+        "author": "dimbleby",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#3134",
+        "number": 3134,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Typechecking fixes",
+        "url": "https://github.com/urllib3/urllib3/pull/3134"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#3055",
+      "label": "pr:urllib3/urllib3#3055",
+      "props": {
+        "author": "sg3-141-592",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#3055",
+        "number": 3055,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Fix assert_hostname=False",
+        "url": "https://github.com/urllib3/urllib3/pull/3055"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#1554",
+      "label": "pr:urllib3/urllib3#1554",
+      "props": {
+        "author": "pquentin",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#1554",
+        "number": 1554,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Miscellaneous test improvements",
+        "url": "https://github.com/urllib3/urllib3/pull/1554"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#391",
+      "label": "pr:urllib3/urllib3#391",
+      "props": {
+        "author": "t-8ch",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#391",
+        "number": 391,
+        "repo": "urllib3-urllib3",
+        "state": "CLOSED",
+        "title": "make active ssl backend accessible to users",
+        "url": "https://github.com/urllib3/urllib3/pull/391"
+      },
+      "type": "PullRequest"
+    },
+    {
+      "id": "pr:urllib3/urllib3#807",
+      "label": "pr:urllib3/urllib3#807",
+      "props": {
+        "author": "Lukasa",
+        "created_at": "",
+        "id": "pr:urllib3/urllib3#807",
+        "number": 807,
+        "repo": "urllib3-urllib3",
+        "state": "MERGED",
+        "title": "Yet another pass at connection cleanup.",
+        "url": "https://github.com/urllib3/urllib3/pull/807"
+      },
+      "type": "PullRequest"
+    }
+  ],
+  "truncated": true
+}

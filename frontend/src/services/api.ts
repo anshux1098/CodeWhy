@@ -20,110 +20,69 @@ export interface GroundedQuestion {
 }
 
 export const GROUNDED_DEMO_QUESTIONS: Record<string, GroundedQuestion[]> = {
-  'acme-netclient': [
-    {
-      label: 'Why is MAX_RETRIES 3?',
-      question: 'Why is MAX_RETRIES 3?',
-      outcomeType: 'full',
-      tag: 'Full Answer',
-      entityId: 'key:MAX_RETRIES',
-    },
-    {
-      label: 'Why did netclient move the helper?',
-      question: 'Why did the netclient package move that helper into its own module?',
-      outcomeType: 'partial',
-      tag: 'Partial (No Quote)',
-      entityId: 'module:netclient',
-    },
-    {
-      label: 'Why is _PAD_BYTES 17?',
-      question: 'Why is _PAD_BYTES 17?',
-      outcomeType: 'refusal',
-      tag: 'Refusal (No Path)',
-      entityId: 'key:_PAD_BYTES',
-    },
-    {
-      label: 'Why is retry set this way?',
-      question: 'Why is retry set this way?',
-      outcomeType: 'ambiguous',
-      tag: 'Ambiguous Entity',
-    },
-    {
-      label: 'Why is TIMEOUT_MS 500?',
-      question: 'Why is TIMEOUT_MS 500?',
-      outcomeType: 'refusal',
-      tag: 'Refusal (Entity Not Found)',
-    },
-    {
-      label: 'Why was the team late for the demo?',
-      question: 'Why was the team late for the demo?',
-      outcomeType: 'refusal',
-      tag: 'Refusal (Out of Scope)',
-    },
-  ],
   'urllib3-urllib3': [
     {
-      label: 'Why was ssl_.py changed for HTTP/2?',
+      label: 'Demonstrates: RFC 9113 HTTP/2 TLS support',
       question: 'Why was src/urllib3/util/ssl_.py changed for HTTP/2 TLS support?',
       outcomeType: 'full',
-      tag: 'Full Answer (RFC 9113)',
+      tag: 'Full Answer',
       entityId: 'file:urllib3/urllib3:src/urllib3/util/ssl_.py',
     },
     {
-      label: 'Why was Python 2.6 support dropped?',
-      question: 'Why was support for Python 2.6 dropped in urllib3?',
-      outcomeType: 'full',
-      tag: 'Full Answer (PR #1429)',
-      entityId: 'file:urllib3/urllib3:src/urllib3/__init__.py',
-    },
-    {
-      label: 'Why was HTTP/2 TLS reverted?',
+      label: 'Demonstrates: Commit revert supersession',
       question: 'Why was src/urllib3/util/ssl_.py reverted for HTTP/2 TLS?',
       outcomeType: 'full',
-      tag: 'Superseded (PR #3466)',
+      tag: 'Full Answer (Supersedes PR #3456)',
       entityId: 'file:urllib3/urllib3:src/urllib3/util/ssl_.py',
     },
     {
-      label: 'Why was url.py changed?',
+      label: 'Demonstrates: Multi-decision file history',
       question: 'Why was src/urllib3/util/url.py changed?',
-      outcomeType: 'refusal',
-      tag: 'Refusal (Thin Score)',
+      outcomeType: 'full',
+      tag: 'Full Answer',
       entityId: 'file:urllib3/urllib3:src/urllib3/util/url.py',
     },
     {
-      label: 'Why does urllib3 use Kubernetes?',
+      label: 'Demonstrates: Low score refusal (below similarity threshold)',
+      question: 'Why was support for Python 2.6 dropped in urllib3?',
+      outcomeType: 'refusal',
+      tag: 'Refusal (Low Score)',
+      entityId: 'file:urllib3/urllib3:src/urllib3/__init__.py',
+    },
+    {
+      label: 'Demonstrates: Out of scope off-topic refusal',
       question: 'Why does urllib3 use Kubernetes for orchestration?',
       outcomeType: 'refusal',
       tag: 'Refusal (Entity Not Found)',
     },
     {
-      label: 'Why does this code exist?',
+      label: 'Demonstrates: Non-existent file entity refusal',
       question: 'Why does this code exist?',
       outcomeType: 'refusal',
-      tag: 'Refusal (Unknown Entity)',
+      tag: 'Refusal (Entity Not Found)',
       entityId: 'file:urllib3/urllib3:does/not/exist.py',
     },
   ],
   'sqlalchemy-alembic': [
     {
-      label: 'Why avoid CAST(x as JSON) in SQLite?',
+      label: 'Demonstrates: SQLite batch operation workaround',
       question: 'Why avoid using CAST(x as JSON) in SQLite batch operations?',
       outcomeType: 'full',
-      tag: 'Full Answer (PR #698)',
+      tag: 'Full Answer',
       entityId: 'file:sqlalchemy/alembic:alembic/operations/batch.py',
     },
     {
-      label: 'Why report warnings from caller line?',
+      label: 'Demonstrates: Warning caller attribution',
       question: "Why report warnings from the caller's file and line number instead of utils.py?",
       outcomeType: 'full',
-      tag: 'Full Answer (PR #578)',
+      tag: 'Full Answer',
       entityId: 'file:sqlalchemy/alembic:alembic/util/messaging.py',
     },
     {
-      label: 'Why add engine.dispose() to asyncio?',
+      label: 'Demonstrates: Asyncio cookbook connection cleanup',
       question: 'Why add engine.dispose() to the asyncio cookbook example?',
       outcomeType: 'full',
-      tag: 'Full Answer (PR #973)',
+      tag: 'Full Answer',
     },
   ],
 };
@@ -140,10 +99,7 @@ export async function fetchRepositories(): Promise<{ items: Repository[]; isLive
   if (!data || !Array.isArray(data.items) || data.items.length === 0) {
     throw new Error('The API returned no repositories.');
   }
-  const items: Repository[] = data.items.filter((repo: Repository) =>
-    repo.id.toLowerCase() !== 'hynek-structlog'
-    && repo.full_name?.toLowerCase() !== 'hynek/structlog'
-  );
+  const items: Repository[] = data.items;
   return { items, isLive: true };
 }
 

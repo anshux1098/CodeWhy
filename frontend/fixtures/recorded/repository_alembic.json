@@ -1,0 +1,20 @@
+{
+  "counts": {
+    "commits": 345,
+    "decisions": 9,
+    "entities": 6,
+    "pull_requests": 199
+  },
+  "fixture": false,
+  "full_name": "sqlalchemy/alembic",
+  "id": "sqlalchemy-alembic",
+  "last_rebuilt_at": null,
+  "name": "alembic",
+  "owner": "sqlalchemy",
+  "prs_fetched": null,
+  "prs_noise_skipped": null,
+  "scope": null,
+  "sources_analyzed": null,
+  "url": "https://github.com/sqlalchemy/alembic",
+  "verified_decisions": null
+}

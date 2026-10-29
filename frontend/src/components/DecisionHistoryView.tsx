@@ -54,8 +54,8 @@ export const DecisionHistoryView: React.FC<DecisionHistoryViewProps> = ({
   // Selected decision for the shared drawer
   const [selectedDecisionId, setSelectedDecisionId] = useState<string | null>(null);
 
-  const repoId = selectedRepo?.id || 'acme-netclient';
-  const activeQuestion = questionContext?.repositoryId === repoId ? questionContext : null;
+  const repoId = selectedRepo?.id ?? '';
+  const activeQuestion = repoId && questionContext?.repositoryId === repoId ? questionContext : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -125,20 +125,20 @@ export const DecisionHistoryView: React.FC<DecisionHistoryViewProps> = ({
   const selectedDecisionItem = allDecisions.find((d) => d.id === selectedDecisionId);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] w-full bg-[#f5f3ed] overflow-y-auto">
+    <div className="flex flex-col h-[calc(100vh-4rem)] w-full bg-[#080907] text-[#F5F3ED] overflow-y-auto">
       {/* Header Context Bar */}
-      <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-2.5 border-b border-[#d7d2c6] bg-[#fffdf8]">
+      <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-2.5 border-b border-[#292A23] bg-[#0B0C09]">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-mono text-[#77776e]">
+          <span className="text-xs font-mono text-[#A5A69D]">
             Decision Lineage /
           </span>
-          <span className="font-mono text-xs font-semibold text-[#292b25] bg-[#efede5] px-2 py-0.5 rounded border border-[#d7d2c6] flex items-center gap-1.5">
-            <GitBranch className="w-3.5 h-3.5 text-[#617c50]" />
+          <span className="font-mono text-xs font-semibold text-[#F5F3ED] bg-[#12130F] px-2 py-0.5 rounded border border-[#292A23] flex items-center gap-1.5">
+            <GitBranch className="w-3.5 h-3.5 text-[#B9915E]" />
             {selectedRepo?.name || repoId}
           </span>
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-mono text-[#77776e]">
+        <div className="flex items-center gap-2 text-xs font-mono text-[#A5A69D]">
           <span>
             {displayedDecisions.length} decisions
           </span>
@@ -149,17 +149,17 @@ export const DecisionHistoryView: React.FC<DecisionHistoryViewProps> = ({
         {activeQuestion && (
           <>
             {/* Scoped Question Header */}
-            <div className="p-3.5 rounded-lg bg-[#fffdf8] border border-[#d7d2c6] space-y-1.5">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-[#77776e]">
+            <div className="p-4 rounded-xl bg-[#12130F] border border-[#292A23] space-y-2 shadow-sm">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[#A5A69D] font-semibold">
                 History Scoped by Question:
               </span>
-              <p className="text-xs sm:text-sm font-sans font-medium text-[#292b25]">
+              <p className="text-xs sm:text-sm font-sans font-medium text-[#F5F3ED] leading-snug">
                 "{activeQuestion.question}"
               </p>
               {activeQuestion.response.entity && (
-                <div className="flex items-center gap-2 pt-1 text-xs font-mono text-[#77776e]">
+                <div className="flex items-center gap-2 pt-0.5 text-xs font-mono text-[#A5A69D]">
                   <span>Target Entity:</span>
-                  <span className="px-1.5 py-0.2 rounded bg-[#f5f3ed] border border-[#d7d2c6] text-[#617c50]">
+                  <span className="px-2 py-0.5 rounded bg-[#080907] border border-[#292A23] text-[#757F6C] font-mono text-[11px]">
                     {activeQuestion.response.entity.label}
                   </span>
                 </div>
@@ -167,49 +167,68 @@ export const DecisionHistoryView: React.FC<DecisionHistoryViewProps> = ({
             </div>
 
             {/* Filters Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               {/* State Filter Buttons */}
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="mr-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-[#77776e]">
-                  <Filter className="w-3 h-3 text-[#617c50]" /> State:
+                <span className="mr-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#A5A69D]">
+                  <Filter className="w-3.5 h-3.5 text-[#B9915E]" /> State:
                 </span>
-                <div className="filter-segment-group" role="group" aria-label="Filter decisions by state">
-                  {(['ALL', 'ACTIVE', 'SUPERSEDED', 'REJECTED', 'UNRESOLVED'] as const).map((st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      onClick={() => setStateFilter(st)}
-                      aria-pressed={stateFilter === st}
-                      data-state-filter={st}
-                      className="filter-segment cursor-pointer"
-                    >
-                      <span>{st === 'ALL' ? 'All' : st}</span>
-                      {st !== 'ALL' && stateCounts[st] !== undefined && (
-                        <span className="filter-segment-count">{stateCounts[st]}</span>
-                      )}
-                    </button>
-                  ))}
+                <div
+                  className="inline-flex items-center p-1 rounded-lg bg-[#0B0C09] border border-[#292A23] gap-1"
+                  role="group"
+                  aria-label="Filter decisions by state"
+                >
+                  {(['ALL', 'ACTIVE', 'SUPERSEDED', 'REJECTED', 'UNRESOLVED'] as const).map((st) => {
+                    const isActive = stateFilter === st;
+                    return (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => setStateFilter(st)}
+                        aria-pressed={isActive}
+                        data-state-filter={st}
+                        className={`filter-segment px-2.5 py-1 rounded-md text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer ${
+                          isActive
+                            ? 'bg-[#181914] text-[#F5F3ED] border border-[#B9915E]/40 font-medium shadow-sm'
+                            : 'text-[#A5A69D] hover:text-[#F5F3ED] hover:bg-[#12130F]/60 border border-transparent'
+                        }`}
+                      >
+                        <span>{st === 'ALL' ? 'All' : st}</span>
+                        {st !== 'ALL' && stateCounts[st] !== undefined && (
+                          <span
+                            className={`filter-segment-count text-[10px] px-1.5 py-0.2 rounded-full ${
+                              isActive
+                                ? 'bg-[#B9915E]/20 text-[#B9915E] font-semibold'
+                                : 'bg-[#292A23]/60 text-[#A5A69D]/80'
+                            }`}
+                          >
+                            {stateCounts[st]}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Entity Filter Form */}
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#77776e]" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8C806F]" />
                 <input
                   type="text"
                   value={entityQuery}
                   onChange={(e) => setEntityQuery(e.target.value)}
                   placeholder="Filter decisions"
-                  className="pl-7 pr-2.5 py-1 bg-[#fffdf8] border border-[#d7d2c6] rounded text-xs font-mono text-[#292b25] placeholder:text-[#929086] focus:outline-none focus:border-[#718d5e] w-48 sm:w-56"
+                  className="pl-8 pr-3 py-1.5 bg-[#080907] border border-[#292A23] rounded-lg text-xs font-mono text-[#F5F3ED] placeholder:text-[#A5A69D]/50 focus:outline-none focus:border-[#B9915E]/70 focus:ring-1 focus:ring-[#B9915E]/30 w-48 sm:w-56 transition-all"
                 />
               </div>
             </div>
 
             {/* Invariant Rule Callout */}
-            <div className="p-3 rounded bg-[#fffdf8] border border-[#d7d2c6] text-xs font-mono text-[#77776e] flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-[#d29922] shrink-0 mt-0.5" />
+            <div className="p-3.5 rounded-xl bg-[#12130F] border border-[#B9915E]/30 text-xs font-mono text-[#A5A69D] flex items-start gap-2.5 shadow-sm">
+              <AlertTriangle className="w-4 h-4 text-[#B9915E] shrink-0 mt-0.5" />
               <p className="leading-relaxed">
-                <strong className="text-[#292b25] font-medium">Supersession Rule:</strong> A newer decision does not automatically supersede an older decision.
+                <strong className="text-[#F5F3ED] font-medium">Supersession Rule:</strong> A newer decision does not automatically supersede an older decision.
                 It is marked superseded only when corroborated by a documented lineage rule (e.g. revert commit or config key change).
               </p>
             </div>
@@ -217,16 +236,16 @@ export const DecisionHistoryView: React.FC<DecisionHistoryViewProps> = ({
         )}
 
         {!activeQuestion && (
-          <div className="p-8 rounded-lg bg-[#fffdf8] border border-[#d7d2c6] text-center space-y-3">
-            <Layers className="w-8 h-8 text-[#929086] mx-auto" />
-            <h3 className="text-sm font-semibold text-[#292b25]">Ask a question to inspect decision history</h3>
-            <p className="text-xs font-mono text-[#77776e] max-w-sm mx-auto">
+          <div className="p-8 rounded-xl bg-[#12130F] border border-[#292A23] text-center space-y-3">
+            <Layers className="w-8 h-8 text-[#8C806F] mx-auto" />
+            <h3 className="text-sm font-semibold text-[#F5F3ED]">Ask a question to inspect decision history</h3>
+            <p className="text-xs font-mono text-[#A5A69D] max-w-sm mx-auto">
               Decision history is scoped to the entity and governing decisions discovered in your investigation.
             </p>
             <button
               type="button"
               onClick={onAskQuestion}
-              className="px-3.5 py-1.5 rounded bg-[#54734f] hover:bg-[#718d5e] text-white text-xs font-medium transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-[#757F6C] hover:bg-[#8C806F] text-[#080907] text-xs font-semibold transition-colors cursor-pointer"
             >
               Open Workspace
             </button>
@@ -235,29 +254,29 @@ export const DecisionHistoryView: React.FC<DecisionHistoryViewProps> = ({
 
         {/* Loading State */}
         {activeQuestion && isLoading && (
-          <div className="py-16 flex flex-col items-center justify-center text-[#77776e] gap-2">
-            <Loader2 className="w-6 h-6 animate-spin text-[#617c50]" />
+          <div className="py-16 flex flex-col items-center justify-center text-[#A5A69D] gap-2">
+            <Loader2 className="w-6 h-6 animate-spin text-[#757F6C]" />
             <p className="text-xs font-mono">Fetching chronological decision records...</p>
           </div>
         )}
 
         {/* Error State */}
         {activeQuestion && error && (
-          <div className="p-4 rounded-lg bg-[#fffdf8] border border-[#da3633]/50 text-[#f85149] space-y-1">
+          <div className="p-4 rounded-xl bg-[#12130F] border border-[#da3633]/40 text-[#f85149] space-y-1">
             <div className="flex items-center gap-2 font-medium text-xs">
               <AlertCircle className="w-4 h-4 text-[#f85149]" />
               <span>Failed to load decisions</span>
             </div>
-            <p className="text-xs font-mono text-[#51534b]">{error}</p>
+            <p className="text-xs font-mono text-[#A5A69D]">{error}</p>
           </div>
         )}
 
         {/* Empty State */}
         {activeQuestion && !isLoading && !error && displayedDecisions.length === 0 && (
-          <div className="p-8 rounded-lg bg-[#fffdf8] border border-[#d7d2c6] text-center space-y-2">
-            <Layers className="w-6 h-6 text-[#929086] mx-auto" />
-            <h3 className="text-sm font-semibold text-[#292b25]">No decisions match filters</h3>
-            <p className="text-xs font-mono text-[#77776e]">
+          <div className="p-8 rounded-xl bg-[#12130F] border border-[#292A23] text-center space-y-2">
+            <Layers className="w-6 h-6 text-[#8C806F] mx-auto" />
+            <h3 className="text-sm font-semibold text-[#F5F3ED]">No decisions match filters</h3>
+            <p className="text-xs font-mono text-[#A5A69D]">
               No decisions match the current state or entity filter for this repository.
             </p>
           </div>
@@ -267,55 +286,55 @@ export const DecisionHistoryView: React.FC<DecisionHistoryViewProps> = ({
         {activeQuestion && !isLoading && !error && displayedDecisions.length > 0 && (
           <div className="relative pl-6 space-y-3">
             {/* Visual Spine */}
-            <div className="absolute left-2.5 top-4 bottom-4 w-px bg-[#d7d2c6] pointer-events-none" />
+            <div className="absolute left-2.5 top-4 bottom-4 w-px bg-[#292A23] pointer-events-none" />
 
             {displayedDecisions.map((decision) => {
               const renderStateConfig = () => {
                 switch (decision.state) {
                   case 'ACTIVE':
                     return {
-                      containerClass: 'bg-[#fffdf8] border border-[#2ea043]/40 hover:border-[#2ea043]/70 status-card-active',
+                      containerClass: 'bg-[#12130F] border border-[#2ea043]/30 hover:border-[#2ea043]/60 status-card-active',
                       badgeClass: 'bg-[#2ea043]/15 text-[#3fb950] border border-[#2ea043]/30 status-badge-active',
                       icon: <Check className="w-3.5 h-3.5 text-[#3fb950] stroke-[2.5] status-icon-active" />,
                       label: 'Active',
-                      summaryClass: 'text-[#292b25] font-medium',
+                      summaryClass: 'text-[#F5F3ED] font-medium',
                       dotClass: 'bg-[#2ea043] status-dot-active',
                     };
                   case 'SUPERSEDED':
                     return {
-                      containerClass: 'bg-[#fffdf8]/70 border border-[#d7d2c6] opacity-75 hover:opacity-100 status-card-superseded',
-                      badgeClass: 'bg-[#efede5] text-[#77776e] border border-[#d7d2c6] status-badge-superseded',
-                      icon: <ArrowRight className="w-3.5 h-3.5 text-[#77776e] status-icon-superseded" />,
+                      containerClass: 'bg-[#12130F]/80 border border-[#292A23] opacity-80 hover:opacity-100 status-card-superseded',
+                      badgeClass: 'bg-[#8C806F]/20 text-[#D4CBBF] border border-[#8C806F]/40 status-badge-superseded',
+                      icon: <ArrowRight className="w-3.5 h-3.5 text-[#D4CBBF] status-icon-superseded" />,
                       label: 'Superseded',
-                      summaryClass: 'text-[#77776e] line-through decoration-[#bdb8ab]',
-                      dotClass: 'bg-[#929086] status-dot-superseded',
+                      summaryClass: 'text-[#A5A69D] line-through decoration-[#8C806F]/60',
+                      dotClass: 'bg-[#8C806F] status-dot-superseded',
                     };
                   case 'REJECTED':
                     return {
-                      containerClass: 'bg-[#fffdf8] border border-[#da3633]/40 hover:border-[#da3633]/70 status-card-rejected',
+                      containerClass: 'bg-[#12130F] border border-[#da3633]/30 hover:border-[#da3633]/60 status-card-rejected',
                       badgeClass: 'bg-[#da3633]/15 text-[#f85149] border border-[#da3633]/30 status-badge-rejected',
                       icon: <X className="w-3.5 h-3.5 text-[#f85149] stroke-[2.5] status-icon-rejected" />,
                       label: 'Rejected',
-                      summaryClass: 'text-[#292b25]',
+                      summaryClass: 'text-[#F5F3ED]',
                       dotClass: 'bg-[#da3633] status-dot-rejected',
                     };
                   case 'UNRESOLVED':
                     return {
-                      containerClass: 'bg-[#fffdf8] border border-[#d29922]/40 hover:border-[#d29922]/70 status-card-unresolved',
+                      containerClass: 'bg-[#12130F] border border-[#d29922]/30 hover:border-[#d29922]/60 status-card-unresolved',
                       badgeClass: 'bg-[#d29922]/15 text-[#e3b341] border border-[#d29922]/30 status-badge-unresolved',
                       icon: <HelpCircle className="w-3.5 h-3.5 text-[#e3b341] status-icon-unresolved" />,
                       label: 'Needs Review',
-                      summaryClass: 'text-[#292b25]',
+                      summaryClass: 'text-[#F5F3ED]',
                       dotClass: 'bg-[#d29922] status-dot-unresolved',
                     };
                   default:
                     return {
-                      containerClass: 'bg-[#fffdf8] border border-[#d7d2c6]',
-                      badgeClass: 'bg-[#efede5] text-[#77776e] border border-[#d7d2c6]',
-                      icon: <Layers className="w-3.5 h-3.5" />,
+                      containerClass: 'bg-[#12130F] border border-[#292A23]',
+                      badgeClass: 'bg-[#181914] text-[#A5A69D] border border-[#292A23]',
+                      icon: <Layers className="w-3.5 h-3.5 text-[#8C806F]" />,
                       label: decision.state,
-                      summaryClass: 'text-[#292b25]',
-                      dotClass: 'bg-[#617c50]',
+                      summaryClass: 'text-[#F5F3ED]',
+                      dotClass: 'bg-[#757F6C]',
                     };
                 }
               };
@@ -327,13 +346,13 @@ export const DecisionHistoryView: React.FC<DecisionHistoryViewProps> = ({
                 <div key={decision.id} className="relative group">
                   {/* Spine Node Dot */}
                   <div
-                    className={`absolute -left-6 top-4 w-2.5 h-2.5 rounded-full ${style.dotClass} border border-[#f5f3ed] z-10`}
+                    className={`absolute -left-6 top-4 w-2.5 h-2.5 rounded-full ${style.dotClass} border border-[#080907] z-10`}
                   />
 
                   {/* Decision Row Card */}
                   <div
                     onClick={() => setSelectedDecisionId(decision.id)}
-                    className={`rounded-lg p-3.5 transition-colors cursor-pointer ${style.containerClass}`}
+                    className={`rounded-xl p-4 transition-all cursor-pointer shadow-sm ${style.containerClass}`}
                   >
                     {/* Header Row: State Badge, ID, Date, and Source Link */}
                     <div className="flex flex-wrap items-center justify-between gap-2.5 mb-2">
@@ -346,19 +365,17 @@ export const DecisionHistoryView: React.FC<DecisionHistoryViewProps> = ({
                         </span>
 
                         {decision.rule && (
-                          <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-[#efede5] text-[#77776e] border border-[#d7d2c6]">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#080907] text-[#A5A69D] border border-[#292A23]">
                             Rule: {decision.rule}
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2.5 text-xs font-mono text-[#77776e]">
-                        {decision.date && (
-                          <span className="flex items-center gap-1 text-[#77776e]">
-                            <Calendar className="w-3.5 h-3.5 text-[#929086]" />
-                            <span>{new Date(decision.date).toLocaleDateString()}</span>
-                          </span>
-                        )}
+                      <div className="flex items-center gap-2.5 text-xs font-mono text-[#A5A69D]">
+                        <span className="flex items-center gap-1 text-[#A5A69D]">
+                          <Calendar className="w-3.5 h-3.5 text-[#8C806F]" />
+                          <span>{decision.date ? new Date(decision.date).toLocaleDateString() : 'date unknown'}</span>
+                        </span>
 
                         {decision.source_url && (
                           <a
@@ -366,7 +383,7 @@ export const DecisionHistoryView: React.FC<DecisionHistoryViewProps> = ({
                             target="_blank"
                             rel="noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 text-[#617c50] hover:underline"
+                            className="inline-flex items-center gap-1 text-[#757F6C] hover:text-[#AFD2FA] hover:underline"
                             title="Open original pull request"
                           >
                             <GitPullRequest className="w-3.5 h-3.5" />
@@ -383,16 +400,16 @@ export const DecisionHistoryView: React.FC<DecisionHistoryViewProps> = ({
                     </p>
 
                     {/* Lineage & Entities Footer */}
-                    <div className="mt-2.5 pt-2 border-t border-[#d7d2c6] flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+                    <div className="mt-2.5 pt-2 border-t border-[#292A23] flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
                       {/* Linked Entities */}
                       <div className="flex flex-wrap items-center gap-1.5">
                         {visibleEntities.length > 0 && (
                           <>
-                            <Tag className="w-3 h-3 text-[#929086]" />
+                            <Tag className="w-3 h-3 text-[#8C806F]" />
                             {visibleEntities.map((ent) => (
                               <span
                                 key={ent}
-                                className="px-1.5 py-0.2 rounded bg-[#f5f3ed] text-[#617c50] border border-[#d7d2c6] text-[11px]"
+                                className="px-2 py-0.5 rounded bg-[#080907] text-[#757F6C] border border-[#292A23] text-[11px]"
                               >
                                 {entityDisplayName(ent)}
                               </span>
@@ -404,20 +421,20 @@ export const DecisionHistoryView: React.FC<DecisionHistoryViewProps> = ({
                       {/* Supersession Links */}
                       <div className="flex items-center gap-3">
                         {decision.supersedes && decision.supersedes.length > 0 && (
-                          <span className="text-[#77776e] text-[11px]">
+                          <span className="text-[#A5A69D] text-[11px]">
                             Supersedes {decision.supersedes.length} earlier{' '}
                             {decision.supersedes.length === 1 ? 'decision' : 'decisions'}
                           </span>
                         )}
 
                         {decision.superseded_by && decision.superseded_by.length > 0 && (
-                          <span className="text-[#e3b341] text-[11px] flex items-center gap-1">
+                          <span className="text-[#B9915E] text-[11px] flex items-center gap-1">
                             <ArrowRight className="w-3 h-3" />
                             <span>Replaced</span>
                           </span>
                         )}
 
-                        <span className="text-[#617c50] font-medium flex items-center gap-1">
+                        <span className="text-[#757F6C] hover:text-[#AFD2FA] font-medium flex items-center gap-1 transition-colors">
                           <span>Details</span>
                           <ArrowRight className="w-3 h-3" />
                         </span>
