@@ -21,15 +21,8 @@ export const ORBIT_SHAPES: Record<OrbitLayout, OrbitShape> = {
   mobile: { cx: 50, cy: 44, rx: 44, ry: 36 },
 };
 
-/**
- * Angles in degrees; 270 is the top of the orbit. Slots fan out from the
- * sides upward so repository stars never sit on the hero copy.
- */
-export const ORBIT_SLOTS: Record<OrbitLayout, readonly number[]> = {
-  wide: [208, 332, 242, 298, 190, 350],
-  tablet: [212, 328],
-  mobile: [250, 290],
-};
+/** One full, slow revolution. */
+export const ORBIT_PERIOD_MS = 240_000;
 
 /** Dim, non-interactive points that give the arc some company. */
 export const ORBIT_DUST: readonly { angle: number; size: number; opacity: number }[] = [
@@ -42,6 +35,22 @@ export interface OrbitPoint {
   angle: number;
   left: number;
   top: number;
+}
+
+export function normalizeAngle(angle: number): number {
+  const wrapped = angle % 360;
+  return wrapped < 0 ? wrapped + 360 : wrapped;
+}
+
+/**
+ * Deterministic star angle: repositories are spread evenly from the top of
+ * the orbit, then drift clockwise at a constant rate.
+ */
+export function starAngle(index: number, count: number, elapsedMs: number): number {
+  if (count <= 0) return 270;
+  const spread = (360 * index) / count;
+  const drift = (elapsedMs / ORBIT_PERIOD_MS) * 360;
+  return normalizeAngle(270 + spread + drift);
 }
 
 export function orbitPoint(angle: number, shape: OrbitShape): OrbitPoint {

@@ -17,6 +17,14 @@ export interface WaveSpec {
   drift: number;
 }
 
+export interface WaveInfluence {
+  x: number;
+  y: number;
+  energy: number;
+  /** Reach in backdrop units; the pointer reaches further than a star. */
+  reach?: number;
+}
+
 const W = (
   points: readonly number[],
   tone: WaveTone,
@@ -36,27 +44,32 @@ export function buildWavePath(points: readonly number[]): string {
 }
 
 /**
- * Bend a wave around the pointer. Only points near the pointer move,
- * and the lift decays with vertical distance so far lines stay still.
+ * Bend a wave around one or two influences. Only points near an influence
+ * move, and the lift decays with vertical distance so far lines stay still.
  */
 export function deformWave(
   base: readonly number[],
-  pointerX: number,
-  pointerY: number,
-  energy: number,
+  influences: readonly WaveInfluence[],
 ): string {
-  if (energy <= 0.002) return buildWavePath(base);
+  const active = influences.filter((item) => item.energy > 0.002);
+  if (active.length === 0) return buildWavePath(base);
 
   const out: number[] = new Array(12);
   for (let i = 0; i < 12; i += 2) {
     const x = base[i];
     const y = base[i + 1];
-    const distanceX = (x - pointerX) / 300;
-    const distanceY = (pointerY - y) / 260;
-    const falloff = Math.exp(-(distanceX * distanceX)) * Math.exp(-(distanceY * distanceY));
-    const lift = Math.max(-13, Math.min(13, (pointerY - y) * 0.12 * falloff));
+    let lift = 0;
+
+    for (const item of active) {
+      const reach = item.reach ?? 300;
+      const distanceX = (x - item.x) / reach;
+      const distanceY = (item.y - y) / (reach * 0.87);
+      const falloff = Math.exp(-(distanceX * distanceX)) * Math.exp(-(distanceY * distanceY));
+      lift += (item.y - y) * 0.12 * falloff * item.energy;
+    }
+
     out[i] = x;
-    out[i + 1] = y + lift * energy;
+    out[i + 1] = y + Math.max(-14, Math.min(14, lift));
   }
   return buildWavePath(out);
 }
