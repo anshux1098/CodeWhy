@@ -1,0 +1,355 @@
+{
+  "answer": "HTTP/2 TLS support was initially added by modifying `create_urllib3_context` to include TLS settings required by RFC 9113. However, it was subsequently reverted because the developers realized after working on them that these new settings could not actually be used, particularly since curl also does not implement them.",
+  "candidates": [],
+  "citations": [
+    {
+      "author": "mrdaybird",
+      "decision_id": "dec_6dee7648b9ef5416",
+      "id": "cit_ev_d467f1bb191c1506",
+      "kind": "SOURCE",
+      "quote": "This PR modifies `create_urllib3_context` to add TLS settings required for HTTP/2 as per RFC 9113.",
+      "source_type": "PullRequest",
+      "source_url": "https://github.com/urllib3/urllib3/pull/3456",
+      "timestamp": null
+    },
+    {
+      "author": "pquentin",
+      "decision_id": "dec_ce303eb845540d38",
+      "id": "cit_ev_a1e7fdc6a5362528",
+      "kind": "SOURCE",
+      "quote": "Unfortunately, we realized after working on them that we can't really use those new settings. curl also does not implement them.",
+      "source_type": "PullRequest",
+      "source_url": "https://github.com/urllib3/urllib3/pull/3466",
+      "timestamp": null
+    }
+  ],
+  "code_differs_from_latest": false,
+  "confidence": {
+    "label": "HIGH",
+    "score": 0.8366,
+    "signals": {
+      "agreement": 0.7,
+      "contradiction": 0.0,
+      "directness": 1.0,
+      "provenance": 0.8,
+      "relevance": 0.58,
+      "temporal_consistency": 1.0
+    }
+  },
+  "decisions": [
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_04fe474d74325a07",
+      "probable_superseded_by": [],
+      "rationale": "ssl.wrap_socket is gone in Python 3.12, requiring a link update to SSLContext.wrap_socket.",
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": null,
+      "source": {
+        "number": 3144,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/3144"
+      },
+      "state": "ACTIVE",
+      "summary": "Update documentation links to use SSLContext.wrap_socket instead of the removed ssl.wrap_socket",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_0a1e8c57cb7c59cf",
+      "probable_superseded_by": [],
+      "rationale": "TLS 1.3 support became available in OpenSSL 1.1.1 and Python 3.7, prompting the need to support and test against it.",
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": null,
+      "source": {
+        "number": 1496,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/1496"
+      },
+      "state": "ACTIVE",
+      "summary": "Add support for TLS 1.3 to all HTTPSConnection implementations and start testing against it",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_1975c2691a4117af",
+      "probable_superseded_by": [],
+      "rationale": "Explicitly chain exceptions or disable the chaining instead of creating implicit exception handling traces that look like a bug.",
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": null,
+      "source": {
+        "number": 2340,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/2340"
+      },
+      "state": "ACTIVE",
+      "summary": "Explicitly chain or disable exceptions using Python 3 built-in syntax",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_374c15ea4fa9fa06",
+      "probable_superseded_by": [],
+      "rationale": "Proxy users had their email address as their username containing an @ symbol, causing issues across both the library and requests issue trackers.",
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": null,
+      "source": {
+        "number": 1647,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/1647"
+      },
+      "state": "ACTIVE",
+      "summary": "Percent-encode invalid characters within auth section and remove rfc3986 as a vendored dependency",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_47cb5a8499ed20ad",
+      "probable_superseded_by": [],
+      "rationale": "This will enable urllib3 to use HTTPS proxies with HTTPS destinations, while retaining the forwarding mode because it has been incredibly useful within corporate environments when used with trusted proxies.",
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": null,
+      "source": {
+        "number": 1923,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/1923"
+      },
+      "state": "ACTIVE",
+      "summary": "Integrate SSLTransport class for TLS-in-TLS tunnels and keep forwarding mode under a flag",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_4ce7c9d1e5a57b60",
+      "probable_superseded_by": [],
+      "rationale": "Checking for Python 3+ using `if six.PY3:` will break on Python 4 because it skips the Python 3+ stuff and runs the Python 2 stuff.",
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": null,
+      "source": {
+        "number": 1669,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/1669"
+      },
+      "state": "ACTIVE",
+      "summary": "Updated Python version checks to correctly handle Python 4 and above instead of relying on PY3",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_5bf9c85e20b5cb14",
+      "probable_superseded_by": [],
+      "rationale": null,
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": null,
+      "source": {
+        "number": 2139,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/2139"
+      },
+      "state": "ACTIVE",
+      "summary": "Make urllib3.util.url regular expressions private",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_5f520b0a0b345b6a",
+      "probable_superseded_by": [],
+      "rationale": "The bytes type and bytes literal are available on all supported Pythons, reducing unnecessary compatibility shims and making the code more forward compatible with Python 3.",
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": null,
+      "source": {
+        "number": 1440,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/1440"
+      },
+      "state": "ACTIVE",
+      "summary": "Remove unnecessary use of six.binary_type and six.b",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_6dee7648b9ef5416",
+      "probable_superseded_by": [],
+      "rationale": "This PR modifies create_urllib3_context to add TLS settings required for HTTP/2 as per RFC 9113.",
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": "1_revert_commit",
+      "source": {
+        "number": 3456,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/3456"
+      },
+      "state": "SUPERSEDED",
+      "summary": "Modify create_urllib3_context to add TLS settings required for HTTP/2 as per RFC 9113",
+      "superseded_by": [
+        "dec_ce303eb845540d38"
+      ],
+      "supersedes": []
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_bf19d791654419d7",
+      "probable_superseded_by": [],
+      "rationale": "The standard library supports passing text or binary passwords to SSLContext, so PyOpenSSLContext and SecureTransportContext objects need to support it as well without requiring users to manually create their own SSLContext.",
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": null,
+      "source": {
+        "number": 1489,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/1489"
+      },
+      "state": "ACTIVE",
+      "summary": "Add support for password-protected client keyfiles via key_password parameter",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_ce303eb845540d38",
+      "probable_superseded_by": [],
+      "rationale": "The new settings could not be used because curl also does not implement them.",
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": "1_revert_commit",
+      "source": {
+        "number": 3466,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/3466"
+      },
+      "state": "ACTIVE",
+      "summary": "Revert the addition of TLS settings for HTTP/2",
+      "superseded_by": [],
+      "supersedes": [
+        "dec_6dee7648b9ef5416"
+      ]
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_d93fcc65f36fe7a9",
+      "probable_superseded_by": [],
+      "rationale": "This brings our URL parser in-line with Python standard library parsing which all use RFC 3986.",
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": null,
+      "source": {
+        "number": 1487,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/1487"
+      },
+      "state": "ACTIVE",
+      "summary": "Implement RFC 3986 URL parsing by adding the rfc3986 module",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_de821fd1ee45bc1e",
+      "probable_superseded_by": [],
+      "rationale": "set_ciphers is always supported in Python 2.7+, so this is no longer needed.",
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": null,
+      "source": {
+        "number": 1448,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/1448"
+      },
+      "state": "ACTIVE",
+      "summary": "Remove leftover Python 2.6 variable set_ciphers",
+      "superseded_by": [],
+      "supersedes": []
+    },
+    {
+      "conflicts_with": [],
+      "effective_at": null,
+      "ended_at": null,
+      "id": "dec_e1b5f1876cb27c16",
+      "probable_superseded_by": [],
+      "rationale": "Warnings using DeprecationWarning were not seen by most users, whereas FutureWarning should be visible by default.",
+      "reaffirms": [],
+      "recorded_at": null,
+      "rule": null,
+      "source": {
+        "number": 3763,
+        "type": "PullRequest",
+        "url": "https://github.com/urllib3/urllib3/pull/3763"
+      },
+      "state": "ACTIVE",
+      "summary": "Switch deprecation warnings from DeprecationWarning to FutureWarning",
+      "superseded_by": [],
+      "supersedes": []
+    }
+  ],
+  "entity": {
+    "decision_count": 14,
+    "id": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+    "label": "src/urllib3/util/ssl_.py",
+    "path": "src/urllib3/util/ssl_.py",
+    "type": "File"
+  },
+  "evidence_gaps": [
+    "9 of 42 PRs touching this file were not analyzed."
+  ],
+  "fixture": false,
+  "outcome": "full",
+  "reason_code": null,
+  "who_to_ask": [
+    {
+      "active": false,
+      "login": "pquentin",
+      "reason": "author"
+    },
+    {
+      "active": false,
+      "login": "sethmlarson",
+      "reason": "author"
+    },
+    {
+      "active": false,
+      "login": "bluetech",
+      "reason": "author"
+    }
+  ]
+}

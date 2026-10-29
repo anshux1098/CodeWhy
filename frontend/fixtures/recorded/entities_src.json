@@ -1,0 +1,174 @@
+{
+  "entities": [
+    {
+      "decision_count": 1,
+      "id": "file:urllib3/urllib3:src/urllib3/__init__.py",
+      "label": "src/urllib3/__init__.py",
+      "path": "src/urllib3/__init__.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 16,
+      "id": "file:urllib3/urllib3:src/urllib3/connection.py",
+      "label": "src/urllib3/connection.py",
+      "path": "src/urllib3/connection.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 13,
+      "id": "file:urllib3/urllib3:src/urllib3/connectionpool.py",
+      "label": "src/urllib3/connectionpool.py",
+      "path": "src/urllib3/connectionpool.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 2,
+      "id": "file:urllib3/urllib3:src/urllib3/contrib/_securetransport/bindings.py",
+      "label": "src/urllib3/contrib/_securetransport/bindings.py",
+      "path": "src/urllib3/contrib/_securetransport/bindings.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 1,
+      "id": "file:urllib3/urllib3:src/urllib3/contrib/_securetransport/low_level.py",
+      "label": "src/urllib3/contrib/_securetransport/low_level.py",
+      "path": "src/urllib3/contrib/_securetransport/low_level.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 3,
+      "id": "file:urllib3/urllib3:src/urllib3/contrib/pyopenssl.py",
+      "label": "src/urllib3/contrib/pyopenssl.py",
+      "path": "src/urllib3/contrib/pyopenssl.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 2,
+      "id": "file:urllib3/urllib3:src/urllib3/contrib/securetransport.py",
+      "label": "src/urllib3/contrib/securetransport.py",
+      "path": "src/urllib3/contrib/securetransport.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 1,
+      "id": "file:urllib3/urllib3:src/urllib3/contrib/socks.py",
+      "label": "src/urllib3/contrib/socks.py",
+      "path": "src/urllib3/contrib/socks.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 4,
+      "id": "file:urllib3/urllib3:src/urllib3/exceptions.py",
+      "label": "src/urllib3/exceptions.py",
+      "path": "src/urllib3/exceptions.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 2,
+      "id": "file:urllib3/urllib3:src/urllib3/fields.py",
+      "label": "src/urllib3/fields.py",
+      "path": "src/urllib3/fields.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 1,
+      "id": "file:urllib3/urllib3:src/urllib3/filepost.py",
+      "label": "src/urllib3/filepost.py",
+      "path": "src/urllib3/filepost.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 1,
+      "id": "file:urllib3/urllib3:src/urllib3/http2/connection.py",
+      "label": "src/urllib3/http2/connection.py",
+      "path": "src/urllib3/http2/connection.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 4,
+      "id": "file:urllib3/urllib3:src/urllib3/poolmanager.py",
+      "label": "src/urllib3/poolmanager.py",
+      "path": "src/urllib3/poolmanager.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 3,
+      "id": "file:urllib3/urllib3:src/urllib3/response.py",
+      "label": "src/urllib3/response.py",
+      "path": "src/urllib3/response.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 2,
+      "id": "file:urllib3/urllib3:src/urllib3/util/__init__.py",
+      "label": "src/urllib3/util/__init__.py",
+      "path": "src/urllib3/util/__init__.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 1,
+      "id": "file:urllib3/urllib3:src/urllib3/util/proxy.py",
+      "label": "src/urllib3/util/proxy.py",
+      "path": "src/urllib3/util/proxy.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 1,
+      "id": "file:urllib3/urllib3:src/urllib3/util/request.py",
+      "label": "src/urllib3/util/request.py",
+      "path": "src/urllib3/util/request.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 1,
+      "id": "file:urllib3/urllib3:src/urllib3/util/retry.py",
+      "label": "src/urllib3/util/retry.py",
+      "path": "src/urllib3/util/retry.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 14,
+      "id": "file:urllib3/urllib3:src/urllib3/util/ssl_.py",
+      "label": "src/urllib3/util/ssl_.py",
+      "path": "src/urllib3/util/ssl_.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 1,
+      "id": "file:urllib3/urllib3:src/urllib3/util/ssltransport.py",
+      "label": "src/urllib3/util/ssltransport.py",
+      "path": "src/urllib3/util/ssltransport.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 2,
+      "id": "file:urllib3/urllib3:src/urllib3/util/timeout.py",
+      "label": "src/urllib3/util/timeout.py",
+      "path": "src/urllib3/util/timeout.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 3,
+      "id": "file:urllib3/urllib3:src/urllib3/util/url.py",
+      "label": "src/urllib3/util/url.py",
+      "path": "src/urllib3/util/url.py",
+      "type": "File"
+    },
+    {
+      "decision_count": 1,
+      "id": "file:urllib3/urllib3:src/urllib3/util/url.pyi",
+      "label": "src/urllib3/util/url.pyi",
+      "path": "src/urllib3/util/url.pyi",
+      "type": "File"
+    },
+    {
+      "decision_count": 0,
+      "id": "module:urllib3/urllib3:src/urllib3",
+      "label": "src/urllib3",
+      "path": "src/urllib3",
+      "type": "Module"
+    }
+  ],
+  "fixture": false,
+  "query": "src"
+}

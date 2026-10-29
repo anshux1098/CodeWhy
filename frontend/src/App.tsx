@@ -10,13 +10,14 @@ import { RepositoryStatusView } from './components/RepositoryStatusView';
 import { GraphExplorerView } from './components/GraphExplorerView';
 import { FileDecisionBriefView } from './components/FileDecisionBriefView';
 import type { Repository, QuestionContext, AskResponse } from './types';
-import { fetchRepositories } from './services/api';
+import { fetchRepositories, fetchHealth } from './services/api';
 
 export function App() {
   const [currentTab, setCurrentTab] = useState<AppTab>('home');
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
   const [repoLoadError, setRepoLoadError] = useState<string | null>(null);
+  const [healthDataSource, setHealthDataSource] = useState<string | null>(null);
   const [questionContext, setQuestionContext] = useState<QuestionContext | null>(null);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -120,7 +121,13 @@ export function App() {
 
     async function loadData() {
       try {
-        const repoData = await fetchRepositories();
+        const [repoData, healthResult] = await Promise.all([
+          fetchRepositories(),
+          fetchHealth().catch(() => ({ health: null, latencyMs: 0, isConnected: false })),
+        ]);
+        if (healthResult?.health?.data_source) {
+          setHealthDataSource(healthResult.health.data_source);
+        }
         if (repoData.items.length > 0) {
           setRepositories(repoData.items);
         } else {
@@ -234,19 +241,53 @@ export function App() {
 
   return (
     <div
-      className={`min-h-screen flex flex-col font-sans${currentTab === 'home' ? ' cw-landing' : ''}`}
-      style={{ backgroundColor: currentTab === 'home' ? 'var(--cw-bg)' : 'var(--canvas)', color: currentTab === 'home' ? 'var(--cw-text)' : 'var(--text)' }}
+      className={`min-h-screen flex flex-col font-sans${
+        currentTab === 'home'
+          ? ' cw-landing'
+          : currentTab === 'workspace'
+          ? ' cw-investigate-page'
+          : currentTab === 'decisions'
+          ? ' cw-decisions-page'
+          : currentTab === 'file'
+          ? ' cw-file-page'
+          : currentTab === 'status'
+          ? ' cw-status-page'
+          : ''
+      }`}
+      style={{
+        backgroundColor: currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' ? 'var(--cw-bg)' : 'var(--canvas)',
+        color: currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' ? 'var(--cw-text)' : 'var(--text)',
+      }}
     >
       <Navbar
-        variant={currentTab === 'home' ? 'landing' : 'default'}
+        variant={currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' ? 'landing' : 'default'}
         onSelectTab={(tab) => navigateToTab(tab)}
         selectedRepo={selectedRepo}
         onOpenRepoSelector={() => setIsSelectorOpen(true)}
       />
 
+      {healthDataSource && healthDataSource !== 'graph' && (
+        <div
+          data-testid="data-source-banner"
+          className="w-full bg-amber-500/20 text-amber-950 border-b border-amber-500/40 px-4 py-2 text-center text-xs font-mono font-bold tracking-wide z-30"
+          role="alert"
+        >
+          Not running on the real graph, results may differ
+        </div>
+      )}
+      {(selectedRepo?.fixture || repositories.some((r) => r.fixture)) && (
+        <div
+          data-testid="fixture-banner"
+          className="w-full bg-rose-500/20 text-rose-950 border-b border-rose-500/40 px-4 py-2 text-center text-xs font-mono font-bold tracking-wide z-30"
+          role="alert"
+        >
+          SAMPLE DATA, NOT REAL HISTORY
+        </div>
+      )}
+
       <div className="flex flex-1 z-10 min-h-0">
         <Sidebar
-          variant={currentTab === 'home' ? 'landing' : 'default'}
+          variant={currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' ? 'landing' : 'default'}
           currentTab={currentTab}
           onSelectTab={(tab) => navigateToTab(tab)}
           isOpen={sidebarOpen}
@@ -254,7 +295,10 @@ export function App() {
         />
 
         {/* Main Content Area */}
-        <main className="flex-1 flex flex-col min-w-0" style={{ backgroundColor: 'var(--canvas)' }}>
+        <main
+          className="flex-1 flex flex-col min-w-0"
+          style={{ backgroundColor: currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' ? 'var(--cw-bg)' : 'var(--canvas)' }}
+        >
           {currentTab === 'home' ? (
             <Hero
               repositories={repositories}

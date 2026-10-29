@@ -1,0 +1,8 @@
+Recorded Date: 2026-10-29T19:42:02.062553+00:00
+Git Commit: 069e82f689e304482bdbe0dfde250b6d3b8705db
+Git Branch: ui-polish
+Backend URL: http://127.0.0.1:8000
+Data Source: graph
+Recorded By: pnpm run record:fixtures (scripts/record_fixtures.py)
+Total Endpoints Recorded: 28
+Notes: All fixture JSON keys are deterministically sorted. All data comes directly from the live Neo4j Aura graph instance without mocks.

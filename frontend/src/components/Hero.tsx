@@ -928,7 +928,7 @@ export const Hero: React.FC<HeroProps> = ({
               {openPanelRepo.sources_analyzed != null && (
                 <span>{openPanelRepo.sources_analyzed} sources analyzed</span>
               )}
-              {panelRebuilt && <span>Rebuilt {panelRebuilt}</span>}
+              {panelRebuilt && <span>Last graph rebuild: {panelRebuilt}</span>}
             </p>
           )}
 
