@@ -27,8 +27,8 @@ export const ArcheologyWorkflow: React.FC = () => {
     },
     {
       num: '03',
-      title: 'AST Entity Mapping',
-      desc: 'Extracts Python AST modules, constants, and classes with full historical change paths.',
+      title: 'Entity Extraction',
+      desc: 'Identifies code entities from the files each pull request changed, including modules, constants, and classes.',
       badge: 'AST Parser',
       icon: Search,
     },

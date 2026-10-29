@@ -25,7 +25,7 @@ export const Footer: React.FC = () => {
         <div className="flex flex-wrap items-center justify-center gap-2.5 text-xs font-mono">
           <span className="badge-emerald flex items-center gap-1.5 px-3 py-1 rounded-lg">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-            100% Verbatim Quote Policy
+            Verbatim Quote Verification
           </span>
           <span className="badge-violet flex items-center gap-1.5 px-3 py-1 rounded-lg">
             <GitBranch className="w-3.5 h-3.5 text-violet-500" />

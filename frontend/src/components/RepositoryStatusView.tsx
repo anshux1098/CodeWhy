@@ -422,7 +422,7 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
             </div>
             <div className="p-3 rounded-xl bg-[#f5f3ed]/80 border border-[#d7d2c6]">
               <span className="text-[#77776e] block text-[10px] uppercase">Query Availability</span>
-              <span className="text-emerald-400 font-bold text-sm">100% Available</span>
+              <span className="text-emerald-400 font-bold text-sm">Available</span>
             </div>
           </div>
         </div>
