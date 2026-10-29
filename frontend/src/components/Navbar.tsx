@@ -2,6 +2,7 @@ import React from 'react';
 import { Logo } from './Logo';
 import type { Repository } from '../types';
 import type { AppTab } from './Sidebar';
+import { branchFromScope } from '../lib/repoBranch';
 import {
   GitBranch,
   Layers,
@@ -13,18 +14,6 @@ interface NavbarProps {
   onSelectTab: (tab: AppTab) => void;
   selectedRepo: Repository | null;
   onOpenRepoSelector: () => void;
-}
-
-function branchFromScope(scope: string | null | undefined): string | null {
-  if (!scope) return null;
-  const m = scope.match(/at branch\s+([^,;]+)/i);
-  if (!m) return null;
-  const branch = m[1].trim();
-  if (!branch) return null;
-  if (branch.toLowerCase() === 'the ingested branch') return null;
-  if (branch.length > 64) return null;
-  if (/\s/.test(branch)) return null;
-  return branch;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
