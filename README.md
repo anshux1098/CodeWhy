@@ -259,11 +259,51 @@ pip install -e ".[embeddings]"
 
 **Bash (Linux / macOS):**
 ```bash
-python3.12 -m venv .venv
+cp .env.example .env
+```
+
+Configure `.env`:
+```env
+# GitHub Credentials
+GITHUB_TOKEN=your_github_token
+
+# Neo4j Database Credentials
+NEO4J_URI=neo4j+s://your-instance.databases.neo4j.io
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=your_password
+NEO4J_DATABASE=neo4j
+
+# LLM Configuration
+LLM_PROVIDER=google
+LLM_MODEL=gemini-2.5-flash
+LLM_API_KEY=your_llm_api_key
+
+# Operational Settings
+DATA_SOURCE=graph            # 'graph' for real Neo4j, 'fixture' for mock testing
+ALLOW_MOCK_PROVIDERS=false   # Set to true for offline testing without credentials
+BACKEND_HOST=127.0.0.1
+BACKEND_PORT=8000
+```
+
+### 3. Backend Setup
+```bash
+# Set up Python virtual environment
+python -m venv .venv
+
+# Activate virtual environment
+# Windows (PowerShell):
+.venv\Scripts\Activate.ps1
+# Linux / macOS:
 source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -e ".[dev]"
-pip install -e ".[embeddings]"
+
+# Install backend dependencies in editable mode
+pip install -e backend
+
+# Verify configuration and external connections
+python scripts/preflight.py --connect
+
+# Start backend server
+uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 --reload
 ```
 
 > **Note on Embeddings & Offline Mode:** Installing `.[embeddings]` provides `sentence-transformers` (`all-MiniLM-L6-v2`). After the first model download from Hugging Face succeeds, set `$env:HF_HUB_OFFLINE="1"` to run completely offline without network checks.
@@ -497,4 +537,4 @@ Every API response carries a derived `"fixture": bool` flag:
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT License. See [LICENSE](LICENSE) for details.
