@@ -4,7 +4,8 @@
 .cw-investigate-page,
 .cw-decisions-page,
 .cw-file-page,
-.cw-status-page {
+.cw-status-page,
+.cw-graph-page {
   --cw-header-h: 62px;
   --cw-bg: #080907;
   --cw-sidebar: #0B0C09;
@@ -25,7 +26,7 @@
 }
 
 /* ── Header (landing variant) ─────────────────────────────── */
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-navbar-landing {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-navbar-landing {
   height: var(--cw-header-h);
   background-color: color-mix(in srgb, var(--cw-bg) 94%, transparent);
   border-bottom: 1px solid var(--cw-border);
@@ -34,7 +35,7 @@
   box-shadow: none;
 }
 
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-brand-mark {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-brand-mark {
   width: 34px;
   height: 34px;
   border-radius: 9px;
@@ -51,20 +52,20 @@
     0 0 16px color-mix(in srgb, var(--cw-bronze) 14%, transparent);
 }
 
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-wordmark {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-wordmark {
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1;
   color: var(--cw-text);
 }
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-wordmark .cw-why {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-wordmark .cw-why {
   background-image: linear-gradient(180deg, #C9A776 0%, #B9915E 55%, #9C7949 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-eyebrow-sub {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-eyebrow-sub {
   font-size: 9.5px;
   letter-spacing: 0.16em;
   color: var(--cw-text-2);
@@ -72,7 +73,7 @@
   font-weight: 600;
 }
 
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-repo-pill {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-repo-pill {
   background-color: var(--cw-surface);
   border: 1px solid var(--cw-border);
   color: var(--cw-text);
@@ -80,12 +81,12 @@
   font-size: 12px;
   font-family: var(--font-mono);
 }
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-repo-pill .cw-branch {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-repo-pill .cw-branch {
   color: var(--cw-olive);
   font-weight: 600;
 }
 
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-switch-repo {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-switch-repo {
   background-color: var(--cw-surface);
   border: 1px solid var(--cw-border);
   color: var(--cw-text);
@@ -94,13 +95,13 @@
   font-weight: 500;
   transition: border-color 0.18s ease, background-color 0.18s ease;
 }
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-switch-repo:hover {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-switch-repo:hover {
   border-color: color-mix(in srgb, var(--cw-bronze) 45%, var(--cw-border));
   background-color: color-mix(in srgb, var(--cw-bronze) 6%, var(--cw-surface));
 }
 
 /* ── Sidebar (landing variant) ───────────────────────────── */
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-sidebar-landing {
   width: 268px;
   top: var(--cw-header-h);
   height: calc(100vh - var(--cw-header-h));
@@ -108,23 +109,23 @@
   border-right: 1px solid var(--cw-border);
 }
 
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing .cw-nav-label {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-sidebar-landing .cw-nav-label {
   color: var(--cw-text-2);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.16em;
 }
 
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing .cw-nav-btn {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-sidebar-landing .cw-nav-btn {
   border-radius: 10px;
   color: var(--cw-text-2);
   transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing .cw-nav-btn:hover {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-sidebar-landing .cw-nav-btn:hover {
   background-color: color-mix(in srgb, var(--cw-olive) 8%, var(--cw-sidebar));
   color: var(--cw-text);
 }
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing .cw-nav-btn[aria-current="page"] {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-sidebar-landing .cw-nav-btn[aria-current="page"] {
   background-image: linear-gradient(
     180deg,
     color-mix(in srgb, var(--cw-olive) 17%, var(--cw-sidebar)) 0%,
@@ -136,11 +137,11 @@
     inset 0 1px 0 rgba(245, 243, 237, 0.05),
     0 4px 14px rgba(0, 0, 0, 0.35);
 }
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing .cw-nav-btn[aria-current="page"] .cw-nav-icon {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-sidebar-landing .cw-nav-btn[aria-current="page"] .cw-nav-icon {
   background-color: color-mix(in srgb, var(--cw-bronze) 16%, transparent);
   color: var(--cw-bronze);
 }
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing .cw-nav-icon {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-sidebar-landing .cw-nav-icon {
   width: 28px;
   height: 28px;
   border-radius: 8px;
@@ -148,7 +149,7 @@
   color: var(--cw-text-2);
 }
 
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing .cw-version {
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-sidebar-landing .cw-version {
   color: var(--cw-text-2);
   font-size: 10px;
   font-weight: 600;
@@ -156,7 +157,63 @@
 }
 
 /* collapsed width */
-:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page) .cw-sidebar-landing.is-collapsed { width: 72px; }
+:is(.cw-landing, .cw-investigate-page, .cw-decisions-page, .cw-file-page, .cw-status-page, .cw-graph-page) .cw-sidebar-landing.is-collapsed { width: 72px; }
+
+/* ── React Flow & Knowledge Graph canvas overrides ────────── */
+.cw-graph-page .react-flow {
+  background-color: var(--cw-bg);
+}
+
+.cw-graph-page .react-flow__controls {
+  overflow: hidden;
+  border: 1px solid var(--cw-border) !important;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--cw-surface) 90%, transparent) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+.cw-graph-page .react-flow__controls-button {
+  border-bottom: 1px solid var(--cw-border) !important;
+  background: transparent !important;
+  color: var(--cw-text-2) !important;
+  fill: currentColor !important;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.cw-graph-page .react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.cw-graph-page .react-flow__controls-button:hover {
+  background: color-mix(in srgb, var(--cw-olive) 18%, var(--cw-surface)) !important;
+  color: var(--cw-text) !important;
+}
+
+.cw-graph-page .react-flow__controls-button svg {
+  fill: currentColor !important;
+  width: 14px;
+  height: 14px;
+}
+
+.cw-graph-page .react-flow__edge-text {
+  fill: var(--cw-text-2) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+}
+
+.cw-graph-page .react-flow__edge-textbg {
+  fill: var(--cw-surface) !important;
+  rx: 4px;
+  ry: 4px;
+}
 
 /* ── Hero ─────────────────────────────────────────────────── */
 .cw-landing .cw-hero {
