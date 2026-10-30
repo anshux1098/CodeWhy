@@ -1,7 +1,20 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import os
+from pathlib import Path
+import sys
 from typing import Optional
+
+_BACKEND_DIR = str(Path(__file__).resolve().parent.parent)
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
+
+if os.environ.get("VERCEL"):
+    os.environ.setdefault("DATA_SOURCE", "graph")
+    os.environ.setdefault("SQLITE_CACHE_PATH", "data/ingest.sqlite3")
+    os.environ.setdefault("ALLOW_MOCK_PROVIDERS", "true")
+    os.environ.setdefault("OFFLINE", "true")
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
