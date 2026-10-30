@@ -252,15 +252,17 @@ export function App() {
           ? ' cw-file-page'
           : currentTab === 'status'
           ? ' cw-status-page'
+          : currentTab === 'graph'
+          ? ' cw-graph-page'
           : ''
       }`}
       style={{
-        backgroundColor: currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' ? 'var(--cw-bg)' : 'var(--canvas)',
-        color: currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' ? 'var(--cw-text)' : 'var(--text)',
+        backgroundColor: currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' || currentTab === 'graph' ? 'var(--cw-bg)' : 'var(--canvas)',
+        color: currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' || currentTab === 'graph' ? 'var(--cw-text)' : 'var(--text)',
       }}
     >
       <Navbar
-        variant={currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' ? 'landing' : 'default'}
+        variant={currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' || currentTab === 'graph' ? 'landing' : 'default'}
         onSelectTab={(tab) => navigateToTab(tab)}
         selectedRepo={selectedRepo}
         onOpenRepoSelector={() => setIsSelectorOpen(true)}
@@ -287,7 +289,7 @@ export function App() {
 
       <div className="flex flex-1 z-10 min-h-0">
         <Sidebar
-          variant={currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' ? 'landing' : 'default'}
+          variant={currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' || currentTab === 'graph' ? 'landing' : 'default'}
           currentTab={currentTab}
           onSelectTab={(tab) => navigateToTab(tab)}
           isOpen={sidebarOpen}
@@ -297,7 +299,7 @@ export function App() {
         {/* Main Content Area */}
         <main
           className="flex-1 flex flex-col min-w-0"
-          style={{ backgroundColor: currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' ? 'var(--cw-bg)' : 'var(--canvas)' }}
+          style={{ backgroundColor: currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' || currentTab === 'graph' ? 'var(--cw-bg)' : 'var(--canvas)' }}
         >
           {currentTab === 'home' ? (
             <Hero
