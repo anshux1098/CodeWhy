@@ -81,6 +81,14 @@ async def _lifespan(application: FastAPI):
         if _deps._DATA_SOURCE is None:
             _deps._DATA_SOURCE = get_data_source(cfg)
             log.info("Data source initialised: %s", type(_deps._DATA_SOURCE).__name__)
+        if not cfg.offline and cfg.data_source == "graph":
+            try:
+                from app.providers.embeddings import get_embedding_provider
+                provider = get_embedding_provider(cfg=cfg)
+                provider.embed_text("warmup")
+                log.info("Embedding provider pre-warmed: %s", type(provider).__name__)
+            except Exception as emb_exc:  # noqa: BLE001
+                log.warning("Embedding pre-warm skipped or failed: %s", emb_exc)
     except Exception as exc:  # noqa: BLE001
         log.error("Startup data source init failed: %s", exc)
     yield
