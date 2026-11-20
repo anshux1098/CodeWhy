@@ -147,27 +147,22 @@ def _run_ingest_background(
             encoding="utf-8",
         )
 
-        # ── Phase 3: fetch PRs & commits ────────────────────────────────
-        job_store.update_job(job_id, status="fetching", phase="Fetching pull requests and commits...", progress_pct=40)
+        # ── Phase 3 & 4: fetch PRs & commits ────────────────────────────
+        job_store.update_job(job_id, status="fetching", phase="Fetching pull requests and commits...", progress_pct=50)
 
         cache_path = Path("data/ingest.sqlite3")
         cache_path.parent.mkdir(parents=True, exist_ok=True)
-        cache = SqliteCache(cache_path)
 
-        client = GitHubGraphQLClient(token=_settings.github_token)
-
-        # ── Phase 4: run ingest pipeline ────────────────────────────────
-        job_store.update_job(job_id, status="fetching", phase="Fetching pull requests and commits...", progress_pct=50)
-
-        run_ingest(
-            repo=repo,
-            targets=targets,
-            settings=_settings,
-            cache=cache,
-            clone_root=clone_root,
-            client=client,
-            max_prs=max_prs,
-        )
+        with SqliteCache(cache_path) as cache, GitHubGraphQLClient(_settings) as client:
+            run_ingest(
+                repo=repo,
+                targets=targets,
+                settings=_settings,
+                cache=cache,
+                clone_root=clone_root,
+                client=client,
+                max_prs=max_prs,
+            )
 
         # ── Phase 5: extract decisions & evidence quotes ────────────────
         job_store.update_job(job_id, status="extracting", phase="Extracting architectural decisions and verifying evidence quotes...", progress_pct=75)
