@@ -157,7 +157,7 @@ def _run_ingest_background(
         client = GitHubGraphQLClient(token=_settings.github_token)
 
         # ── Phase 4: run ingest pipeline ────────────────────────────────
-        job_store.update_job(job_id, status="extracting", phase="Running ingest pipeline...", progress_pct=60)
+        job_store.update_job(job_id, status="fetching", phase="Fetching pull requests and commits...", progress_pct=50)
 
         run_ingest(
             repo=repo,
@@ -169,17 +169,49 @@ def _run_ingest_background(
             max_prs=max_prs,
         )
 
-        # ── Phase 5: done ───────────────────────────────────────────────
+        # ── Phase 5: extract decisions & evidence quotes ────────────────
+        job_store.update_job(job_id, status="extracting", phase="Extracting architectural decisions and verifying evidence quotes...", progress_pct=75)
+
+        extract_cmd = [
+            sys.executable,
+            "scripts/extract.py",
+            "--repo",
+            repo,
+            "--cache",
+            str(cache_path),
+            "--targets",
+            str(targets_path),
+            "--max-sources",
+            "15",
+        ]
+        logger.info("Running decision extraction: %s", " ".join(extract_cmd))
+        subprocess.run(extract_cmd, check=True)
+
+        # ── Phase 6: rebuild Neo4j knowledge graph ─────────────────────
+        job_store.update_job(job_id, status="indexing", phase="Populating Neo4j knowledge graph...", progress_pct=90)
+
+        rebuild_cmd = [
+            sys.executable,
+            "scripts/rebuild_graph.py",
+            "--repo",
+            repo,
+            "--cache",
+            str(cache_path),
+        ]
+        logger.info("Rebuilding Neo4j graph: %s", " ".join(rebuild_cmd))
+        subprocess.run(rebuild_cmd, check=True)
+
+        # ── Phase 7: done ───────────────────────────────────────────────
         result_repo_id = repo.replace("/", "-")
         job_store.update_job(
             job_id,
             status="done",
-            phase="Ingestion complete.",
+            phase="Ingestion complete. Knowledge graph ready.",
             progress_pct=100,
             finished_at=finished_at_now(),
             result_repo_id=result_repo_id,
         )
-        logger.info("Ingest job %s done for %s → %s", job_id, repo, result_repo_id)
+        logger.info("Ingest job %s fully completed for %s → %s", job_id, repo, result_repo_id)
 
     except Exception as exc:  # noqa: BLE001
         logger.exception("Ingest job %s failed: %s", job_id, exc)
