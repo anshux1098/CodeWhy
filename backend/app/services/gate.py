@@ -2,10 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Optional
+from typing import Callable, Optional
 
 from app.config import Settings, settings
 from app.services.entity_resolution import ResolutionOutcome, ResolutionResult
+from app.services.policy import (
+    GatePolicyProfile,
+    GateSignals,
+    GateTelemetryEvent,
+    PolicyRegistry,
+    evaluate_policy,
+)
 from app.services.retrieval import EvidenceBundle
 
 
@@ -21,6 +28,69 @@ class GateCheckResult:
     reason_code: Optional[str] = None
     gate_name: Optional[str] = None
     detail: Optional[str] = None
+    grounding_method: Optional[str] = None
+    score_margin: Optional[float] = None
+    evidence_tier: Optional[str] = None
+    evidence_sufficiency: Optional[float] = None
+    entailment_score: Optional[float] = None
+    calibrated_relevance: Optional[float] = None
+    policy_profile: Optional[str] = None
+
+
+def collect_gate_signals(
+    resolution: ResolutionResult,
+    bundle: Optional[EvidenceBundle] = None,
+) -> GateSignals:
+    """Pure signal collector decoupling observation from policy decisions."""
+    entity_resolved = bool(resolution.entity is not None and bundle is not None)
+    entity_name = resolution.entity.name if resolution.entity else None
+
+    if bundle is None:
+        return GateSignals(
+            entity_resolved=False,
+            entity_outcome=resolution.outcome.value,
+            entity_reason_code=resolution.reason_code,
+            entity_name=entity_name,
+            entity_error_detail=resolution.error_message,
+            grounding_method=resolution.grounding_method,
+            score_margin=resolution.score_margin,
+        )
+
+    evidence_tier = getattr(bundle, "evidence_tier", "direct" if bundle.decisions else "none")
+    evidence_sufficiency = float(
+        getattr(bundle, "evidence_sufficiency", 1.0 if bundle.decisions else 0.0)
+    )
+    verified_quotes = [
+        ev for ev in bundle.evidence_items
+        if ev.quote_verified and bool(ev.quote.strip())
+    ]
+    entailment_score = round(
+        len(verified_quotes) / max(len(bundle.evidence_items), 1), 4
+    ) if verified_quotes else 0.0
+
+    calibrated_rel = getattr(bundle, "calibrated_relevance_score", None)
+    effective_relevance = (
+        float(calibrated_rel)
+        if calibrated_rel is not None
+        else float(bundle.best_similarity_score)
+    )
+
+    return GateSignals(
+        entity_resolved=entity_resolved,
+        entity_outcome=resolution.outcome.value,
+        entity_reason_code=resolution.reason_code,
+        entity_name=entity_name,
+        entity_error_detail=resolution.error_message,
+        grounding_method=resolution.grounding_method,
+        score_margin=resolution.score_margin,
+        decision_count=len(bundle.decisions),
+        evidence_tier=evidence_tier,
+        evidence_sufficiency=evidence_sufficiency,
+        verified_quote_count=len(verified_quotes),
+        total_evidence_count=len(bundle.evidence_items),
+        entailment_score=entailment_score,
+        calibrated_relevance=effective_relevance,
+    )
 
 
 def evaluate_refusal_gate(
@@ -29,89 +99,45 @@ def evaluate_refusal_gate(
     min_score: Optional[float] = None,
     question: str = "",
     cfg: Optional[Settings] = None,
+    *,
+    repository_id: Optional[str] = None,
+    profile: Optional[GatePolicyProfile] = None,
+    telemetry_sink: Optional[Callable[[GateTelemetryEvent], None]] = None,
 ) -> GateCheckResult:
-    """Enforces the 4-check refusal gate from Layer 6 of the specification.
+    """Evaluate the 4-gate refusal pipeline via the declarative Policy Engine.
 
-    G1 Entity: Question resolves to exactly one entity.
-       Otherwise -> refuse (entity_not_found, out_of_scope) or ask user (ambiguous_entity).
-    G2 Path: Entity has at least one decision through GOVERNS.
-       Otherwise -> refuse (no_decision_path).
-    G3 Quote: At least one linked evidence item has a verified quote.
-       Otherwise -> partial answer "change recorded, rationale unknown" (no_verified_quote).
-    G4 Relevance: Best similarity between question and decisions >= MIN_SCORE.
-       Otherwise -> refuse (low_score).
+    1. Collect pure ``GateSignals`` from entity resolution and retrieved evidence.
+    2. Resolve the active ``GatePolicyProfile`` (explicit profile, per-repo override,
+       or configured default profile).
+    3. Evaluate declarative rules and emit structured telemetry.
     """
     config = cfg or settings
-    threshold = min_score if min_score is not None else config.min_score
+    if profile is not None:
+        active_profile = profile
+    else:
+        registry = PolicyRegistry.from_settings(config)
+        active_profile = registry.for_repository(repository_id)
 
-    # ------------------------------------------------------------------
-    # G1: Entity Resolution Check
-    # ------------------------------------------------------------------
-    if resolution.outcome == ResolutionOutcome.REFUSAL:
-        return GateCheckResult(
-            outcome=GateOutcome.REFUSAL,
-            reason_code=resolution.reason_code or "entity_not_found",
-            gate_name="G1",
-            detail=resolution.error_message or "Entity not found or out of scope.",
-        )
+    if min_score is not None:
+        active_profile = active_profile.with_min_relevance(min_score)
 
-    if resolution.outcome == ResolutionOutcome.AMBIGUOUS:
-        return GateCheckResult(
-            outcome=GateOutcome.REFUSAL,
-            reason_code="ambiguous_entity",
-            gate_name="G1",
-            detail=resolution.error_message or "Ambiguous entity matched.",
-        )
-
-    if not resolution.entity or bundle is None:
-        return GateCheckResult(
-            outcome=GateOutcome.REFUSAL,
-            reason_code="entity_not_found",
-            gate_name="G1",
-            detail="Entity could not be resolved.",
-        )
-
-    # ------------------------------------------------------------------
-    # G2: Decision Path Check (GOVERNS)
-    # ------------------------------------------------------------------
-    if not bundle.decisions:
-        return GateCheckResult(
-            outcome=GateOutcome.REFUSAL,
-            reason_code="no_decision_path",
-            gate_name="G2",
-            detail=f"No engineering decision path governs entity {resolution.entity.name}.",
-        )
-
-    # ------------------------------------------------------------------
-    # G3: Verified Quote Check
-    # ------------------------------------------------------------------
-    has_verified_quote = any(
-        ev.quote_verified and bool(ev.quote.strip())
-        for ev in bundle.evidence_items
+    signals = collect_gate_signals(resolution, bundle)
+    outcome_str, reason_code, gate_name, detail = evaluate_policy(
+        signals,
+        active_profile,
+        telemetry_sink=telemetry_sink,
     )
 
-    if not has_verified_quote:
-        # Fails G3: must return partial answer with no_verified_quote
-        return GateCheckResult(
-            outcome=GateOutcome.PARTIAL,
-            reason_code="no_verified_quote",
-            gate_name="G3",
-            detail="Change is recorded in history, but no verified rationale quote exists.",
-        )
-
-    # ------------------------------------------------------------------
-    # G4: Relevance Check (MIN_SCORE)
-    # ------------------------------------------------------------------
-    if bundle.best_similarity_score < threshold:
-        return GateCheckResult(
-            outcome=GateOutcome.REFUSAL,
-            reason_code="low_score",
-            gate_name="G4",
-            detail=(
-                f"Best evidence similarity {bundle.best_similarity_score:.2f} "
-                f"is below threshold {threshold:.2f}."
-            ),
-        )
-
-    # All gates passed cleanly!
-    return GateCheckResult(outcome=GateOutcome.PASS, gate_name="ALL")
+    return GateCheckResult(
+        outcome=GateOutcome(outcome_str),
+        reason_code=reason_code,
+        gate_name=gate_name,
+        detail=detail,
+        grounding_method=signals.grounding_method,
+        score_margin=signals.score_margin,
+        evidence_tier=signals.evidence_tier,
+        evidence_sufficiency=signals.evidence_sufficiency,
+        entailment_score=signals.entailment_score,
+        calibrated_relevance=signals.calibrated_relevance,
+        policy_profile=active_profile.name,
+    )

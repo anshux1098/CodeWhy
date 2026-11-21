@@ -68,6 +68,33 @@ class Settings(BaseSettings):
     max_chain_length: int = 6
     max_evidence_items: int = 12
     min_score: float = 0.55
+    # G1 Hybrid Entity Grounding parameters (configurable, no hardcoded cutoffs)
+    entity_ambiguity_margin: float = 0.08
+    entity_min_grounding_score: float = 0.35
+    entity_rrf_k: int = 60
+    entity_enable_semantic_grounding: bool = True
+    # G2 Multi-Hop Evidence Retrieval & Graceful Degradation parameters
+    enable_multihop_fallback: bool = True
+    evidence_tier1_directness: float = 1.0
+    evidence_tier2_directness: float = 0.65
+    evidence_tier3_directness: float = 0.40
+    # G3 Claim-Level NLI / Faithfulness Verification parameters
+    enable_nli_verification: bool = True
+    nli_model_name: str = "cross-encoder/nli-deberta-v3-small"
+    nli_entailment_threshold: float = 0.45
+    nli_min_answer_faithfulness: float = 0.50
+    # G4 Two-Stage Calibrated Reranker & Conformal Thresholding parameters
+    enable_reranker: bool = True
+    reranker_model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    reranker_platt_a: float = 4.0
+    reranker_platt_b: float = -1.2
+    conformal_alpha: float = 0.05
+    # Point 5: Learned / Calibrated Confidence Scoring Model
+    confidence_model_path: str = ""
+    confidence_use_calibrated_model: bool = False
+    # Point 6: Declarative Gate Policy Engine & Per-Repo Profiles
+    gate_policy_profile: str = "balanced"
+    gate_policy_path: str = ""
 
     data_source: str = "fixture"
     # Opt in to running the graph data source on mock providers and an in-memory

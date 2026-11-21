@@ -278,6 +278,10 @@ class BaseGraphStore(ABC):
         """Fetch people associated with the repository / entity."""
         return []
 
+    def get_sources_for_entity(self, repo: str, entity_id: str) -> list[dict[str, Any]]:
+        """Fetch raw source nodes (PullRequest, Commit, Document) touching an entity."""
+        return []
+
     @abstractmethod
     def close(self) -> None:
         """Release underlying connections."""
@@ -567,13 +571,78 @@ class InMemoryGraphStore(BaseGraphStore):
         return res
 
     def get_people_for_entity(self, repo: str, entity_id: str) -> list[dict[str, Any]]:
+        dec_ids = {
+            f for (f, r, t) in self.edges
+            if r == "GOVERNS" and t == entity_id
+        }
+        src_ids: dict[str, dict[str, Any]] = {}
+        for dec_id in dec_ids:
+            d_props = self.nodes.get(dec_id, {})
+            for (f, r, t) in self.edges:
+                if r == "DECIDED_IN" and f == dec_id:
+                    src_ids[t] = d_props
+
         people: list[dict[str, Any]] = []
-        for node_id, labels in self.labels.items():
-            if "Person" in labels:
-                p = self.nodes.get(node_id)
-                if p:
-                    people.append(p)
+        seen: set[tuple[str, str]] = set()
+        for src_id, d_props in src_ids.items():
+            src_props = self.nodes.get(src_id, {})
+            activity = (
+                d_props.get("effective_at")
+                or src_props.get("created_at")
+                or ""
+            )
+            for (f, r, t) in self.edges:
+                if t == src_id and r in ("AUTHORED", "REVIEWED"):
+                    p_node = self.nodes.get(f, {})
+                    login = p_node.get("login") or (f.split(":", 1)[1] if ":" in f else f)
+                    reason = "reviewer" if r == "REVIEWED" else "author"
+                    key = (str(login).lower(), reason)
+                    if login and key not in seen:
+                        seen.add(key)
+                        people.append({
+                            "login": login,
+                            "reason": reason,
+                            "last_committed_at": activity,
+                        })
         return people
+
+    def get_sources_for_entity(self, repo: str, entity_id: str) -> list[dict[str, Any]]:
+        ent_node = self.nodes.get(entity_id, {})
+        ent_path = str(ent_node.get("path") or ent_node.get("name") or "").strip()
+        sources: list[dict[str, Any]] = []
+        seen: set[str] = set()
+
+        # 1. Explicit graph edges (MODIFIES, TOUCHES, MENTIONS, REFERENCES)
+        for (f, r, t) in self.edges:
+            if t == entity_id and r in ("MODIFIES", "TOUCHES", "MENTIONS", "REFERENCES"):
+                src = self.nodes.get(f)
+                if src and f not in seen:
+                    seen.add(f)
+                    sources.append(dict(src))
+
+        # 2. Source nodes whose files list includes this entity's path
+        if ent_path:
+            for nid, props in self.nodes.items():
+                if nid in seen:
+                    continue
+                if repo and props.get("repo") not in (None, "", repo):
+                    continue
+                raw_labels = self.labels.get(nid, set())
+                label_set = {raw_labels} if isinstance(raw_labels, str) else set(raw_labels)
+                matched_label = next(
+                    (lbl for lbl in label_set if lbl in ("PullRequest", "Commit", "Document", "Issue", "Discussion")),
+                    None,
+                )
+                if not matched_label:
+                    continue
+                files = props.get("files") or props.get("changed_files") or []
+                if isinstance(files, (list, tuple, set)) and ent_path in files:
+                    seen.add(nid)
+                    item = dict(props)
+                    item.setdefault("id", nid)
+                    item.setdefault("source_type", matched_label)
+                    sources.append(item)
+        return sources
 
     def close(self) -> None:
         pass
@@ -991,10 +1060,41 @@ class Neo4jGraphStore(BaseGraphStore):
             return items
 
     def get_people_for_entity(self, repo: str, entity_id: str) -> list[dict[str, Any]]:
-        cql = "MATCH (p:Person) RETURN properties(p) AS props LIMIT 100"
+        cql = (
+            "MATCH (d:Decision)-[:GOVERNS]->(e:CodeEntity {id: $entity_id}) "
+            "MATCH (d)-[:DECIDED_IN]->(src) "
+            "MATCH (p:Person)-[rel:AUTHORED|REVIEWED]->(src) "
+            "RETURN p.login AS login, "
+            "CASE WHEN type(rel) = 'REVIEWED' THEN 'reviewer' ELSE 'author' END AS reason, "
+            "coalesce(d.effective_at, src.created_at, '') AS last_committed_at "
+            "LIMIT 20"
+        )
         with self.driver.session(database=self.database) as session:
-            result = session.run(cql)
-            return [dict(record["props"]) for record in result]
+            result = session.run(cql, entity_id=entity_id)
+            return [
+                {
+                    "login": record["login"],
+                    "reason": record["reason"],
+                    "last_committed_at": record["last_committed_at"],
+                }
+                for record in result
+                if record.get("login")
+            ]
+
+    def get_sources_for_entity(self, repo: str, entity_id: str) -> list[dict[str, Any]]:
+        cql = (
+            "MATCH (src)-[rel:MODIFIES|TOUCHES|MENTIONS|REFERENCES]->(e:CodeEntity {id: $entity_id}) "
+            "RETURN src, labels(src)[0] AS label "
+            "LIMIT 10"
+        )
+        with self.driver.session(database=self.database) as session:
+            result = session.run(cql, entity_id=entity_id)
+            sources: list[dict[str, Any]] = []
+            for record in result:
+                props = dict(record["src"])
+                props.setdefault("source_type", record.get("label") or "PullRequest")
+                sources.append(props)
+            return sources
 
     def close(self) -> None:
         self.driver.close()

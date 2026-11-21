@@ -344,13 +344,14 @@ def generate_answer(
 ) -> AskResponse:
     """End-to-end question answering pipeline enforcing the 4-gate refusal system and citation verification."""
 
-    # 1. Evaluate Refusal Gate
+    # 1. Evaluate Refusal Gate (via Declarative Policy Engine)
     gate_res = evaluate_refusal_gate(
         resolution=resolution,
         bundle=bundle,
         min_score=min_score,
         question=question,
         cfg=cfg,
+        repository_id=repository_id,
     )
 
     # Handle Gate: REFUSAL
@@ -595,9 +596,53 @@ def generate_answer(
     # One quote contained in another from the same source is the same claim twice.
     valid_citations = dedupe_citations(valid_citations)
 
-    # Determine final outcome and confidence
-    contradiction_val = 1.0 if bundle.has_contradiction else 0.0
-    directness_val = 1.0 if valid_citations else 0.0
+    # G3 Post-LLM Claim-Level NLI / Faithfulness Verification
+    config = cfg or settings
+    faithfulness_gaps: list[str] = []
+    faithfulness_contradiction = False
+    entailment_factor = 1.0
+    if config.enable_nli_verification and valid_citations and output.answer.strip():
+        from app.services.faithfulness import verify_answer_faithfulness
+
+        premises: list[tuple[str, str]] = []
+        for cit in valid_citations:
+            # Include both the verified quote and any linked decision summary/rationale
+            dec = next((d for d in bundle.decisions if d.get("id") == cit.decision_id), None)
+            extra = ""
+            if dec:
+                extra = f" {dec.get('summary', '')} {dec.get('rationale', '')}"
+            premises.append((cit.id, f"{cit.quote}{extra}".strip()))
+
+        report = verify_answer_faithfulness(
+            output.answer.strip(),
+            premises,
+            cfg=config,
+        )
+        if report.contradiction_detected:
+            faithfulness_contradiction = True
+            faithfulness_gaps.append(
+                "Claim-level NLI verification detected a potential contradiction between the generated answer and cited evidence."
+            )
+        if report.total_claims > 0 and report.entailment_rate < config.nli_min_answer_faithfulness:
+            entailment_factor = max(0.35, report.entailment_rate)
+            faithfulness_gaps.append(
+                f"Only {report.verified_claims}/{report.total_claims} answer claims were entailed by cited evidence "
+                f"(faithfulness={report.entailment_rate:.2f})."
+            )
+
+    # Determine final outcome and confidence (tier-aware directness + NLI faithfulness)
+    contradiction_val = 1.0 if (bundle.has_contradiction or faithfulness_contradiction) else 0.0
+    if not valid_citations:
+        directness_val = 0.0
+    else:
+        tier_val = getattr(bundle, "evidence_tier", "direct")
+        if tier_val == "module":
+            directness_val = config.evidence_tier2_directness
+        elif tier_val == "source":
+            directness_val = config.evidence_tier3_directness
+        else:
+            directness_val = config.evidence_tier1_directness
+        directness_val = round(directness_val * entailment_factor, 4)
 
     conf = calculate_confidence(
         directness=directness_val,
@@ -606,11 +651,16 @@ def generate_answer(
         relevance=bundle.best_similarity_score,
         temporal_consistency=1.0,
         contradiction=contradiction_val,
+        cfg=config,
     )
 
     if conf.label == ConfidenceLabel.HIGH and valid_citations:
         outcome = Outcome.FULL
         reason_code = None
+    elif conf.label == ConfidenceLabel.LOW:
+        outcome = Outcome.REFUSAL
+        reason_code = ReasonCode.LOW_SCORE
+        valid_citations = []
     else:
         outcome = Outcome.PARTIAL
         reason_code = None
@@ -626,16 +676,29 @@ def generate_answer(
     )
 
     answer_gaps = [] if outcome == Outcome.FULL else ["Partial evidence coverage"]
+    answer_gaps.extend(faithfulness_gaps)
+    fallback_note = getattr(bundle, "fallback_note", None)
+    if fallback_note:
+        answer_gaps.append(fallback_note)
     note = _partial_coverage_note(store, resolution.entity.id)
     if note:
         answer_gaps.append(note)
 
+    final_answer = (
+        (
+            "Relevant decisions exist for this entity, but the generated answer could not be "
+            "reliably verified against the cited evidence."
+        )
+        if outcome == Outcome.REFUSAL
+        else output.answer.strip()
+    )
+
     return AskResponse(
         outcome=outcome,
         reason_code=reason_code,
-        answer=output.answer.strip(),
+        answer=final_answer,
         entity=entity_obj,
-        decisions=decisions_list,
+        decisions=[] if outcome == Outcome.REFUSAL else decisions_list,
         citations=valid_citations,
         evidence_gaps=answer_gaps,
         confidence=conf,

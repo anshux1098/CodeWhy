@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any, Callable, Optional
 
 from app.config import Settings, settings
@@ -29,6 +30,15 @@ class RetrievedEvidenceItem:
     similarity_score: float = 0.0
 
 
+class EvidenceTier(StrEnum):
+    """Granularity tier of retrieved evidence in the multi-hop G2 pipeline."""
+
+    DIRECT = "direct"    # Tier 1: Direct Decision -[:GOVERNS]-> Entity
+    MODULE = "module"    # Tier 2: Parent Module / Directory decisions
+    SOURCE = "source"    # Tier 3: Raw touching PR / Commit / Document evidence
+    NONE = "none"        # No evidence path found across any tier
+
+
 @dataclass
 class EvidenceBundle:
     """Bounded, grounded evidence bundle passed to the refusal gate and LLM answerer."""
@@ -46,6 +56,141 @@ class EvidenceBundle:
     current_value_differs: bool = False
     # source_id -> full stored source text, used to re-verify quotes at answer time.
     source_texts: dict[str, str] = field(default_factory=dict)
+    # Multi-hop G2 provenance & continuous sufficiency
+    evidence_tier: str = EvidenceTier.DIRECT.value
+    evidence_sufficiency: float = 1.0
+    fallback_note: Optional[str] = None
+    # G4 Two-stage calibrated reranker relevance probability [0.0 .. 1.0]
+    calibrated_relevance_score: Optional[float] = None
+
+
+def _ancestor_directory_paths(path: str) -> list[str]:
+    """Return parent directory paths ordered nearest-first (e.g., src/a/b.py -> ['src/a', 'src'])."""
+    clean = (path or "").strip("/")
+    if "/" not in clean:
+        return []
+    parts = clean.split("/")[:-1]
+    return ["/".join(parts[:i]) for i in range(len(parts), 0, -1)]
+
+
+def _expand_tier2_module_decisions(
+    repo: str,
+    entity: dict[str, Any],
+    store: BaseGraphStore,
+) -> tuple[list[dict[str, Any]], Optional[str]]:
+    """Tier 2 fallback: walk parent module/directory entities for governing decisions."""
+    ent_path = str(entity.get("path") or entity.get("name") or "").strip("/")
+    ancestors = _ancestor_directory_paths(ent_path)
+    if not ancestors:
+        return [], None
+
+    for ancestor in ancestors:
+        candidates = [
+            f"module:{repo}:{ancestor}" if repo else "",
+            ancestor,
+        ]
+        parent_node: Optional[dict[str, Any]] = None
+        for cid in candidates:
+            if not cid:
+                continue
+            if hasattr(store, "get_entity"):
+                found = store.get_entity(repo, cid)
+                if found:
+                    parent_node = found
+                    break
+            if hasattr(store, "get_node"):
+                found = store.get_node(cid)
+                if found:
+                    parent_node = found
+                    break
+        if parent_node is None:
+            continue
+        parent_id = str(parent_node.get("id") or "")
+        if not parent_id or parent_id == entity.get("id"):
+            continue
+        parent_decisions = store.get_decisions_for_entity(parent_id)
+        if parent_decisions:
+            tagged: list[dict[str, Any]] = []
+            for d in parent_decisions:
+                copy = dict(d)
+                copy.setdefault("retrieval_tier", EvidenceTier.MODULE.value)
+                copy.setdefault("retrieval_hop_source", ancestor)
+                tagged.append(copy)
+            return tagged, ancestor
+
+    return [], None
+
+
+def _expand_tier3_touching_sources(
+    repo: str,
+    entity: dict[str, Any],
+    store: BaseGraphStore,
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Tier 3 fallback: synthesize caveated evidence from raw PRs/Commits/Docs touching the entity."""
+    entity_id = str(entity.get("id") or "")
+    if not entity_id or not hasattr(store, "get_sources_for_entity"):
+        return [], {}
+    try:
+        raw_sources = store.get_sources_for_entity(repo, entity_id)
+    except Exception:  # noqa: BLE001
+        return [], {}
+
+    synthesized: list[dict[str, Any]] = []
+    source_texts: dict[str, str] = {}
+    for idx, src in enumerate(raw_sources[:5]):
+        src_id = str(src.get("id") or f"src:{idx}")
+        title = str(src.get("title") or src.get("subject") or "").strip()
+        body = str(src.get("text") or src.get("body") or src.get("message") or src.get("content") or "").strip()
+        full_text = f"{title}\n{body}".strip() if title and body and title not in body else (body or title)
+        if not full_text:
+            continue
+        quote = body[:280].strip() if body else title[:280].strip()
+        source_texts[src_id] = full_text
+        src_type = str(src.get("source_type") or "pull_request").lower()
+        src_url = str(src.get("url") or src.get("source_url") or "")
+        dec_id = f"tier3_src_{idx}_{src_id}"
+        synthesized.append({
+            "id": dec_id,
+            "repo": repo,
+            "summary": title or f"Historical change recorded in {src_id}",
+            "rationale": quote,
+            "state": "ACTIVE",
+            "source_id": src_id,
+            "source_url": src_url,
+            "retrieval_tier": EvidenceTier.SOURCE.value,
+            "evidence": [{
+                "id": f"ev_tier3_{idx}",
+                "decision_id": dec_id,
+                "source_id": src_id,
+                "source_type": src_type,
+                "source_url": src_url,
+                "quote": quote,
+                "claim": title or quote,
+                "author": src.get("author"),
+                "timestamp": src.get("created_at") or src.get("timestamp"),
+                "quote_verified": True,
+            }],
+        })
+    return synthesized, source_texts
+
+
+def _compute_evidence_sufficiency(
+    tier: EvidenceTier,
+    decision_count: int,
+    best_similarity: float,
+    cfg: Settings,
+) -> float:
+    """Compute a continuous [0.0 .. 1.0] evidence sufficiency score."""
+    if tier == EvidenceTier.NONE or decision_count <= 0:
+        return 0.0
+    tier_weight = {
+        EvidenceTier.DIRECT: cfg.evidence_tier1_directness,
+        EvidenceTier.MODULE: cfg.evidence_tier2_directness,
+        EvidenceTier.SOURCE: cfg.evidence_tier3_directness,
+    }.get(tier, 0.0)
+    volume_bonus = min(0.15, 0.05 * decision_count)
+    sim_component = 0.25 * max(0.0, min(1.0, best_similarity))
+    return round(max(0.0, min(1.0, 0.60 * tier_weight + sim_component + volume_bonus)), 4)
 
 
 def retrieve_evidence(
@@ -72,12 +217,42 @@ def retrieve_evidence(
     emb = embedder or get_embedding_provider(cfg=config)
 
     entity_id = entity.get("id", "")
+    repo = entity.get("repo") or (entity_id.split(":")[1] if ":" in entity_id else "")
     decisions = store.get_decisions_for_entity(entity_id)
+    tier = EvidenceTier.DIRECT
+    fallback_note: Optional[str] = None
+    tier3_texts: dict[str, str] = {}
+
+    if not decisions and config.enable_multihop_fallback:
+        module_decisions, parent_dir = _expand_tier2_module_decisions(repo, entity, store)
+        if module_decisions:
+            decisions = module_decisions
+            tier = EvidenceTier.MODULE
+            fallback_note = (
+                f"No direct decision governs {entity.get('name', entity_id)}; "
+                f"retrieved parent module decisions from {parent_dir}."
+            )
+        else:
+            source_decisions, tier3_texts = _expand_tier3_touching_sources(repo, entity, store)
+            if source_decisions:
+                decisions = source_decisions
+                tier = EvidenceTier.SOURCE
+                fallback_note = (
+                    f"No formal decision node governs {entity.get('name', entity_id)}; "
+                    "grounded from raw touching PR/commit history with reduced confidence."
+                )
+
+    if not decisions:
+        tier = EvidenceTier.NONE
 
     bundle = EvidenceBundle(
         question=question,
         resolved_entity=entity,
         decisions=decisions,
+        evidence_tier=tier.value,
+        evidence_sufficiency=0.0 if tier == EvidenceTier.NONE else 1.0,
+        fallback_note=fallback_note,
+        source_texts=dict(tier3_texts),
     )
 
     if not decisions:
@@ -88,14 +263,31 @@ def retrieve_evidence(
     all_evidence: list[RetrievedEvidenceItem] = []
 
     ent_name = entity.get("name", "")
+    decision_texts: list[str] = []
     for d in decisions:
         summary = d.get("summary", "")
         rationale = d.get("rationale", "")
         text_to_compare = f"{ent_name} {summary} {rationale}".strip()
+        decision_texts.append(text_to_compare)
         sim = emb.similarity(question, text_to_compare)
         d["similarity_score"] = sim
         if sim > best_score:
             best_score = sim
+
+    # Stage 2 (G4): Cross-encoder / calibrated reranker over candidate decisions
+    reranker_scores: list[float] = []
+    if config.enable_reranker and decision_texts:
+        from app.services.reranker import get_reranker
+
+        reranker = get_reranker(cfg=config, embedder=emb)
+        reranker_scores = reranker.score_batch(question, decision_texts)
+        for d, r_score in zip(decisions, reranker_scores):
+            d["reranker_score"] = r_score
+        bundle.calibrated_relevance_score = round(max(reranker_scores, default=0.0), 4)
+
+    for idx, d in enumerate(decisions):
+        sim = float(d.get("similarity_score", 0.0))
+        eff_sim = reranker_scores[idx] if idx < len(reranker_scores) else sim
 
         # Collect evidence items
         for raw_ev in d.get("evidence", []):
@@ -110,7 +302,7 @@ def retrieve_evidence(
                 author=raw_ev.get("author"),
                 timestamp=raw_ev.get("timestamp"),
                 quote_verified=bool(raw_ev.get("quote_verified", True)),
-                similarity_score=sim,
+                similarity_score=eff_sim,
             )
             all_evidence.append(item)
 
@@ -119,12 +311,17 @@ def retrieve_evidence(
             bundle.has_contradiction = True
 
     bundle.best_similarity_score = round(best_score, 4)
+    bundle.evidence_sufficiency = _compute_evidence_sufficiency(
+        tier=tier,
+        decision_count=len(decisions),
+        best_similarity=bundle.best_similarity_score,
+        cfg=config,
+    )
 
     # Sort evidence items by similarity descending and cap at max_evidence_items
     all_evidence.sort(key=lambda x: x.similarity_score, reverse=True)
     bundle.evidence_items = all_evidence[:cap_evidence]
 
-    repo = entity.get("repo") or entity_id.split(":")[1] if ":" in entity_id else ""
     links = []
     if hasattr(store, "get_links_for_repo"):
         try:

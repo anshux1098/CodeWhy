@@ -357,7 +357,11 @@ class GraphDataSource:
             resolution = self._resolve_explicit_entity(repository_id, request.entity_id)
         else:
             resolution = resolve_question(
-                request.question, all_entities, repository_id, self.store
+                request.question,
+                all_entities,
+                repository_id,
+                self.store,
+                cfg=self.settings,
             )
 
         bundle = None
