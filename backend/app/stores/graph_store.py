@@ -1006,6 +1006,8 @@ class Neo4jGraphStore(BaseGraphStore):
 
 def get_graph_store(cfg: Optional[Settings] = None) -> BaseGraphStore:
     """Returns Neo4jGraphStore if credentials exist and reachable, otherwise InMemoryGraphStore."""
+    from pathlib import Path
+
     config = cfg or settings
     if config.neo4j_uri and config.neo4j_username and config.neo4j_password:
         try:
@@ -1016,10 +1018,13 @@ def get_graph_store(cfg: Optional[Settings] = None) -> BaseGraphStore:
                 database=config.neo4j_database,
             )
             store.driver.verify_connectivity()
+            with store.driver.session(database=config.neo4j_database) as session:
+                session.run("RETURN 1").consume()
             return store
         except Exception as exc:
             logger.warning("Failed to connect to Neo4j (%s); falling back to InMemoryGraphStore", exc)
-            if not config.allow_mock_providers and not config.sqlite_cache_path:
+            has_bundled_cache = bool(config.sqlite_cache_path) or Path("data/ingest.sqlite3").exists()
+            if not config.allow_mock_providers and not has_bundled_cache:
                 raise
             return InMemoryGraphStore()
     return InMemoryGraphStore()

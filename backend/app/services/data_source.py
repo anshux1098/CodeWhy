@@ -537,16 +537,19 @@ def _load_sqlite_into_graph_source(source: "GraphDataSource", cfg: Settings) -> 
     log = logging.getLogger(__name__)
     if not isinstance(source.store, InMemoryGraphStore):
         return
-    if not cfg.sqlite_cache_path:
+    raw_cache_path = cfg.sqlite_cache_path or (
+        "data/ingest.sqlite3" if cfg.neo4j_uri else ""
+    )
+    if not raw_cache_path:
         return
 
-    cache_path = _P(cfg.sqlite_cache_path)
+    cache_path = _P(raw_cache_path)
     if not cache_path.is_absolute() and not cache_path.exists():
         # The server often runs from backend/ while the cache lives at the repo root.
         # Try resolving the path relative to the repository root (parent of this file's
         # backend/app/services/ directory, going up three parents to get to repo root).
         repo_root = _P(__file__).resolve().parent.parent.parent.parent
-        candidate = repo_root / cfg.sqlite_cache_path
+        candidate = repo_root / raw_cache_path
         if candidate.exists():
             cache_path = candidate
     if not cache_path.exists():
@@ -601,10 +604,12 @@ def get_data_source(cfg: Settings) -> DataSource:
         return FixtureDataSource(cfg)
     if cfg.data_source == "graph":
         source = GraphDataSource(cfg)
-        # Without a real store and a real provider this source can only invent
-        # answers, so refuse rather than serve fabricated history. Mock mode is
-        # available deliberately, and still reports fixture=true on every response.
-        if not source.is_real and not cfg.allow_mock_providers:
+        # Allow SQLite cache fallback when Neo4j was configured but is temporarily
+        # unreachable/paused (e.g., AuraDB 72-hour idle pause) and bundled SQLite exists.
+        _load_sqlite_into_graph_source(source, cfg)
+        has_loaded_cache = source.store.node_count() > 0
+
+        if not source.is_real and not cfg.allow_mock_providers and not has_loaded_cache:
             missing = []
             if not getattr(source.store, "is_real", False):
                 missing.append("a real Neo4j store (NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD)")
@@ -616,10 +621,6 @@ def get_data_source(cfg: Settings) -> DataSource:
                 + ". Set ALLOW_MOCK_PROVIDERS=true to run against the in-memory store "
                 "and a mock LLM; every response then carries \"fixture\": true."
             )
-        # When the store is in-memory and a SQLite cache is configured, pre-populate
-        # it now so the first request already has data. This path is only taken once
-        # because deps.py caches the data source at the process level.
-        _load_sqlite_into_graph_source(source, cfg)
         return source
 
     raise DataSourceError(
