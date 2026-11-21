@@ -52,7 +52,7 @@ class PlattCalibrator:
     """Logistic (Platt) calibration: P(relevant | s) = sigmoid(a * s + b)."""
 
     a: float = 4.0
-    b: float = -1.2
+    b: float = -1.5
 
     def calibrate(self, raw_score: float) -> float:
         return round(_sigmoid(self.a * float(raw_score) + self.b), 4)
@@ -145,7 +145,13 @@ class BaseReranker(ABC):
     def score_pair(self, query: str, document: str) -> float:
         ...
 
-    def score_batch(self, query: str, documents: Sequence[str]) -> list[float]:
+    def score_batch(
+        self,
+        query: str,
+        documents: Sequence[str],
+        *,
+        precomputed_sims: Optional[Sequence[float]] = None,
+    ) -> list[float]:
         return [self.score_pair(query, doc) for doc in documents]
 
 
@@ -169,11 +175,20 @@ class CalibratedLexicalSemanticReranker(BaseReranker):
             b=config.reranker_platt_b,
         )
 
-    def _raw_score(self, query: str, document: str, q_vec: Optional[list[float]] = None) -> float:
+    def _raw_score(
+        self,
+        query: str,
+        document: str,
+        q_vec: Optional[list[float]] = None,
+        precomputed_sim: Optional[float] = None,
+    ) -> float:
         if not query.strip() or not document.strip():
             return 0.0
-        qv = q_vec if q_vec is not None else self.embedder.embed_text(query)
-        sem_sim = max(0.0, compute_cosine_similarity(qv, self.embedder.embed_text(document)))
+        if precomputed_sim is not None:
+            sem_sim = max(0.0, float(precomputed_sim))
+        else:
+            qv = q_vec if q_vec is not None else self.embedder.embed_text(query)
+            sem_sim = max(0.0, compute_cosine_similarity(qv, self.embedder.embed_text(document)))
 
         q_toks = {
             t.lower() for t in _TOKEN_RE.findall(query)
@@ -200,9 +215,20 @@ class CalibratedLexicalSemanticReranker(BaseReranker):
         raw = self._raw_score(query, document)
         return self.calibrator.calibrate(raw)
 
-    def score_batch(self, query: str, documents: Sequence[str]) -> list[float]:
+    def score_batch(
+        self,
+        query: str,
+        documents: Sequence[str],
+        *,
+        precomputed_sims: Optional[Sequence[float]] = None,
+    ) -> list[float]:
         if not documents:
             return []
+        if precomputed_sims is not None and len(precomputed_sims) == len(documents):
+            return [
+                self.calibrator.calibrate(self._raw_score(query, doc, precomputed_sim=sim))
+                for doc, sim in zip(documents, precomputed_sims)
+            ]
         q_vec = self.embedder.embed_text(query)
         return [self.calibrator.calibrate(self._raw_score(query, doc, q_vec=q_vec)) for doc in documents]
 

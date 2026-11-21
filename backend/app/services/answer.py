@@ -134,35 +134,60 @@ def agreement_from_citations(citations: Sequence[Any]) -> float:
     return 1.0
 
 
-def provenance_from_citations(citations: Sequence[Any]) -> float:
-    """Compute provenance signal [0.80 .. 1.00] from verified citation completeness."""
+def provenance_from_citations(
+    citations: Sequence[Any],
+    decisions: Optional[Sequence[Any]] = None,
+) -> float:
+    """Compute provenance quality [0.50 .. 1.00] from source authority and metadata completeness."""
     if not citations:
+        return 0.50
+    has_source_type = any(getattr(c, "source_type", None) is not None for c in citations)
+    if not has_source_type:
+        has_url = all(bool((getattr(c, "source_url", "") or "").strip()) for c in citations)
+        has_author = all(bool((getattr(c, "author", "") or "").strip()) for c in citations)
+        has_ts = all(bool((getattr(c, "timestamp", "") or "").strip()) for c in citations)
+        if has_url and has_author and has_ts:
+            return 1.0
+        if has_url and has_author:
+            return 0.9
         return 0.8
-    has_url = all(bool((getattr(c, "source_url", "") or "").strip()) for c in citations)
-    has_author = all(bool((getattr(c, "author", "") or "").strip()) for c in citations)
-    has_ts = all(bool((getattr(c, "timestamp", "") or "").strip()) for c in citations)
-    if has_url and has_author and has_ts:
-        return 1.0
-    if has_url and has_author:
-        return 0.9
-    if has_url:
-        return 0.8
-    return 0.8
+
+    type_weights = {
+        SourceType.DOCUMENT: 0.95,
+        SourceType.PULL_REQUEST: 0.85,
+        SourceType.ISSUE: 0.78,
+        SourceType.COMMIT: 0.68,
+    }
+    scores: list[float] = []
+    for c in citations:
+        st = getattr(c, "source_type", SourceType.PULL_REQUEST)
+        base = type_weights.get(st, 0.75)
+        if (getattr(c, "author", None) or "").strip():
+            base += 0.05
+        if (getattr(c, "timestamp", None) or "").strip():
+            base += 0.05
+        scores.append(min(1.0, base))
+    return round(sum(scores) / len(scores), 2)
 
 
 def temporal_consistency_from_bundle(bundle: Optional[EvidenceBundle]) -> float:
-    """Compute temporal_consistency [0.50 .. 1.00] from decision lifecycle state."""
+    """Compute temporal_consistency [0.40 .. 1.00] from drift, contradiction, and lifecycle state."""
     if bundle is None or not bundle.decisions:
         return 0.5
+    score = 1.0
+    if bundle.has_contradiction:
+        score -= 0.25
+    if bundle.current_value_differs:
+        score -= 0.20
+    if bundle.chain_truncated:
+        score -= 0.15
     has_active = any(
         str(d.get("state") or "ACTIVE").upper() == "ACTIVE"
         for d in bundle.decisions
     )
-    if not has_active:
+    if not has_active and not bundle.has_contradiction and not bundle.current_value_differs:
         return 0.5
-    if bundle.chain_truncated:
-        return 0.85
-    return 1.0
+    return round(max(0.4, min(1.0, score)), 2)
 
 
 def _who_to_ask_for_bundle(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field
 
 from app.api.deps import get_source
 from app.schemas.ask import AskRequest, AskResponse
@@ -95,3 +96,62 @@ def get_graph(
     source: DataSource = Depends(get_source),
 ) -> GraphResponse:
     return source.get_graph(repository_id, entity_id)
+
+
+@router.get(
+    "/repositories/{repository_id}/prompts",
+    responses=NOT_FOUND_RESPONSE,
+    summary="Dynamically generated grounded starter questions for any repository",
+)
+def get_suggested_prompts(
+    repository_id: str,
+    limit: int = Query(default=5, ge=1, le=12),
+    source: DataSource = Depends(get_source),
+) -> dict:
+    if hasattr(source, "suggest_prompts"):
+        return source.suggest_prompts(repository_id, limit=limit)
+    # Fallback for FixtureDataSource
+    decs = source.list_decisions(repository_id, limit=limit, offset=0).items
+    return {
+        "repository_id": repository_id,
+        "prompts": [
+            {
+                "label": d.summary[:70],
+                "question": f"Why did the team decide: {d.summary.rstrip('.')}?",
+                "outcomeType": "full",
+                "tag": "Superseded / Reverted" if d.state.value == "SUPERSEDED" else "Full Answer",
+                "entityId": d.entities[0] if d.entities else None,
+            }
+            for d in decs
+        ],
+        "fixture": True,
+    }
+
+
+class AuditFilesRequest(BaseModel):
+    files: list[str] = Field(min_length=1, max_length=100)
+
+
+@router.post(
+    "/repositories/{repository_id}/audit",
+    responses=NOT_FOUND_RESPONSE,
+    summary="PR Risk & Architectural Compliance Auditor for changed file paths",
+)
+def audit_repository_files(
+    repository_id: str,
+    request: AuditFilesRequest,
+    source: DataSource = Depends(get_source),
+) -> dict:
+    if hasattr(source, "audit_files"):
+        return source.audit_files(repository_id, request.files)
+    source.get_repository(repository_id)
+    return {
+        "repository_id": repository_id,
+        "files_checked": len(request.files),
+        "matched_entities": [],
+        "risk_level": "LOW",
+        "active_constraints_count": 0,
+        "superseded_or_reverted_count": 0,
+        "decisions": [],
+        "fixture": True,
+    }

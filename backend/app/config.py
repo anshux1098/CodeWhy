@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     enable_reranker: bool = True
     reranker_model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     reranker_platt_a: float = 4.0
-    reranker_platt_b: float = -1.2
+    reranker_platt_b: float = -1.5
     conformal_alpha: float = 0.05
     # Point 5: Learned / Calibrated Confidence Scoring Model
     confidence_model_path: str = ""

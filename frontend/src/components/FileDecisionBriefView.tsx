@@ -7,10 +7,12 @@ import {
 import {
   AlertTriangle,
   Check,
+  Copy,
   ExternalLink,
   FileCode2,
   Loader2,
   Search,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface FileDecisionBriefViewProps {
@@ -264,6 +266,40 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
     .slice(0, 4);
   const readingOrder = deriveReadingOrder(linkedDecisions);
   const linkedDecisionIds = new Set(linkedDecisions.map((decision) => decision.id));
+  const [copiedGuardrails, setCopiedGuardrails] = useState(false);
+
+  const modificationRisk: 'HIGH' | 'MEDIUM' | 'LOW' =
+    revertedDecisions.length > 0 || governingDecisions.length >= 3
+      ? 'HIGH'
+      : governingDecisions.length >= 1
+        ? 'MEDIUM'
+        : 'LOW';
+
+  const handleCopyGuardrails = async () => {
+    if (!selectedEntity) return;
+    const lines = [
+      `# CodeWhy Architectural Guardrails: ${selectedEntity.path}`,
+      `Repository: ${selectedRepo?.full_name ?? selectedRepo?.name ?? repoId}`,
+      `Modification Risk: ${modificationRisk} (${governingDecisions.length} active, ${revertedDecisions.length} reverted)`,
+      '',
+      '## Active Invariants (Do Not Violate)',
+      ...(governingDecisions.length > 0
+        ? governingDecisions.map((d) => `- [${d.id}] ${d.summary}${d.source_url ? ` (${d.source_url})` : ''}`)
+        : ['- None recorded yet.']),
+      '',
+      '## Historical Reverts / Traps',
+      ...(revertedDecisions.length > 0
+        ? revertedDecisions.map((d) => `- [${d.id}] ${d.summary}${d.source_url ? ` (${d.source_url})` : ''}`)
+        : ['- None recorded.']),
+    ];
+    try {
+      await navigator.clipboard?.writeText(lines.join('\n'));
+      setCopiedGuardrails(true);
+      window.setTimeout(() => setCopiedGuardrails(false), 2000);
+    } catch {
+      // ignore clipboard denial in headless browsers
+    }
+  };
 
   return (
     <div className="h-[calc(100vh-4rem)] w-full overflow-y-auto bg-[#080907] text-[#F5F3ED]">
@@ -276,9 +312,31 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
           </div>
         </div>
         {selectedEntity && history && (
-          <span className="text-xs font-mono text-[#A5A69D]">
-            Derived from {linkedDecisions.length} decisions
-          </span>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span
+              className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] font-mono font-semibold ${
+                modificationRisk === 'HIGH'
+                  ? 'border-[#da3633]/40 bg-[#da3633]/15 text-[#f85149]'
+                  : modificationRisk === 'MEDIUM'
+                    ? 'border-[#d29922]/40 bg-[#d29922]/15 text-[#e3b341]'
+                    : 'border-[#2ea043]/40 bg-[#2ea043]/15 text-[#3fb950]'
+              }`}
+            >
+              <ShieldAlert className="h-3 w-3" />
+              Risk: {modificationRisk}
+            </span>
+            <button
+              type="button"
+              onClick={handleCopyGuardrails}
+              className="inline-flex items-center gap-1.5 rounded border border-[#292A23] bg-[#12130F] px-2.5 py-1 text-[11px] font-mono text-[#F5F3ED] hover:border-[#B9915E] transition-colors cursor-pointer"
+            >
+              {copiedGuardrails ? <Check className="h-3 w-3 text-[#3fb950]" /> : <Copy className="h-3 w-3 text-[#B9915E]" />}
+              {copiedGuardrails ? 'Copied Guardrails' : 'Copy AI Guardrails'}
+            </button>
+            <span className="text-xs font-mono text-[#A5A69D]">
+              Derived from {linkedDecisions.length} decisions
+            </span>
+          </div>
         )}
       </header>
 

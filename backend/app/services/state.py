@@ -182,8 +182,10 @@ def check_code_differs_from_latest(
     decision_id: str,
     analysis: RepositoryStateAnalysis,
     decisions: Sequence[dict[str, Any]],
+    *,
+    latest_entity_commit_at: Optional[str] = None,
 ) -> bool:
-    """Return True if the decision is superseded or its value differs from the latest active value."""
+    """Return True if the decision is superseded or silent code drift occurred after the latest ACTIVE decision."""
     state_res = analysis.states.get(decision_id)
     if not state_res:
         return False
@@ -194,7 +196,17 @@ def check_code_differs_from_latest(
     for chain in analysis.supersession_chains:
         if decision_id in chain:
             head = chain[0]
-            if head != decision_id and analysis.states.get(head, {}).state == DecisionState.ACTIVE:
+            if head != decision_id and getattr(analysis.states.get(head), "state", None) == DecisionState.ACTIVE:
                 return True
+
+    # Silent code drift (C.2): code or config changed in a commit newer than the latest ACTIVE decision
+    if latest_entity_commit_at and state_res.state == DecisionState.ACTIVE:
+        dec_ts = ""
+        for d in decisions:
+            if d.get("id") == decision_id:
+                dec_ts = _get_timestamp(d)
+                break
+        if dec_ts and latest_entity_commit_at > dec_ts:
+            return True
 
     return False

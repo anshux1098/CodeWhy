@@ -357,3 +357,52 @@ export async function fetchIngestStatus(jobId: string): Promise<IngestJobStatus>
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+export async function fetchSuggestedPrompts(repositoryId: string, limit = 5): Promise<GroundedQuestion[]> {
+  try {
+    const res = await fetch(
+      `/api/v1/repositories/${encodeURIComponent(repositoryId)}/prompts?limit=${limit}`,
+      { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(5000) },
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data?.prompts) ? data.prompts : [];
+  } catch {
+    return [];
+  }
+}
+
+export interface FileAuditResponse {
+  repository_id: string;
+  files_checked: number;
+  risk_level: 'HIGH' | 'MEDIUM' | 'LOW';
+  active_constraints_count: number;
+  superseded_or_reverted_count: number;
+  decisions: Array<{
+    id: string;
+    summary: string;
+    rationale?: string | null;
+    state: string;
+    rule?: string | null;
+    source_url?: string | null;
+    author?: string | null;
+    entity_path?: string | null;
+  }>;
+}
+
+export async function auditRepositoryFiles(
+  repositoryId: string,
+  files: string[],
+): Promise<FileAuditResponse> {
+  const res = await fetch(
+    `/api/v1/repositories/${encodeURIComponent(repositoryId)}/audit`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ files }),
+      signal: AbortSignal.timeout(6000),
+    },
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}

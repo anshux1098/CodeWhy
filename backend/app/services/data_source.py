@@ -195,20 +195,51 @@ def citations_for_decision(
 
 
 def from_source_id(source_id: Any) -> tuple[str, Optional[int], SourceType]:
-    """Derive provenance from a stable source id such as ``pr:owner/repo#123``.
-
-    Returns empty values when the id does not carry enough information, so the
-    caller refuses rather than guessing.
+    """Derive provenance from a stable source id such as ``pr:owner/repo#123``,
+    ``doc:owner/repo:path``, ``commit:owner/repo:sha``, ``discussion:owner/repo#N``,
+    or ``incident:owner/repo:ID``.
     """
     text = str(source_id or "")
-    match = re.match(r"^(pr|pull_request|issue):(?P<owner>[^/]+)/(?P<repo>[^#]+)#(?P<number>\d+)$", text)
-    if not match:
-        return "", None, SourceType.PULL_REQUEST
-    number = int(match.group("number"))
-    kind = SourceType.ISSUE if text.startswith("issue") else SourceType.PULL_REQUEST
-    segment = "issues" if kind is SourceType.ISSUE else "pull"
-    url = f"https://github.com/{match.group('owner')}/{match.group('repo')}/{segment}/{number}"
-    return url, number, kind
+    match = re.match(r"^(pr|pull_request|issue|discussion):(?P<owner>[^/]+)/(?P<repo>[^#]+)#(?P<number>\d+)$", text)
+    if match:
+        number = int(match.group("number"))
+        prefix = match.group(1)
+        if prefix == "discussion":
+            return (
+                f"https://github.com/{match.group('owner')}/{match.group('repo')}/discussions/{number}",
+                number,
+                SourceType.ISSUE,
+            )
+        kind = SourceType.ISSUE if prefix == "issue" else SourceType.PULL_REQUEST
+        segment = "issues" if kind is SourceType.ISSUE else "pull"
+        url = f"https://github.com/{match.group('owner')}/{match.group('repo')}/{segment}/{number}"
+        return url, number, kind
+
+    doc_match = re.match(r"^doc:(?P<owner>[^/]+)/(?P<repo>[^:]+):(?P<path>.+)$", text)
+    if doc_match:
+        return (
+            f"https://github.com/{doc_match.group('owner')}/{doc_match.group('repo')}/blob/main/{doc_match.group('path')}",
+            0,
+            SourceType.DOCUMENT,
+        )
+
+    commit_match = re.match(r"^commit:(?P<owner>[^/]+)/(?P<repo>[^:]+):(?P<sha>[0-9a-fA-F]+)$", text)
+    if commit_match:
+        return (
+            f"https://github.com/{commit_match.group('owner')}/{commit_match.group('repo')}/commit/{commit_match.group('sha')}",
+            0,
+            SourceType.COMMIT,
+        )
+
+    inc_match = re.match(r"^incident:(?P<owner>[^/]+)/(?P<repo>[^:]+):(?P<inc>.+)$", text)
+    if inc_match:
+        return (
+            f"https://github.com/{inc_match.group('owner')}/{inc_match.group('repo')}/issues?q={inc_match.group('inc')}",
+            0,
+            SourceType.ISSUE,
+        )
+
+    return "", None, SourceType.PULL_REQUEST
 
 
 class GraphDataSource:
@@ -571,6 +602,114 @@ class GraphDataSource:
             truncated=truncated,
             fixture=not self.is_real,
         )
+
+    def suggest_prompts(self, repository_id: str, limit: int = 5) -> dict[str, Any]:
+        """Generate grounded starter questions for any repository from its top governed entities."""
+        entities = self._require_repository(repository_id)
+        ranked: list[tuple[int, dict[str, Any], list[dict[str, Any]]]] = []
+        for ent in entities:
+            decs = self.store.get_decisions_for_entity(ent.get("id", ""))
+            if decs:
+                ranked.append((len(decs), ent, decs))
+        ranked.sort(key=lambda item: item[0], reverse=True)
+
+        prompts: list[dict[str, Any]] = []
+        for count, ent, decs in ranked[:limit]:
+            name = ent.get("name") or ent.get("path") or ""
+            top_summary = (decs[0].get("summary") or "").strip()
+            prompts.append({
+                "question": f"Why is {name} designed this way?",
+                "entity_id": ent.get("id", ""),
+                "entity_name": name,
+                "decision_count": count,
+                "hint": top_summary[:120],
+            })
+            if len(prompts) < limit and len(decs) >= 2:
+                prompts.append({
+                    "question": f"What historical decisions or trade-offs were superseded in {name}?",
+                    "entity_id": ent.get("id", ""),
+                    "entity_name": name,
+                    "decision_count": count,
+                    "hint": (decs[1].get("summary") or top_summary)[:120],
+                })
+        return {"repository_id": repository_id, "prompts": prompts[:limit]}
+
+    def audit_files(self, repository_id: str, files: Sequence[str]) -> dict[str, Any]:
+        """Pre-flight architectural risk audit for a list of changed file paths (CI/PR bot)."""
+        entities = self._require_repository(repository_id)
+        ent_by_path: dict[str, dict[str, Any]] = {}
+        for ent in entities:
+            p = str(ent.get("path") or ent.get("name") or "").strip()
+            if p:
+                ent_by_path[p] = ent
+
+        findings: list[dict[str, Any]] = []
+        total_active = 0
+        total_superseded_or_reverted = 0
+        high_risk = 0
+        for fpath in files:
+            clean = str(fpath or "").strip()
+            if not clean:
+                continue
+            ent = ent_by_path.get(clean)
+            if ent is None:
+                ent = next(
+                    (e for p, e in ent_by_path.items() if p.endswith(f"/{clean}") or p == clean),
+                    None,
+                )
+            if ent is None:
+                findings.append({
+                    "file": clean,
+                    "risk": "LOW",
+                    "decision_count": 0,
+                    "active_decisions": [],
+                    "unresolved_conflicts": 0,
+                })
+                continue
+
+            decs = self.store.get_decisions_for_entity(ent.get("id", ""))
+            active = [d for d in decs if str(d.get("state") or "ACTIVE") == "ACTIVE"]
+            sup_or_rev = [
+                d for d in decs
+                if str(d.get("state") or "") in ("SUPERSEDED", "REVERTED")
+            ]
+            unresolved = [d for d in decs if str(d.get("state") or "") == "UNRESOLVED"]
+            total_active += len(active)
+            total_superseded_or_reverted += len(sup_or_rev)
+
+            if unresolved or (active and sup_or_rev) or len(active) >= 2:
+                risk = "HIGH"
+                high_risk += 1
+            elif active:
+                risk = "MEDIUM"
+            else:
+                risk = "LOW"
+            findings.append({
+                "file": clean,
+                "entity_id": ent.get("id", ""),
+                "risk": risk,
+                "decision_count": len(decs),
+                "active_decisions": [
+                    {
+                        "id": d.get("id", ""),
+                        "summary": d.get("summary", ""),
+                        "state": d.get("state", "ACTIVE"),
+                    }
+                    for d in active[:5]
+                ],
+                "unresolved_conflicts": len(unresolved),
+            })
+
+        overall_risk = "HIGH" if high_risk > 0 else ("MEDIUM" if total_active > 0 else "LOW")
+        return {
+            "repository_id": repository_id,
+            "risk_level": overall_risk,
+            "active_constraints_count": total_active,
+            "superseded_or_reverted_count": total_superseded_or_reverted,
+            "audited_files": len(findings),
+            "high_risk_files": high_risk,
+            "findings": findings,
+        }
 
 
 def _load_sqlite_into_graph_source(source: "GraphDataSource", cfg: Settings) -> None:

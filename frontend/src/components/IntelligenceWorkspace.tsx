@@ -5,7 +5,9 @@ import type {
 } from '../types';
 import {
   askQuestion,
+  fetchSuggestedPrompts,
   GROUNDED_DEMO_QUESTIONS,
+  type GroundedQuestion,
 } from '../services/api';
 import { ContextualEvidenceMargin } from './ContextualEvidenceMargin';
 import { DecisionDrawer } from './DecisionDrawer';
@@ -75,7 +77,24 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
   }, [repoId]);
 
   const isDemoRepo = selectedRepo?.fixture ?? false;
-  const groundedQuestions = (selectedRepo && GROUNDED_DEMO_QUESTIONS[selectedRepo.id]) || [];
+  const staticQuestions = (selectedRepo && GROUNDED_DEMO_QUESTIONS[selectedRepo.id]) || [];
+  const [dynamicQuestions, setDynamicQuestions] = useState<GroundedQuestion[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDynamicQuestions([]);
+    if (!repoId) return;
+    fetchSuggestedPrompts(repoId, 6).then((items) => {
+      if (!cancelled && items.length > 0) {
+        setDynamicQuestions(items);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [repoId]);
+
+  const groundedQuestions = staticQuestions.length > 0 ? staticQuestions : dynamicQuestions;
 
   useEffect(() => {
     if (initialQuestion && initialQuestion.trim()) {

@@ -13,8 +13,9 @@ if _BACKEND_DIR not in sys.path:
 if os.environ.get("VERCEL"):
     os.environ.setdefault("DATA_SOURCE", "graph")
     os.environ.setdefault("SQLITE_CACHE_PATH", "data/ingest.sqlite3")
-    os.environ.setdefault("ALLOW_MOCK_PROVIDERS", "true")
-    os.environ.setdefault("OFFLINE", "true")
+    if not os.environ.get("LLM_API_KEY"):
+        os.environ.setdefault("ALLOW_MOCK_PROVIDERS", "true")
+        os.environ.setdefault("OFFLINE", "true")
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -134,6 +135,16 @@ def create_app(config: Optional[Settings] = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @application.middleware("http")
+    async def _security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        return response
     application.include_router(routes_health.router, prefix=API_PREFIX)
     application.include_router(routes_repositories.router, prefix=API_PREFIX)
     application.include_router(routes_decisions.router, prefix=API_PREFIX)

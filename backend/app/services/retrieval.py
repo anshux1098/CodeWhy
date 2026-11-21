@@ -290,7 +290,11 @@ def retrieve_evidence(
         from app.services.reranker import get_reranker
 
         reranker = get_reranker(cfg=config, embedder=emb)
-        reranker_scores = reranker.score_batch(question, decision_texts)
+        reranker_scores = reranker.score_batch(
+            question,
+            decision_texts,
+            precomputed_sims=[float(d.get("similarity_score", 0.0)) for d in decisions],
+        )
         for d, r_score in zip(decisions, reranker_scores):
             d["reranker_score"] = r_score
         bundle.calibrated_relevance_score = round(max(reranker_scores, default=0.0), 4)
@@ -362,11 +366,25 @@ def retrieve_evidence(
             d.setdefault("conflicts_with", st.conflicts_with)
             d.setdefault("reaffirms", st.reaffirms)
 
+    latest_entity_commit_at = entity.get("latest_commit_at")
+    if not latest_entity_commit_at and hasattr(store, "get_node"):
+        try:
+            ent_node = store.get_node(entity_id)
+            if isinstance(ent_node, dict):
+                latest_entity_commit_at = ent_node.get("latest_commit_at")
+        except Exception:  # noqa: BLE001
+            latest_entity_commit_at = None
+
     bundle.supersession_chains = analysis.supersession_chains
     bundle.chain_truncated = analysis.chain_truncated
     bundle.has_contradiction = analysis.has_contradiction or bundle.has_contradiction
     bundle.current_value_differs = any(
-        check_code_differs_from_latest(d.get("id", ""), analysis, decisions)
+        check_code_differs_from_latest(
+            d.get("id", ""),
+            analysis,
+            decisions,
+            latest_entity_commit_at=latest_entity_commit_at,
+        )
         for d in decisions
     )
 
