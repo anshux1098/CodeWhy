@@ -309,6 +309,7 @@ def _rebuild_graph_with_cache(
     # 2. Source nodes & Person authorship/review edges.
     merged_at_by_source: dict[str, str] = {}
     author_by_source: dict[str, str] = {}
+    source_metadata: dict[str, dict[str, Any]] = {}
     person_logins: set[str] = set()
 
     def _ensure_person(login: str) -> Optional[str]:
@@ -355,12 +356,41 @@ def _rebuild_graph_with_cache(
             if merged:
                 merged_at_by_source[str(row["id"])] = str(merged)
             properties["author"] = author or ""
+            reviewers_list: list[dict[str, Any]] = []
+            seen_revs: set[str] = set()
             for rev in payload.get("reviews") or []:
                 if isinstance(rev, dict):
                     rev_login = _author_login(rev.get("author"))
                     rpid = _ensure_person(rev_login)
                     if rpid and rev_login != author:
                         _queue_rel("REVIEWED", rpid, str(row["id"]), {"state": rev.get("state") or ""})
+                    if rev_login and rev_login.lower() not in seen_revs and not rev_login.endswith("[bot]"):
+                        seen_revs.add(rev_login.lower())
+                        reviewers_list.append({
+                            "login": rev_login,
+                            "submittedAt": rev.get("submittedAt") or merged or "",
+                        })
+            for tc in payload.get("review_thread_comments") or []:
+                if isinstance(tc, dict):
+                    tc_login = _author_login(tc.get("author"))
+                    rpid = _ensure_person(tc_login)
+                    if rpid and tc_login != author:
+                        _queue_rel("REVIEWED", rpid, str(row["id"]), {"state": "COMMENTED"})
+                    if tc_login and tc_login.lower() not in seen_revs and not tc_login.endswith("[bot]"):
+                        seen_revs.add(tc_login.lower())
+                        reviewers_list.append({
+                            "login": tc_login,
+                            "submittedAt": tc.get("createdAt") or merged or "",
+                        })
+            properties["reviewers"] = json.dumps(reviewers_list)
+        source_metadata[str(row["id"])] = {
+            "title": payload.get("title") or "",
+            "body": payload.get("body") or "",
+            "merged": payload.get("merged", True) if label == "PullRequest" else True,
+            "state": payload.get("state") or payload.get("status") or "",
+            "mergedAt": payload.get("mergedAt") or payload.get("merged_at") or "",
+            "createdAt": payload.get("createdAt") or payload.get("created_at") or "",
+        }
         _queue_node(label, properties)
 
     commit_count = 0
@@ -458,12 +488,32 @@ def _rebuild_graph_with_cache(
         })
 
     # 4. Links & Supersession Analysis (Phase 4)
+    for d in verified:
+        sid = d.get("source_id", "")
+        if not d.get("effective_at") and sid in merged_at_by_source:
+            d["effective_at"] = merged_at_by_source[sid]
+
     link_rows = [dict(row) for row in cache.links_for(repo)]
+    config_changes_rows: list[dict[str, Any]] = []
+    if hasattr(cache, "config_value_changes_for"):
+        try:
+            config_changes_rows = [dict(row) for row in cache.config_value_changes_for(repo)]
+        except Exception:
+            config_changes_rows = []
     from app.services.supersession import compute_supersession_edges
     from app.services.state import compute_decision_states
 
-    super_edges = compute_supersession_edges(verified, links=link_rows)
-    state_analysis = compute_decision_states(verified, edges=super_edges)
+    super_edges = compute_supersession_edges(
+        verified,
+        links=link_rows,
+        source_metadata=source_metadata,
+        config_changes=config_changes_rows,
+    )
+    state_analysis = compute_decision_states(
+        verified,
+        edges=super_edges,
+        source_metadata=source_metadata,
+    )
 
     # 6C: Batch-embed full decision text (entities + summary + rationale)
     logger.info("Loading %d verified decisions into graph...", len(verified))
@@ -496,6 +546,9 @@ def _rebuild_graph_with_cache(
             "supersedes": supersedes_list,
             "superseded_by": superseded_by_list,
             "rule": rule_val,
+            "probable_superseded_by": st_res.probable_superseded_by if st_res else [],
+            "conflicts_with": st_res.conflicts_with if st_res else [],
+            "reaffirms": st_res.reaffirms if st_res else [],
             "recorded_at": None,
             "effective_at": merged_at_by_source.get(source_id),
             "ended_at": None,
@@ -578,6 +631,17 @@ def _rebuild_graph_with_cache(
                     if lbl in TEXT_BEARING_LABELS:
                         stub_props["text"] = ""
                     _queue_node(lbl, stub_props)
+                elif endpoint.startswith("incident:"):
+                    inc_key = endpoint.rsplit(":", 1)[-1]
+                    _queue_node(
+                        "Incident",
+                        {
+                            "id": endpoint,
+                            "repo": slug,
+                            "key": inc_key,
+                            "created_at": "",
+                        },
+                    )
                 else:
                     bucket = dangling_grouped.setdefault(link["rel_type"], [])
                     if endpoint not in bucket:

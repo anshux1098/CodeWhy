@@ -824,6 +824,55 @@
         "title": "ErrorResponse",
         "type": "object"
       },
+      "ExtractPreviewRequest": {
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "body": {
+            "default": "",
+            "maxLength": 50000,
+            "title": "Body",
+            "type": "string"
+          },
+          "comments": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewComment"
+            },
+            "title": "Comments",
+            "type": "array"
+          },
+          "source_type": {
+            "default": "pull_request",
+            "enum": [
+              "pull_request",
+              "issue",
+              "doc"
+            ],
+            "title": "Source Type",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "ExtractPreviewRequest",
+        "type": "object"
+      },
       "GraphEdge": {
         "additionalProperties": false,
         "properties": {
@@ -1044,10 +1093,39 @@
       },
       "IngestRequest": {
         "properties": {
+          "dirs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dirs",
+            "type": "array"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
           "max_prs": {
-            "default": 100,
-            "title": "Max Prs",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Prs"
+          },
+          "mode": {
+            "default": "quick",
+            "enum": [
+              "quick",
+              "deep"
+            ],
+            "title": "Mode",
+            "type": "string"
           },
           "repo": {
             "title": "Repo",
@@ -1068,6 +1146,41 @@
         ],
         "title": "Outcome",
         "type": "string"
+      },
+      "PreviewComment": {
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Createdat"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "title": "PreviewComment",
+        "type": "object"
       },
       "ReasonCode": {
         "enum": [
@@ -1138,6 +1251,18 @@
       "RepositoryResponse": {
         "additionalProperties": false,
         "properties": {
+          "candidate_decisions": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Decisions"
+          },
           "counts": {
             "$ref": "#/components/schemas/RepositoryCounts"
           },
@@ -1210,6 +1335,18 @@
             ],
             "title": "Prs Noise Skipped"
           },
+          "rejected_quotes_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected Quotes Count"
+          },
           "scope": {
             "anyOf": [
               {
@@ -1232,6 +1369,18 @@
               }
             ],
             "title": "Sources Analyzed"
+          },
+          "unverified_blocked": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unverified Blocked"
           },
           "url": {
             "title": "Url",
@@ -1439,6 +1588,50 @@
         ]
       }
     },
+    "/api/v1/extract/preview": {
+      "post": {
+        "description": "Run prompt-injection screening, LLM extraction, and verbatim quote verification live.",
+        "operationId": "preview_extraction_api_v1_extract_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtractPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Preview Extraction Api V1 Extract Preview Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Live Extraction & Quote Verification Sandbox",
+        "tags": [
+          "extract"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "health_api_v1_health_get",
@@ -1627,6 +1820,46 @@
           }
         },
         "summary": "Poll the status of an ingest job",
+        "tags": [
+          "ingest"
+        ]
+      }
+    },
+    "/api/v1/repositories/ingest/{job_id}/stream": {
+      "get": {
+        "operationId": "stream_ingest_job_api_v1_repositories_ingest__job_id__stream_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stream live SSE progress updates for an ingest job",
         "tags": [
           "ingest"
         ]

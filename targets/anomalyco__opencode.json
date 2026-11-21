@@ -1,0 +1,15 @@
+{
+  "repo": "anomalyco/opencode",
+  "files": [
+    "packages/client/src/promise/generated/types.ts",
+    "packages/schema/src/config/flag.ts",
+    "packages/desktop/src/renderer/api-types.ts",
+    "packages/desktop/src/renderer/api.ts",
+    "packages/app/src/runtime/i18n/en.ts",
+    "packages/core/src/file-access.ts",
+    "packages/gui-plugins/src/browser/i18n/en.ts",
+    "packages/app/src/runtime/platform/platform.tsx"
+  ],
+  "dirs": [],
+  "config_keys": []
+}

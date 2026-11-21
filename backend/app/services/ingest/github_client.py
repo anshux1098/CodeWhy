@@ -177,7 +177,7 @@ class GitHubGraphQLClient:
             self._pause(attempt)
 
     def _is_retryable(self, status_code: int) -> bool:
-        return status_code >= 500 or status_code == 429 or status_code == 403
+        return status_code >= 500 or status_code in {403, 408, 429, 499}
 
     def _looks_rate_limited(self, response: httpx.Response, snapshot: Optional[RateLimitSnapshot]) -> bool:
         if response.headers.get("x-ratelimit-remaining") == "0":

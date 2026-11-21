@@ -244,7 +244,7 @@ def clone_repository(
         "--no-recurse-submodules",
     ]
     if fast_clone:
-        command.append("--filter=blob:none")
+        command.extend(["--depth", "200"])
     command.extend([
         f"{GITHUB_CLONE_BASE}/{owner}/{name}",
         str(destination),
@@ -262,6 +262,14 @@ def clone_repository(
                 f"{repo} cloned to {measured_mb:.0f} MB, over the {size_limit_mb} MB limit"
             )
     return destination
+
+
+def head_commit_sha(path: Path, branch: str, *, runner: CommandRunner = default_runner) -> str:
+    """Return the HEAD commit SHA for `branch` without walking the full git history."""
+    result = runner(["git", "rev-parse", branch], path)
+    if result.returncode != 0:
+        raise GitProbeError(f"git rev-parse failed: {(result.stderr or '').strip()[:200]}")
+    return (result.stdout or "").strip()
 
 
 def read_history(path: Path, branch: str, *, runner: CommandRunner = default_runner) -> list[Commit]:

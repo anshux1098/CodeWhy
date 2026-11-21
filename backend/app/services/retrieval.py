@@ -6,7 +6,11 @@ from enum import StrEnum
 from typing import Any, Callable, Optional
 
 from app.config import Settings, settings
-from app.providers.embeddings import BaseEmbeddingProvider, get_embedding_provider
+from app.providers.embeddings import (
+    BaseEmbeddingProvider,
+    compute_cosine_similarity,
+    get_embedding_provider,
+)
 from app.stores.graph_store import BaseGraphStore
 
 logger = logging.getLogger(__name__)
@@ -258,7 +262,8 @@ def retrieve_evidence(
     if not decisions:
         return bundle
 
-    # Compute similarity between question and decisions
+    # Compute similarity between question and decisions (embed question once!)
+    q_vec = emb.embed_text(question)
     best_score = 0.0
     all_evidence: list[RetrievedEvidenceItem] = []
 
@@ -269,7 +274,12 @@ def retrieve_evidence(
         rationale = d.get("rationale", "")
         text_to_compare = f"{ent_name} {summary} {rationale}".strip()
         decision_texts.append(text_to_compare)
-        sim = emb.similarity(question, text_to_compare)
+        stored_emb = d.get("embedding")
+        if isinstance(stored_emb, (list, tuple)) and len(stored_emb) == len(q_vec):
+            sim = compute_cosine_similarity(q_vec, stored_emb)
+        else:
+            d_vec = emb.embed_text(text_to_compare)
+            sim = compute_cosine_similarity(q_vec, d_vec)
         d["similarity_score"] = sim
         if sim > best_score:
             best_score = sim
@@ -323,7 +333,7 @@ def retrieve_evidence(
     bundle.evidence_items = all_evidence[:cap_evidence]
 
     links = []
-    if hasattr(store, "get_links_for_repo"):
+    if any(not d.get("state") for d in decisions) and hasattr(store, "get_links_for_repo"):
         try:
             links = store.get_links_for_repo(repo)
         except Exception:
@@ -365,6 +375,20 @@ def retrieve_evidence(
             bundle.people = store.get_people_for_entity(repo, entity_id)
         except Exception:
             bundle.people = []
+
+    # Populate bundle.sources from unique source nodes so who_to_ask can rank reviewers
+    if hasattr(store, "get_node"):
+        seen_src_ids: set[str] = set()
+        for d in decisions:
+            sid = str(d.get("source_id") or "")
+            if sid and sid not in seen_src_ids:
+                seen_src_ids.add(sid)
+                try:
+                    s_node = store.get_node(sid)
+                    if isinstance(s_node, dict):
+                        bundle.sources.append(s_node)
+                except Exception:
+                    pass
 
     # Load the stored text behind every retained source so the answer path can
     # re-verify quotes instead of trusting the extraction-time flag.

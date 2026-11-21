@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 import re
+import threading
 from typing import TYPE_CHECKING, Any, Final, Optional, Protocol, runtime_checkable
 
 from app.config import Settings, settings
@@ -216,6 +218,9 @@ class GraphDataSource:
         self.settings = cfg or settings
         self.store = store or get_graph_store(self.settings)
         self.provider = get_llm_provider(cfg=self.settings)
+        self._ask_cache: OrderedDict[tuple[Any, ...], Any] = OrderedDict()
+        self._ask_cache_lock = threading.Lock()
+        self._ask_cache_max = 128
 
     @property
     def is_real(self) -> bool:
@@ -286,20 +291,30 @@ class GraphDataSource:
             ),
         )
 
+    def _require_repository_exists(self, repository_id: str) -> None:
+        """Verify repository existence via Repository node lookup before scanning entities."""
+        if not self._has_repository_node(repository_id):
+            if not self.store.search_entities(repository_id, ""):
+                raise NotFoundError(f"repository {repository_id!r} not found")
+
     def _repository_response(self, repository_id: str, node: dict) -> RepositoryResponse:
         # Name and url come from the Repository node the build wrote, not from the id
         # string: the id is the slug the API addresses, and the real address lives on
         # the node as `url` with the raw `owner/name` in `full_name`.
         raw_name = node.get("full_name") or repository_id
+        decisions_cnt = _clean_int(node.get("decisions_count"))
+        entities_cnt = _clean_int(node.get("entities_count"))
+        prs_cnt = _clean_int(node.get("pull_requests_count"))
+        commits_cnt = _clean_int(node.get("commits_count"))
         return RepositoryResponse(
             id=repository_id,
             name=node.get("name") or repository_id.rsplit("/", 1)[-1],
             url=node.get("url") or f"https://github.com/{raw_name}",
             counts=RepositoryCounts(
-                decisions=self.store.count_nodes(repository_id, "Decision"),
-                entities=self.store.count_nodes(repository_id, "CodeEntity"),
-                pull_requests=self.store.count_nodes(repository_id, "PullRequest"),
-                commits=self.store.count_nodes(repository_id, "Commit"),
+                decisions=decisions_cnt if decisions_cnt is not None else self.store.count_nodes(repository_id, "Decision"),
+                entities=entities_cnt if entities_cnt is not None else self.store.count_nodes(repository_id, "CodeEntity"),
+                pull_requests=prs_cnt if prs_cnt is not None else self.store.count_nodes(repository_id, "PullRequest"),
+                commits=commits_cnt if commits_cnt is not None else self.store.count_nodes(repository_id, "Commit"),
             ),
             full_name=_clean_text(node.get("full_name")),
             owner=_clean_text(node.get("owner")),
@@ -316,7 +331,7 @@ class GraphDataSource:
         )
 
     def get_repository(self, repository_id: str) -> RepositoryResponse:
-        self._require_repository(repository_id)
+        self._require_repository_exists(repository_id)
         return self._repository_response(repository_id, self._find_node(repository_id) or {})
 
     def list_repositories(self) -> RepositoryListResponse:
@@ -327,22 +342,32 @@ class GraphDataSource:
         return RepositoryListResponse(items=items, fixture=not self.is_real)
 
     def search_entities(self, repository_id: str, query: str) -> EntityListResponse:
-        raw_ents = self._require_repository(repository_id)
         if query.strip():
+            self._require_repository_exists(repository_id)
             raw_ents = self.store.search_entities(repository_id, query)
+        else:
+            raw_ents = self._require_repository(repository_id)
         entities_list: list[Entity] = []
         for e in raw_ents:
             try:
                 etype = EntityType(e.get("entity_type", "File"))
             except ValueError:
                 etype = EntityType.FILE
+            pre_count = _clean_int(e.get("decision_count"))
+            if pre_count is None:
+                pre_count = _clean_int(e.get("verified_decisions"))
+            dec_count = (
+                pre_count
+                if pre_count is not None
+                else len(self.store.get_decisions_for_entity(e.get("id", "")))
+            )
             entities_list.append(
                 Entity(
                     id=e.get("id", e.get("name", "")),
                     type=etype,
                     label=e.get("name", ""),
                     path=e.get("path", e.get("name", "")),
-                    decision_count=len(self.store.get_decisions_for_entity(e.get("id", ""))),
+                    decision_count=dec_count,
                 )
             )
         return EntityListResponse(
@@ -352,6 +377,22 @@ class GraphDataSource:
         )
 
     def ask(self, repository_id: str, request: AskRequest) -> AskResponse:
+        repo_node = self._find_node(repository_id)
+        rebuilt_at = str(repo_node.get("last_rebuilt_at") or "") if isinstance(repo_node, dict) else ""
+        cache_key = (
+            repository_id,
+            request.question.strip().lower(),
+            request.entity_id,
+            rebuilt_at,
+            self.settings.min_score,
+            bool(self.is_real),
+        )
+        with self._ask_cache_lock:
+            cached = self._ask_cache.get(cache_key)
+            if cached is not None:
+                self._ask_cache.move_to_end(cache_key)
+                return cached
+
         all_entities = self._require_repository(repository_id)
         if request.entity_id is not None:
             resolution = self._resolve_explicit_entity(repository_id, request.entity_id)
@@ -373,7 +414,7 @@ class GraphDataSource:
                 cfg=self.settings,
             )
 
-        return generate_answer(
+        response = generate_answer(
             question=request.question,
             resolution=resolution,
             bundle=bundle,
@@ -384,6 +425,12 @@ class GraphDataSource:
             cfg=self.settings,
             repository_id=repository_id,
         )
+        with self._ask_cache_lock:
+            self._ask_cache[cache_key] = response
+            self._ask_cache.move_to_end(cache_key)
+            while len(self._ask_cache) > self._ask_cache_max:
+                self._ask_cache.popitem(last=False)
+        return response
 
     def get_decision(self, decision_id: str) -> DecisionDetail:
         """Return one decision, or refuse. Nothing is invented for a missing id.
@@ -431,7 +478,7 @@ class GraphDataSource:
         limit: int = 50,
         offset: int = 0,
     ) -> DecisionListResponse:
-        self._require_repository(repository_id)
+        self._require_repository_exists(repository_id)
         result = self.store.list_decisions(
             repository_id,
             entity_id=entity_id,
@@ -469,7 +516,7 @@ class GraphDataSource:
         )
 
     def get_graph(self, repository_id: str, entity_id: str | None) -> GraphResponse:
-        self._require_repository(repository_id)
+        self._require_repository_exists(repository_id)
         if entity_id is not None and self.store.get_entity(repository_id, entity_id) is None:
             # An unknown entity is a 404. Returning an empty graph with 200 would
             # tell the caller the entity has no history when it is not in the graph.

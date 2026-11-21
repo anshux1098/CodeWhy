@@ -28,10 +28,6 @@ function entityDisplayName(ent: string): string {
   return ent;
 }
 
-function isVisibleEntity(ent: string): boolean {
-  return entityDisplayName(ent).toLowerCase() !== 'src/urllib3/connection.py';
-}
-
 interface DecisionHistoryViewProps {
   selectedRepo: Repository | null;
   questionContext: QuestionContext | null;
@@ -363,7 +359,7 @@ export const DecisionHistoryView: React.FC<DecisionHistoryViewProps> = ({
               };
 
               const style = renderStateConfig();
-              const visibleEntities = decision.entities.filter(isVisibleEntity);
+              const visibleEntities = decision.entities;
 
               return (
                 <div key={decision.id} className="relative group">

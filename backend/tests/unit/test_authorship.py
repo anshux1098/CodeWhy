@@ -92,9 +92,8 @@ def test_a_missing_author_stays_empty_rather_than_being_invented(tmp_path: Path)
     assert GraphDataSource(cfg, store=store).get_decision("d1").citations[0].author in (None, "")
 
 
-def test_no_person_node_or_authored_edge_is_created(tmp_path: Path) -> None:
+def test_person_node_and_authored_edge_are_created(tmp_path: Path) -> None:
     store = _store(tmp_path, pr_author="sethmlarson")
-    assert "Person" not in store.label_counts()
-    assert "AUTHORED" not in store.relationship_type_counts()
-    assert "REVIEWED" not in store.relationship_type_counts()
+    assert "Person" in store.label_counts()
+    assert "AUTHORED" in store.relationship_type_counts()
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Sequence
@@ -111,7 +112,7 @@ class BaseGraphStore(ABC):
         self,
         label: str,
         rows: Sequence[dict[str, Any]],
-        batch_size: int = 500,
+        batch_size: int = 20,
     ) -> None:
         """Batch-merge nodes; subclasses override with UNWIND for bulk speed."""
         for props in rows:
@@ -121,7 +122,7 @@ class BaseGraphStore(ABC):
         self,
         rel_type: str,
         rows: Sequence[dict[str, Any]],
-        batch_size: int = 500,
+        batch_size: int = 100,
     ) -> None:
         """Batch-merge relationships (`{from_id, to_id, props?}`); subclasses override with UNWIND."""
         for row in rows:
@@ -572,38 +573,34 @@ class InMemoryGraphStore(BaseGraphStore):
 
     def get_people_for_entity(self, repo: str, entity_id: str) -> list[dict[str, Any]]:
         dec_ids = {
-            f for (f, r, t) in self.edges
-            if r == "GOVERNS" and t == entity_id
+            from_id
+            for (from_id, rel_type, to_id) in self.edges
+            if rel_type == "GOVERNS" and to_id == entity_id
         }
-        src_ids: dict[str, dict[str, Any]] = {}
-        for dec_id in dec_ids:
-            d_props = self.nodes.get(dec_id, {})
-            for (f, r, t) in self.edges:
-                if r == "DECIDED_IN" and f == dec_id:
-                    src_ids[t] = d_props
-
+        source_ids = {
+            to_id
+            for (from_id, rel_type, to_id) in self.edges
+            if rel_type == "DECIDED_IN" and from_id in dec_ids
+        }
         people: list[dict[str, Any]] = []
-        seen: set[tuple[str, str]] = set()
-        for src_id, d_props in src_ids.items():
-            src_props = self.nodes.get(src_id, {})
-            activity = (
-                d_props.get("effective_at")
-                or src_props.get("created_at")
-                or ""
-            )
-            for (f, r, t) in self.edges:
-                if t == src_id and r in ("AUTHORED", "REVIEWED"):
-                    p_node = self.nodes.get(f, {})
-                    login = p_node.get("login") or (f.split(":", 1)[1] if ":" in f else f)
-                    reason = "reviewer" if r == "REVIEWED" else "author"
-                    key = (str(login).lower(), reason)
-                    if login and key not in seen:
-                        seen.add(key)
-                        people.append({
-                            "login": login,
-                            "reason": reason,
-                            "last_committed_at": activity,
-                        })
+        seen: set[str] = set()
+        for (from_id, rel_type, to_id) in self.edges:
+            if rel_type in ("AUTHORED", "REVIEWED") and to_id in source_ids:
+                p = self.nodes.get(from_id)
+                if not p or "Person" not in self.labels.get(from_id, set()):
+                    continue
+                if repo and p.get("repo") not in (None, "", repo):
+                    continue
+                login = str(p.get("login") or p.get("name") or "")
+                if not login or login.lower() in seen:
+                    continue
+                seen.add(login.lower())
+                src = self.nodes.get(to_id) or {}
+                enriched = dict(p)
+                enriched["reason"] = "reviewer" if rel_type == "REVIEWED" else "author"
+                if src.get("created_at") and not enriched.get("last_committed_at"):
+                    enriched["last_committed_at"] = src.get("created_at")
+                people.append(enriched)
         return people
 
     def get_sources_for_entity(self, repo: str, entity_id: str) -> list[dict[str, Any]]:
@@ -671,6 +668,12 @@ class Neo4jGraphStore(BaseGraphStore):
                 import neo4j
             except ImportError as exc:
                 raise RuntimeError("neo4j package is required to connect to Neo4j AuraDB") from exc
+            if "SSL_CERT_FILE" not in os.environ:
+                try:
+                    import certifi
+                    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+                except ImportError:
+                    pass
             driver = neo4j.GraphDatabase.driver(uri, auth=(user, password))
         self.driver = driver
         self.database = database
@@ -733,11 +736,17 @@ class Neo4jGraphStore(BaseGraphStore):
         with self.driver.session(database=self.database) as session:
             session.run(query, from_id=from_id, to_id=to_id, props=props)
 
+    def _run_write_batch(self, session: Any, query: str, batch: list[dict[str, Any]]) -> None:
+        if hasattr(session, "execute_write"):
+            session.execute_write(lambda tx: tx.run(query, batch=batch).consume())
+        else:
+            session.run(query, batch=batch)
+
     def merge_nodes_batch(
         self,
         label: str,
         rows: Sequence[dict[str, Any]],
-        batch_size: int = 500,
+        batch_size: int = 20,
     ) -> None:
         if not rows:
             return
@@ -748,16 +757,28 @@ class Neo4jGraphStore(BaseGraphStore):
             f"MERGE (n:{label} {{{node_id_field}: row.{node_id_field}}}) "
             f"SET n += row"
         )
-        items = list(rows)
+        max_batch_bytes = 200_000
+        current_batch: list[dict[str, Any]] = []
+        current_bytes = 0
         with self.driver.session(database=self.database) as session:
-            for start in range(0, len(items), batch_size):
-                session.run(query, batch=items[start : start + batch_size])
+            for item in rows:
+                approx_bytes = sum(len(v) if isinstance(v, str) else 64 for v in item.values())
+                if current_batch and (
+                    len(current_batch) >= batch_size or current_bytes + approx_bytes > max_batch_bytes
+                ):
+                    self._run_write_batch(session, query, current_batch)
+                    current_batch = []
+                    current_bytes = 0
+                current_batch.append(item)
+                current_bytes += approx_bytes
+            if current_batch:
+                self._run_write_batch(session, query, current_batch)
 
     def merge_relationships_batch(
         self,
         rel_type: str,
         rows: Sequence[dict[str, Any]],
-        batch_size: int = 500,
+        batch_size: int = 100,
     ) -> None:
         if not rows:
             return
@@ -778,7 +799,7 @@ class Neo4jGraphStore(BaseGraphStore):
         ]
         with self.driver.session(database=self.database) as session:
             for start in range(0, len(items), batch_size):
-                session.run(query, batch=items[start : start + batch_size])
+                self._run_write_batch(session, query, items[start : start + batch_size])
 
     def get_node(self, node_id: str) -> Optional[dict[str, Any]]:
         """Fetch any node by id across labels.
@@ -1061,25 +1082,28 @@ class Neo4jGraphStore(BaseGraphStore):
 
     def get_people_for_entity(self, repo: str, entity_id: str) -> list[dict[str, Any]]:
         cql = (
-            "MATCH (d:Decision)-[:GOVERNS]->(e:CodeEntity {id: $entity_id}) "
-            "MATCH (d)-[:DECIDED_IN]->(src) "
-            "MATCH (p:Person)-[rel:AUTHORED|REVIEWED]->(src) "
-            "RETURN p.login AS login, "
-            "CASE WHEN type(rel) = 'REVIEWED' THEN 'reviewer' ELSE 'author' END AS reason, "
-            "coalesce(d.effective_at, src.created_at, '') AS last_committed_at "
-            "LIMIT 20"
+            "MATCH (p:Person)-[r:AUTHORED|REVIEWED]->(s)<-[:DECIDED_IN]-(d:Decision)-[:GOVERNS]->(e:CodeEntity {id: $entity_id}) "
+            "WHERE e.repo = $repo OR d.repo = $repo "
+            "RETURN DISTINCT properties(p) AS props, type(r) AS rel_type, "
+            "coalesce(s.mergedAt, s.created_at, d.effective_at, '') AS activity_at "
+            "LIMIT 50"
         )
         with self.driver.session(database=self.database) as session:
-            result = session.run(cql, entity_id=entity_id)
-            return [
-                {
-                    "login": record["login"],
-                    "reason": record["reason"],
-                    "last_committed_at": record["last_committed_at"],
-                }
-                for record in result
-                if record.get("login")
-            ]
+            result = session.run(cql, repo=repo, entity_id=entity_id)
+            people: list[dict[str, Any]] = []
+            seen: set[str] = set()
+            for record in result:
+                props = dict(record["props"])
+                login = str(props.get("login") or props.get("name") or "")
+                if not login or login.lower() in seen:
+                    continue
+                seen.add(login.lower())
+                rel_type = record.get("rel_type") or ""
+                props["reason"] = "reviewer" if rel_type == "REVIEWED" else "author"
+                if record.get("activity_at") and not props.get("last_committed_at"):
+                    props["last_committed_at"] = record["activity_at"]
+                people.append(props)
+            return people
 
     def get_sources_for_entity(self, repo: str, entity_id: str) -> list[dict[str, Any]]:
         cql = (

@@ -1,4 +1,5 @@
 {
+  "candidate_decisions": null,
   "counts": {
     "commits": 9,
     "decisions": 5,
@@ -13,8 +14,10 @@
   "owner": null,
   "prs_fetched": null,
   "prs_noise_skipped": null,
+  "rejected_quotes_count": null,
   "scope": null,
   "sources_analyzed": null,
+  "unverified_blocked": null,
   "url": "https://github.invalid/acme/netclient",
   "verified_decisions": null
 }

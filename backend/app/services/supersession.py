@@ -79,6 +79,7 @@ def _get_timestamp(decision: dict[str, Any]) -> str:
     """Return the most reliable ISO timestamp for chronological ordering."""
     return str(
         decision.get("effective_at")
+        or decision.get("decision_date")
         or decision.get("recorded_at")
         or decision.get("created_at")
         or ""
