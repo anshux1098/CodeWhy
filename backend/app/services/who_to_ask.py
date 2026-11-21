@@ -190,6 +190,12 @@ def determine_who_to_ask(
     if sources:
         for s in sources:
             reviewers = s.get("reviewers") or []
+            if isinstance(reviewers, str):
+                try:
+                    import json
+                    reviewers = json.loads(reviewers)
+                except ValueError:
+                    reviewers = []
             if isinstance(reviewers, list):
                 for rev in reviewers:
                     login = rev.get("login") if isinstance(rev, dict) else str(rev)

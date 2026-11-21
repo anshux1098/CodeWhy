@@ -25,9 +25,6 @@ interface LegacyRepositorySelectorModalProps {
   onAddNewRepo?: (newRepo: Repository) => void;
 }
 
-// Only show these two repos in the selector
-const ALLOWED_REPOS = ['urllib3/urllib3', 'sqlalchemy/alembic'];
-
 const FOCUSABLE_SELECTOR = [
   'a[href]',
   'button:not([disabled])',
@@ -55,7 +52,6 @@ export const LegacyRepositorySelectorModal: React.FC<LegacyRepositorySelectorMod
   if (!isOpen) return null;
 
   const filteredRepos = repositories
-    .filter(r => ALLOWED_REPOS.some(name => r.name === name || r.id === name.replace('/', '-')))
     .filter(r =>
       r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (r.owner && r.owner.toLowerCase().includes(searchQuery.toLowerCase()))

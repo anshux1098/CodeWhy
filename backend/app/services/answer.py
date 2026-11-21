@@ -134,6 +134,54 @@ def agreement_from_citations(citations: Sequence[Any]) -> float:
     return 1.0
 
 
+def provenance_from_citations(citations: Sequence[Any]) -> float:
+    """Compute provenance signal [0.80 .. 1.00] from verified citation completeness."""
+    if not citations:
+        return 0.8
+    has_url = all(bool((getattr(c, "source_url", "") or "").strip()) for c in citations)
+    has_author = all(bool((getattr(c, "author", "") or "").strip()) for c in citations)
+    has_ts = all(bool((getattr(c, "timestamp", "") or "").strip()) for c in citations)
+    if has_url and has_author and has_ts:
+        return 1.0
+    if has_url and has_author:
+        return 0.9
+    if has_url:
+        return 0.8
+    return 0.8
+
+
+def temporal_consistency_from_bundle(bundle: Optional[EvidenceBundle]) -> float:
+    """Compute temporal_consistency [0.50 .. 1.00] from decision lifecycle state."""
+    if bundle is None or not bundle.decisions:
+        return 0.5
+    has_active = any(
+        str(d.get("state") or "ACTIVE").upper() == "ACTIVE"
+        for d in bundle.decisions
+    )
+    if not has_active:
+        return 0.5
+    if bundle.chain_truncated:
+        return 0.85
+    return 1.0
+
+
+def _who_to_ask_for_bundle(
+    bundle: Optional[EvidenceBundle],
+    store: Optional[Any],
+) -> list[Any]:
+    if bundle is None and store is None:
+        return []
+    from app.services.who_to_ask import determine_who_to_ask
+
+    return determine_who_to_ask(
+        decisions=bundle.decisions if bundle else [],
+        sources=bundle.sources if bundle else [],
+        people=bundle.people if bundle else [],
+        evidence_items=bundle.evidence_items if bundle else [],
+        store=store,
+    )
+
+
 def _normalise_quote(quote: str) -> str:
     """Whitespace collapsed and lower-cased, so containment ignores formatting."""
     return " ".join((quote or "").split()).lower()
@@ -224,7 +272,7 @@ def _no_verified_quote_response(
         provenance=0.6,
         agreement=0.4,
         relevance=similarity,
-        temporal_consistency=1.0,
+        temporal_consistency=0.85 if contradiction == 1.0 else 1.0,
         contradiction=contradiction,
     )
     return AskResponse(
@@ -236,6 +284,7 @@ def _no_verified_quote_response(
         citations=[],
         evidence_gaps=gaps,
         confidence=conf,
+        who_to_ask=_who_to_ask_for_bundle(None, store) if decisions else [],
         fixture=not is_real,
     )
 
@@ -416,6 +465,7 @@ def generate_answer(
                     ),
                 ),
                 evidence_gaps=[_no_decision_path_gap(store, resolution.entity.id)],
+                who_to_ask=_who_to_ask_for_bundle(bundle, store),
                 fixture=not is_real,
             )
 
@@ -438,11 +488,12 @@ def generate_answer(
                         provenance=0.5,
                         agreement=0.4,
                         relevance=sim,
-                        temporal_consistency=1.0,
+                        temporal_consistency=temporal_consistency_from_bundle(bundle),
                         contradiction=0.0,
                     ),
                 ),
                 evidence_gaps=["Evidence relevance score below MIN_SCORE threshold"],
+                who_to_ask=_who_to_ask_for_bundle(bundle, store),
                 fixture=not is_real,
             )
 
@@ -490,7 +541,7 @@ def generate_answer(
             provenance=0.6,
             agreement=0.4,
             relevance=bundle.best_similarity_score,
-            temporal_consistency=1.0,
+            temporal_consistency=temporal_consistency_from_bundle(bundle),
             contradiction=1.0 if bundle.has_contradiction else 0.0,
         )
         partial_gaps = ["No verbatim verified quote explaining the original rationale exists"]
@@ -509,6 +560,8 @@ def generate_answer(
             citations=[],  # no_verified_quote forbids citations
             evidence_gaps=partial_gaps,
             confidence=conf,
+            who_to_ask=_who_to_ask_for_bundle(bundle, store),
+            code_differs_from_latest=bundle.current_value_differs if bundle else None,
             fixture=not is_real,
         )
 
@@ -601,10 +654,10 @@ def generate_answer(
 
     conf = calculate_confidence(
         directness=directness_val,
-        provenance=0.8,
+        provenance=provenance_from_citations(valid_citations),
         agreement=agreement_from_citations(valid_citations),
         relevance=bundle.best_similarity_score,
-        temporal_consistency=1.0,
+        temporal_consistency=temporal_consistency_from_bundle(bundle),
         contradiction=contradiction_val,
     )
 
@@ -615,15 +668,7 @@ def generate_answer(
         outcome = Outcome.PARTIAL
         reason_code = None
 
-    from app.services.who_to_ask import determine_who_to_ask
-
-    who_to_ask_list = determine_who_to_ask(
-        decisions=bundle.decisions if bundle else [],
-        sources=bundle.sources if bundle else [],
-        people=bundle.people if bundle else [],
-        evidence_items=bundle.evidence_items if bundle else [],
-        store=store,
-    )
+    who_to_ask_list = _who_to_ask_for_bundle(bundle, store)
 
     answer_gaps = [] if outcome == Outcome.FULL else ["Partial evidence coverage"]
     note = _partial_coverage_note(store, resolution.entity.id)

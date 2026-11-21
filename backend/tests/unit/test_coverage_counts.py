@@ -231,7 +231,10 @@ class _CoverageRecordingDriver:
         if "RETURN count(n) AS c" in query or "RETURN count(r) AS c" in query:
             return _Result([{"c": 0}])
         if "MERGE (n:" in query and "SET n +=" in query:
-            self.node_writes.append(params.get("props", {}))
+            if "batch" in params:
+                self.node_writes.extend(params.get("batch") or [])
+            else:
+                self.node_writes.append(params.get("props", {}))
         return _Result([])
 
     def close(self) -> None:

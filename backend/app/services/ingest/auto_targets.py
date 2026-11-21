@@ -25,7 +25,7 @@ NON_SOURCE_DIRS: frozenset[str] = frozenset({
     "example", "examples", "sample", "samples",
     "benchmark", "benchmarks",
     ".github", ".circleci", ".gitlab",
-    "node_modules", "vendor", "packages", "third_party", "dist", "build",
+    "node_modules", "vendor", "third_party", "dist", "build",
 })
 
 SKIP_FILENAMES: frozenset[str] = frozenset({

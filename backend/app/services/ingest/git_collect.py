@@ -272,11 +272,14 @@ def collect_file_commits(
     *,
     runner: CommandRunner = default_runner,
     repo: str = "",
+    max_commits: Optional[int] = None,
 ) -> list[CollectedCommit]:
+    limit_args = ["-n", str(max_commits)] if max_commits is not None and max_commits > 0 else []
     metadata = runner(
         [
             "git",
             "log",
+            *limit_args,
             "--follow",
             "--name-status",
             "-M",
@@ -295,6 +298,7 @@ def collect_file_commits(
         [
             "git",
             "log",
+            *limit_args,
             "--follow",
             "-p",
             "-U3",

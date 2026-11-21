@@ -31,8 +31,8 @@ from app.services.ingest.github_client import LOW_REMAINING_THRESHOLD
 from app.services.ingest.git_probe import (
     clone_repository,
     default_branch,
+    head_commit_sha,
     parse_slug,
-    read_history,
 )
 from app.services.ingest.targets import IngestTargets
 from app.services.noise import label_repository_noise
@@ -109,6 +109,8 @@ def collect_target_commits(
     targets: IngestTargets,
     cache: SqliteCache,
     repo: str,
+    *,
+    max_commits: Optional[int] = None,
 ) -> tuple[list[Any], set[int], list[int]]:
     seen: dict[str, Any] = {}
     pull_requests: set[int] = set()
@@ -116,7 +118,7 @@ def collect_target_commits(
     commit_rows: list[dict[str, Any]] = []
     file_rows: list[tuple[str, dict[str, Any]]] = []
     for relative in targets.all_files():
-        commits = collect_file_commits(clone, relative, branch, repo=repo)
+        commits = collect_file_commits(clone, relative, branch, repo=repo, max_commits=max_commits)
         for commit in commits:
             seen[commit.sha] = commit
             pull_requests.update(commit.pull_requests)
@@ -421,7 +423,10 @@ def run_ingest(
     summary.notes.append(f"clone branch {branch}")
 
     _emit("commits", 25, 100, f"Collecting git history across {len(targets.all_files())} target files...")
-    target_commits, target_prs, all_numbers = collect_target_commits(clone, branch, targets, cache, repo)
+    commit_cap = 50 if fast_clone else 200
+    target_commits, target_prs, all_numbers = collect_target_commits(
+        clone, branch, targets, cache, repo, max_commits=commit_cap
+    )
     summary.commits = len(target_commits)
     try:
         summary.commit_files = cache.count_commit_files(repo)
@@ -429,8 +434,7 @@ def run_ingest(
         summary.commit_files = cache.count_commit_files()
     logger.info("collected %d commits across %d target files", len(target_commits), len(targets.all_files()))
 
-    history = read_history(clone, branch)
-    head_sha = history[0].sha if history else ""
+    head_sha = head_commit_sha(clone, branch)
     documents = collect_documents(clone, targets.dirs, head_sha=head_sha)
     for document in documents:
         cache.put_raw("doc", repo, document.path, document.__dict__)
