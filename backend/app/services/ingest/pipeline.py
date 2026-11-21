@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import logging
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 from app.config import Settings
+from app.services.ingest.connectors import detect_incident_from_source
 from app.services.ingest.git_collect import (
     collect_documents,
     collect_file_commits,
@@ -15,9 +17,12 @@ from app.services.ingest.git_collect import (
 )
 from app.services.ingest.github_objects import (
     IngestionStopped,
+    build_discussions_query,
     build_issue_or_pull_request_query,
+    build_preflight_query,
     build_recent_merged_query,
     chunked,
+    normalise_discussion,
     normalise_resolved,
     parse_aliased,
     resolve_kind,
@@ -108,6 +113,8 @@ def collect_target_commits(
     seen: dict[str, Any] = {}
     pull_requests: set[int] = set()
     numbers: set[int] = set()
+    commit_rows: list[dict[str, Any]] = []
+    file_rows: list[tuple[str, dict[str, Any]]] = []
     for relative in targets.all_files():
         commits = collect_file_commits(clone, relative, branch, repo=repo)
         for commit in commits:
@@ -116,18 +123,26 @@ def collect_target_commits(
             numbers.update(commit.pull_requests)
             numbers.update(commit.closing)
             numbers.update(commit.mentions)
-        for commit in commits:
-            cache.put_commit(repo, commit.as_row())
-            cache.put_commit_file(
-                commit.sha,
-                {
-                    "path": relative,
-                    "old_path": None,
-                    "status": "M",
-                    "diff": commit.diff,
-                    "diff_truncated": commit.diff_truncated,
-                },
+            commit_rows.append(commit.as_row())
+            file_rows.append(
+                (
+                    commit.sha,
+                    {
+                        "path": relative,
+                        "old_path": None,
+                        "status": "M",
+                        "diff": commit.diff,
+                        "diff_truncated": commit.diff_truncated,
+                    },
+                )
             )
+    if hasattr(cache, "put_commits_and_files_batch"):
+        cache.put_commits_and_files_batch(repo, commit_rows, file_rows)
+    else:
+        for row in commit_rows:
+            cache.put_commit(repo, row)
+        for sha, frow in file_rows:
+            cache.put_commit_file(sha, frow)
     return list(seen.values()), pull_requests, sorted(numbers)
 
 
@@ -165,31 +180,106 @@ def fetch_references(
         for number in numbers
         if refresh or not cache.has_raw("pr", repo, str(number)) and not cache.has_raw("issue", repo, str(number))
     ]
-    for batch in chunked(pending):
+    batches = [list(b) for b in chunked(pending)]
+    if not batches:
+        return outcome
+
+    def _query_batch(batch_nums: list[int]):
         _guard_rate_limit(client)
-        result = parse_aliased(
-            client.query(
-                build_issue_or_pull_request_query(list(batch)),
-                {"owner": owner, "name": name},
-                tolerate_unresolved=True,
-            ),
-            "n",
-            list(batch),
+        payload = client.query(
+            build_issue_or_pull_request_query(batch_nums),
+            {"owner": owner, "name": name},
+            tolerate_unresolved=True,
         )
+        return batch_nums, parse_aliased(payload, "n", batch_nums)
+
+    if len(batches) > 1 and getattr(client, "supports_concurrency", False):
+        with ThreadPoolExecutor(max_workers=min(3, len(batches))) as pool:
+            batch_results = list(pool.map(_query_batch, batches))
+    else:
+        batch_results = [_query_batch(b) for b in batches]
+
+    for _batch, result in batch_results:
         cost += result.cost
         for node in result.items.values():
             kind = resolve_kind(node)
             outcome.fetched_issues += kind == "issue"
             outcome.fetched_pull_requests += kind == "pr"
-        outcome.fetched = len(result.items)
+        outcome.fetched += len(result.items)
         for number, node in result.items.items():
             kind = resolve_kind(node)
-            if cache.put_raw(kind, repo, str(number), normalise_resolved(node)):
+            normalised = normalise_resolved(node)
+            if cache.put_raw(kind, repo, str(number), normalised):
                 outcome.stored += 1
+            if kind == "pr":
+                inc = detect_incident_from_source(
+                    repo=repo,
+                    source_id=f"pr:{repo}#{number}",
+                    title=str(normalised.get("title") or ""),
+                    body=str(normalised.get("body") or ""),
+                    source_url=f"https://github.com/{repo}/pull/{number}",
+                )
+                if inc is not None:
+                    cache.put_raw("incident", repo, inc.key, {
+                        "id": inc.id,
+                        "key": inc.key,
+                        "severity": inc.severity,
+                        "title": inc.title,
+                        "source_id": inc.source_id,
+                        "source_url": inc.source_url,
+                    })
         for number in result.missing:
             cache.record_missing(run_id, repo, "reference", number, "resolved to neither an issue nor a pull request")
     outcome.cost = cost
     return outcome
+
+
+def preflight_repository(client: Any, owner: str, name: str) -> dict[str, Any]:
+    """Run a lightweight GraphQL preflight check before cloning."""
+    try:
+        payload = client.query(build_preflight_query(), {"owner": owner, "name": name})
+        repo_node = ((payload.get("data") or {}).get("repository") or {})
+        disk_kb = repo_node.get("diskUsage")
+        size_mb = round(float(disk_kb) / 1024.0, 2) if isinstance(disk_kb, (int, float)) else None
+        return {
+            "exists": bool(repo_node),
+            "size_hint_mb": size_mb,
+            "has_discussions": bool(repo_node.get("hasDiscussionsEnabled")),
+            "default_branch": (repo_node.get("defaultBranchRef") or {}).get("name"),
+        }
+    except Exception as exc:  # noqa: BLE001 - preflight is advisory, never fatal in tests/mocks
+        logger.debug("Preflight check skipped for %s/%s: %s", owner, name, exc)
+        return {"exists": True, "size_hint_mb": None, "has_discussions": False, "default_branch": None}
+
+
+def fetch_discussions(
+    client: Any,
+    owner: str,
+    name: str,
+    cache: SqliteCache,
+    repo: str,
+    *,
+    limit: int = 20,
+) -> int:
+    """Fetch recent GitHub Discussions if enabled on the repository."""
+    try:
+        payload = client.query(
+            build_discussions_query(limit),
+            {"owner": owner, "name": name, "first": limit, "after": None},
+        )
+    except Exception as exc:  # noqa: BLE001 - Discussions may be disabled or unsupported by mock
+        logger.debug("Discussions fetch skipped for %s: %s", repo, exc)
+        return 0
+    repo_node = ((payload.get("data") or {}).get("repository") or {})
+    nodes = ((repo_node.get("discussions") or {}).get("nodes") or [])
+    stored = 0
+    for node in nodes:
+        if not isinstance(node, dict) or not node.get("number"):
+            continue
+        norm = normalise_discussion(node)
+        if cache.put_raw("discussion", repo, str(norm["number"]), norm):
+            stored += 1
+    return stored
 
 
 def _guard_rate_limit(client: Any) -> None:
@@ -294,7 +384,16 @@ def run_ingest(
     max_prs: Optional[int] = None,
     max_issues: Optional[int] = None,
     refresh: bool = False,
+    fast_clone: bool = False,
+    on_progress: Optional[Callable[[str, int, int, str], None]] = None,
 ) -> IngestSummary:
+    def _emit(stage: str, current: int, total: int, message: str) -> None:
+        if on_progress is not None:
+            try:
+                on_progress(stage, current, total, message)
+            except Exception:  # noqa: BLE001
+                pass
+
     owner, name = parse_slug(repo)
     effective_prs = max_prs if max_prs is not None else settings.max_ingestion_prs
     effective_issues = max_issues if max_issues is not None else settings.max_ingestion_issues
@@ -306,13 +405,28 @@ def run_ingest(
     )
     cache.start_run(summary.run_id, repo)
 
-    clone = clone_repository(repo, clone_root, size_limit_mb=settings.max_repo_size_mb)
+    _emit("cloning", 10, 100, f"Checking and cloning {owner}/{name}...")
+    dest_clone = clone_root / f"{owner}__{name}"
+    preflight: dict[str, Any] = {"exists": True, "size_hint_mb": None, "has_discussions": False, "default_branch": None}
+    if not dest_clone.exists():
+        preflight = preflight_repository(client, owner, name)
+    clone = clone_repository(
+        repo,
+        clone_root,
+        size_limit_mb=settings.max_repo_size_mb,
+        size_hint_mb=preflight.get("size_hint_mb"),
+        fast_clone=fast_clone,
+    )
     branch = default_branch(clone)
     summary.notes.append(f"clone branch {branch}")
 
+    _emit("commits", 25, 100, f"Collecting git history across {len(targets.all_files())} target files...")
     target_commits, target_prs, all_numbers = collect_target_commits(clone, branch, targets, cache, repo)
     summary.commits = len(target_commits)
-    summary.commit_files = cache.count_commit_files()
+    try:
+        summary.commit_files = cache.count_commit_files(repo)
+    except TypeError:
+        summary.commit_files = cache.count_commit_files()
     logger.info("collected %d commits across %d target files", len(target_commits), len(targets.all_files()))
 
     history = read_history(clone, branch)
@@ -323,7 +437,62 @@ def run_ingest(
     summary.documents = len(documents)
     summary.documents_truncated = sum(1 for document in documents if document.truncated)
 
+    # Stage 3B: Persist config_keys & config_value_changes from target files
     try:
+        from app.services.config_keys import (
+            build_config_value_history,
+            extract_config_keys_from_source,
+        )
+
+        all_cfg_keys = []
+        for rel_path in targets.all_files():
+            full_path = clone / rel_path
+            if not full_path.is_file():
+                continue
+            try:
+                src_text = full_path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            all_cfg_keys.extend(extract_config_keys_from_source(src_text, rel_path, repo))
+
+        if all_cfg_keys:
+            cache.put_config_keys([k.as_dict() for k in all_cfg_keys])
+            commit_meta_by_sha = {
+                c["sha"]: c for c in cache.iter_commits(repo) if c.get("sha")
+            }
+            cf_by_path: dict[str, list[dict[str, Any]]] = {}
+            for cf in cache.iter_commit_files(repo):
+                p = cf.get("path")
+                if not p:
+                    continue
+                sha = cf.get("sha") or ""
+                meta = commit_meta_by_sha.get(sha, {})
+                cf_by_path.setdefault(p, []).append({
+                    "sha": sha,
+                    "diff": cf.get("diff") or "",
+                    "authored_at": meta.get("authored_at"),
+                    "author_name": meta.get("author_name"),
+                })
+
+            all_changes = []
+            for key_ent in all_cfg_keys:
+                file_cfs = cf_by_path.get(key_ent.file_path, [])
+                if file_cfs:
+                    all_changes.extend(
+                        build_config_value_history(
+                            repo=repo,
+                            key_name=key_ent.name,
+                            file_path=key_ent.file_path,
+                            commit_files=file_cfs,
+                        )
+                    )
+            if all_changes:
+                cache.put_config_value_changes([c.as_dict() for c in all_changes])
+    except Exception as exc:  # noqa: BLE001 - config key persistence should never abort ingest
+        logger.debug("Config key extraction skipped for %s: %s", repo, exc)
+
+    try:
+        _emit("pull_requests", 45, 100, "Fetching target and recent pull requests from GitHub...")
         targets_outcome = fetch_references(
             client, owner, name, sorted(all_numbers), cache, repo, summary.run_id, refresh=refresh
         )
@@ -348,6 +517,7 @@ def run_ingest(
         summary.pull_requests_fetched += recency_outcome.fetched_pull_requests
         summary.issues_fetched += recency_outcome.fetched_issues
 
+        _emit("issues", 60, 100, "Fetching linked issues and discussions...")
         recent_issues = issue_numbers_from_cache(cache, repo, sorted(all_numbers) + recent_numbers)
         # A pull request body can name another pull request, and that number is a
         # pull request, not an issue. Drop any number already stored as a PR so it
@@ -370,6 +540,9 @@ def run_ingest(
         summary.graphql_cost += issue_outcome.cost
         summary.pull_requests_fetched += issue_outcome.fetched_pull_requests
         summary.issues_fetched += issue_outcome.fetched_issues
+
+        if preflight.get("has_discussions"):
+            fetch_discussions(client, owner, name, cache, repo, limit=20)
     except IngestionStopped as stopped:
         summary.status = "stopped_rate_limit"
         summary.notes.append(str(stopped))

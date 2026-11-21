@@ -18,6 +18,62 @@ def chunked(values: Sequence[int], size: int = BATCH_LIMIT) -> Iterable[Sequence
         yield values[start : start + size]
 
 
+def build_preflight_query() -> str:
+    """Lightweight GraphQL check for repository existence, default branch, size, and Discussions."""
+    return (
+        "query CodeWhyPreflight($owner: String!, $name: String!) {\n"
+        "  rateLimit { cost remaining resetAt }\n"
+        "  repository(owner: $owner, name: $name) {\n"
+        "    nameWithOwner\n"
+        "    diskUsage\n"
+        "    hasDiscussionsEnabled\n"
+        "    defaultBranchRef { name }\n"
+        "  }\n"
+        "}\n"
+    )
+
+
+def build_discussions_query(first: int = 20, after: Optional[str] = None) -> str:
+    """Fetch GitHub Discussions (ADRs, RFCs, architectural Q&A)."""
+    return (
+        "query CodeWhyDiscussions($owner: String!, $name: String!, $first: Int!, $after: String) {\n"
+        "  rateLimit { cost remaining resetAt }\n"
+        "  repository(owner: $owner, name: $name) {\n"
+        "    discussions(first: $first, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {\n"
+        "      pageInfo { hasNextPage endCursor }\n"
+        "      nodes {\n"
+        "        number title body url createdAt\n"
+        "        author { login }\n"
+        "        category { name }\n"
+        "        comments(first: 20) { nodes { author { login } body createdAt } }\n"
+        "      }\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+    )
+
+
+def normalise_discussion(node: dict[str, Any]) -> dict[str, Any]:
+    comments = node.get("comments") or {}
+    return {
+        "number": node.get("number"),
+        "title": node.get("title"),
+        "body": node.get("body"),
+        "url": node.get("url"),
+        "createdAt": node.get("createdAt"),
+        "author": (node.get("author") or {}).get("login"),
+        "category": (node.get("category") or {}).get("name"),
+        "comments": [
+            {
+                "author": (comment.get("author") or {}).get("login"),
+                "body": comment.get("body"),
+                "createdAt": comment.get("createdAt"),
+            }
+            for comment in (comments.get("nodes") or [])
+        ],
+    }
+
+
 def build_recent_merged_query(first: int, after: Optional[str] = None) -> str:
     return (
         "query CodeWhyRecent($owner: String!, $name: String!, $first: Int!, $after: String) {\n"

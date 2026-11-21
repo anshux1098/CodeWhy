@@ -31,6 +31,9 @@ class RepositoryResponse(BaseModel):
     sources_analyzed: Optional[int] = Field(default=None, ge=0)
     prs_noise_skipped: Optional[int] = Field(default=None, ge=0)
     verified_decisions: Optional[int] = Field(default=None, ge=0)
+    candidate_decisions: Optional[int] = Field(default=None, ge=0)
+    unverified_blocked: Optional[int] = Field(default=None, ge=0)
+    rejected_quotes_count: Optional[int] = Field(default=None, ge=0)
     last_rebuilt_at: Optional[str] = None
     fixture: bool
 

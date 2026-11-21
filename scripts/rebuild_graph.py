@@ -216,7 +216,18 @@ def rebuild_graph(
         logger.warning("Cache file %s does not exist. Created empty graph schema.", cache_path)
         return {"nodes": 0, "relationships": 0, "excluded_placeholders": 0}
 
-    cache = SqliteCache(cache_path)
+    with SqliteCache(cache_path) as cache:
+        return _rebuild_graph_with_cache(repo, cache, store, cfg=cfg, t0=t0)
+
+
+def _rebuild_graph_with_cache(
+    repo: str,
+    cache: SqliteCache,
+    store: BaseGraphStore,
+    *,
+    cfg: Optional[Settings] = None,
+    t0: float = 0.0,
+) -> dict[str, int]:
     # The caller's settings rather than the module-level one. `settings` is built
     # from `.env`, so relying on it here would make a test inherit whatever the
     # developer has configured, and make a run download model weights even when it
@@ -251,12 +262,25 @@ def rebuild_graph(
     # `app/services/coverage.py` for the touched/analyzed/noise-skipped definitions.
     coverage = compute_coverage(cache, repo)
 
+    # Track every node id merged during this rebuild locally so endpoint
+    # validation and stub creation require ZERO remote get_node() round-trips.
+    known_node_ids: set[str] = set()
+    node_batches: dict[str, dict[str, dict[str, Any]]] = {}
+    rel_batches: dict[str, list[dict[str, Any]]] = {}
+
+    def _queue_node(label: str, props: dict[str, Any]) -> None:
+        nid = str(props.get("id") or props.get("login") or "")
+        if not nid:
+            return
+        known_node_ids.add(nid)
+        node_batches.setdefault(label, {})[nid] = props
+
     # 1. Repository node. Its id is the slug the API addresses it by; every other
     #    node carries the same slug as its `repo` property so a lookup matches.
     parts = repo.split("/")
     owner = parts[0] if len(parts) > 1 else ""
     name = parts[1] if len(parts) > 1 else parts[0]
-    store.merge_node("Repository", {
+    _queue_node("Repository", {
         "id": slug,
         "repo": slug,
         "name": name,
@@ -270,14 +294,34 @@ def rebuild_graph(
         **repository_counts(cache, repo, coverage),
     })
 
-    # 2. Source nodes. The links table names commits, pull requests, issues and
-    #    documents as endpoints, so each has to exist as a node or the edge is
-    #    dropped silently by MATCH. Text is stored on the text-bearing ones so a
-    #    quote can be re-verified at answer time from the node alone.
-    #    The merge date is captured here so a decision can be dated by when its pull
-    #    request merged, rather than by when the row happened to be extracted.
+    def _queue_rel(
+        rel_type: str,
+        from_id: str,
+        to_id: str,
+        properties: Optional[dict[str, Any]] = None,
+    ) -> None:
+        rel_batches.setdefault(rel_type, []).append({
+            "from_id": from_id,
+            "to_id": to_id,
+            "props": properties or {},
+        })
+
+    # 2. Source nodes & Person authorship/review edges.
     merged_at_by_source: dict[str, str] = {}
     author_by_source: dict[str, str] = {}
+    person_logins: set[str] = set()
+
+    def _ensure_person(login: str) -> Optional[str]:
+        clean = (login or "").strip()
+        if not clean or "@" in clean or clean.endswith("[bot]"):
+            return None
+        pid = f"person:{clean}"
+        if clean not in person_logins:
+            person_logins.add(clean)
+            _queue_node("Person", {"id": pid, "login": clean, "repo": slug})
+        return pid
+
+    pr_count = 0
     for row in cache.fetch_raw_objects(repo, limit=10_000_000):
         label = source_label_for(row["id"])
         if label is None:
@@ -302,39 +346,59 @@ def rebuild_graph(
         author = _author_login(payload.get("author"))
         if author:
             author_by_source[str(row["id"])] = author
+            pid = _ensure_person(author)
+            if pid and label in ("PullRequest", "Issue", "Discussion"):
+                _queue_rel("AUTHORED", pid, str(row["id"]))
         if label == "PullRequest":
+            pr_count += 1
             merged = payload.get("mergedAt") or payload.get("merged_at")
             if merged:
                 merged_at_by_source[str(row["id"])] = str(merged)
             properties["author"] = author or ""
-        store.merge_node(label, properties)
+            for rev in payload.get("reviews") or []:
+                if isinstance(rev, dict):
+                    rev_login = _author_login(rev.get("author"))
+                    rpid = _ensure_person(rev_login)
+                    if rpid and rev_login != author:
+                        _queue_rel("REVIEWED", rpid, str(row["id"]), {"state": rev.get("state") or ""})
+        _queue_node(label, properties)
 
+    commit_count = 0
     for commit in cache.iter_commits(repo):
         sha = commit.get("sha") or ""
         if not sha:
             continue
-        store.merge_node("Commit", {
-            "id": f"commit:{sha}",
+        commit_count += 1
+        cid = f"commit:{sha}"
+        _queue_node("Commit", {
+            "id": cid,
             "repo": slug,
             "sha": sha,
             "subject": commit.get("subject") or "",
             "message": (commit.get("message") or "")[:2000],
             "url": f"https://github.com/{repo}/commit/{sha}",
-            "created_at": "",
+            "created_at": commit.get("authored_at") or "",
         })
+        c_author = (commit.get("author_name") or "").strip()
+        if c_author and " " not in c_author:
+            cpid = _ensure_person(c_author)
+            if cpid:
+                _queue_rel("AUTHORED", cpid, cid)
 
-    # 3. Code entities: configuration keys, files and their modules. A file node uses
-    #    the same `file:<repo>:<path>` id the containment links name, so the same
-    #    artefact is one node rather than one per referencing feature.
+    # 3. Code entities: configuration keys, files and their modules.
+    entity_ids_seen: set[str] = set()
     for c in cache.config_keys_for(repo):
-        store.merge_node("CodeEntity", {
+        entity_ids_seen.add(c["id"])
+        cfg_cov = entity_counts(coverage, c["file_path"])
+        _queue_node("CodeEntity", {
             "id": c["id"],
             "repo": slug,
             "name": c["name"],
             "path": c["file_path"],
             "entity_type": "ConfigKey",
             "created_at": c["created_at"],
-            **entity_counts(coverage, c["file_path"]),
+            "decision_count": cfg_cov.get("verified_decisions", 0),
+            **cfg_cov,
         })
 
     decisions = [dict(d) for d in cache.decisions_for_repo(repo)]
@@ -361,28 +425,36 @@ def rebuild_graph(
 
     module_names: set[str] = set()
     for path in sorted(file_paths):
-        store.merge_node("CodeEntity", {
-            "id": f"file:{repo}:{path}",
+        fid = f"file:{repo}:{path}"
+        entity_ids_seen.add(fid)
+        f_cov = entity_counts(coverage, path)
+        _queue_node("CodeEntity", {
+            "id": fid,
             "repo": slug,
             "name": path,
             "path": path,
             "entity_type": "File",
             "created_at": "",
-            **entity_counts(coverage, path),
+            "decision_count": f_cov.get("verified_decisions", 0),
+            **f_cov,
         })
         module = get_module_for_path(path)
         if module:
             module_names.add(module)
     ordered_paths = sorted(file_paths)
     for module in sorted(module_names):
-        store.merge_node("CodeEntity", {
-            "id": f"module:{repo}:{module}",
+        mid = f"module:{repo}:{module}"
+        entity_ids_seen.add(mid)
+        m_cov = module_counts(coverage, module, ordered_paths)
+        _queue_node("CodeEntity", {
+            "id": mid,
             "repo": slug,
             "name": module,
             "path": module,
             "entity_type": "Module",
             "created_at": "",
-            **module_counts(coverage, module, ordered_paths),
+            "decision_count": m_cov.get("verified_decisions", 0),
+            **m_cov,
         })
 
     # 4. Links & Supersession Analysis (Phase 4)
@@ -393,20 +465,28 @@ def rebuild_graph(
     super_edges = compute_supersession_edges(verified, links=link_rows)
     state_analysis = compute_decision_states(verified, edges=super_edges)
 
-    # Decisions & Evidence. Only a decision with a verified quote is graphed: a
-    # placeholder says something changed but carries no checkable citation.
+    # 6C: Batch-embed full decision text (entities + summary + rationale)
     logger.info("Loading %d verified decisions into graph...", len(verified))
+    embed_inputs = []
+    parsed_entities_by_dec: list[list[str]] = []
     for d in verified:
+        ents = json.loads(d["affected_entities"] or "[]")
+        parsed_entities_by_dec.append(ents)
+        ents_str = " ".join(str(e) for e in ents)
+        embed_inputs.append(f"{ents_str} {d['summary']} {d.get('rationale') or ''}".strip())
+    embeddings = embedder.embed_batch(embed_inputs) if embed_inputs else []
+
+    for idx, d in enumerate(verified):
         dec_id = d["id"]
         source_id = d["source_id"]
-        embedding = embedder.embed_text(d["summary"])
+        embedding = embeddings[idx]
         st_res = state_analysis.states.get(dec_id)
         computed_state = st_res.state.value if st_res else d["state"]
         supersedes_list = st_res.supersedes if st_res else []
         superseded_by_list = st_res.superseded_by if st_res else []
         rule_val = st_res.rule if st_res else None
 
-        store.merge_node("Decision", {
+        _queue_node("Decision", {
             "id": dec_id,
             "repo": slug,
             "summary": d["summary"],
@@ -416,18 +496,12 @@ def rebuild_graph(
             "supersedes": supersedes_list,
             "superseded_by": superseded_by_list,
             "rule": rule_val,
-            # The contract names no meaning for either date, and the decision took
-            # effect when its pull request merged. `recorded_at` stays null rather
-            # than borrowing `created_at`, which is when the row was extracted.
             "recorded_at": None,
             "effective_at": merged_at_by_source.get(source_id),
             "ended_at": None,
             "evaluated_at": d["created_at"],
-            # The person who proposed the change, taken from the cached pull request.
-            # No Person node or AUTHORED edge is made; the login is a plain property.
             "author": author_by_source.get(source_id) or "",
             "quote_verified": bool(d["quote_verified"]),
-            # Provenance, so a citation can be built without re-deriving it.
             "source_id": source_id,
             "source_type": source_type_name(source_id),
             "source_number": source_number(source_id),
@@ -435,31 +509,33 @@ def rebuild_graph(
             "embedding": embedding,
         })
 
-        # A decision whose source row is gone from the cache would otherwise point at
-        # a node that does not exist and lose its edge to MATCH.
-        if store.get_node(source_id) is None:
+        if source_id not in known_node_ids:
             label = source_label_for(source_id) or "Document"
-            store.merge_node(label, {
+            _queue_node(label, {
                 "id": source_id, "repo": slug, "url": source_url(source_id, repo),
                 "number": source_number(source_id), "created_at": "",
             })
-        store.merge_relationship("DECIDED_IN", dec_id, source_id)
+        _queue_rel("DECIDED_IN", dec_id, source_id)
 
-        for ent_name in json.loads(d["affected_entities"] or "[]"):
+        for ent_name in parsed_entities_by_dec[idx]:
             ent_id = entity_id_for(ent_name, repo)
-            store.merge_node("CodeEntity", {
-                "id": ent_id,
-                "repo": slug,
-                "name": ent_name,
-                "path": ent_name,
-                "entity_type": "File" if "/" in ent_name else "ConfigKey",
-                "created_at": d["created_at"],
-                **entity_counts(coverage, ent_name),
-            })
-            store.merge_relationship("GOVERNS", dec_id, ent_id)
+            if ent_id not in known_node_ids:
+                entity_ids_seen.add(ent_id)
+                e_cov = entity_counts(coverage, ent_name)
+                _queue_node("CodeEntity", {
+                    "id": ent_id,
+                    "repo": slug,
+                    "name": ent_name,
+                    "path": ent_name,
+                    "entity_type": "File" if "/" in ent_name else "ConfigKey",
+                    "created_at": d["created_at"],
+                    "decision_count": e_cov.get("verified_decisions", 0),
+                    **e_cov,
+                })
+            _queue_rel("GOVERNS", dec_id, ent_id)
 
         for ev in cache.evidence_for_decision(dec_id):
-            store.merge_node("Evidence", {
+            _queue_node("Evidence", {
                 "id": ev["id"],
                 "repo": slug,
                 "decision_id": dec_id,
@@ -467,9 +543,6 @@ def rebuild_graph(
                 "source_type": ev["source_type"],
                 "source_url": ev["source_url"],
                 "quote": ev["quote"],
-                # The cache leaves the evidence author empty for these quotes, but the
-                # pull request it came from names its author, so fall back to that
-                # rather than citing the quote with no one behind it.
                 "author": ev["author"] or author_by_source.get(ev["source_id"]) or "",
                 "timestamp": ev["timestamp"],
                 "classification": ev["classification"],
@@ -477,46 +550,65 @@ def rebuild_graph(
                 "quote_verified": bool(ev["quote_verified"]),
                 "created_at": ev["created_at"],
             })
-            store.merge_relationship("SUPPORTED_BY", dec_id, ev["id"])
+            _queue_rel("SUPPORTED_BY", dec_id, ev["id"])
 
-    # 5. Links table (REVERTS, SUPERSEDES, PART_OF, REFERENCES, CONTAINS)
+    # 6D: Update Repository node with exact pre-stored counts
+    repo_props = node_batches.get("Repository", {}).get(slug)
+    if repo_props is not None:
+        repo_props["decisions_count"] = len(verified)
+        repo_props["entities_count"] = len(entity_ids_seen)
+        repo_props["pull_requests_count"] = pr_count
+        repo_props["commits_count"] = commit_count
+
+    # 5. Links table (REVERTS, SUPERSEDES, PART_OF, REFERENCES, CONTAINS, IMPORTS, TRIGGERED_BY)
     logger.info("Loading %d links into graph...", len(link_rows))
-
-    # A commit can name a pull request that was never ingested, so the edge would
-    # point at a node that does not exist and be dropped by MATCH. A source endpoint
-    # is materialised as a node from the id alone; a file or module endpoint is not,
-    # because those must come from the file history and a missing one is a real fault.
+    dangling_grouped: dict[str, list[str]] = {}
     for link in link_rows:
         for endpoint in (graph_id(link["source_id"], repo), graph_id(link["target_id"], repo)):
-            if store.get_node(endpoint) is None:
-                _materialise_source_stub(store, endpoint, repo, slug)
+            if endpoint not in known_node_ids:
+                lbl = source_label_for(endpoint)
+                if lbl is not None:
+                    stub_props: dict[str, Any] = {
+                        "id": endpoint,
+                        "repo": slug,
+                        "number": source_number(endpoint),
+                        "url": source_url(endpoint, repo),
+                        "created_at": "",
+                    }
+                    if lbl in TEXT_BEARING_LABELS:
+                        stub_props["text"] = ""
+                    _queue_node(lbl, stub_props)
+                else:
+                    bucket = dangling_grouped.setdefault(link["rel_type"], [])
+                    if endpoint not in bucket:
+                        bucket.append(endpoint)
 
-    dangling = missing_endpoints(store, link_rows, repo)
-    if dangling:
+    if dangling_grouped:
+        dangling = sorted(dangling_grouped.items())
         raise RebuildGraphError(
             f"{sum(len(ids) for _rel, ids in dangling)} link endpoints are not in the graph; "
             "the build would silently drop those edges. "
             f"examples: {[(rel, ids[:3]) for rel, ids in dangling[:3]]}"
         )
+
     for link in link_rows:
-        store.merge_relationship(
-            rel_type=link["rel_type"],
-            from_id=graph_id(link["source_id"], repo),
-            to_id=graph_id(link["target_id"], repo),
-            properties={
+        _queue_rel(
+            link["rel_type"],
+            graph_id(link["source_id"], repo),
+            graph_id(link["target_id"], repo),
+            {
                 "confidence": link["confidence"],
                 "derivation": link["derivation_method"],
             },
         )
 
-    # Merge decision-to-decision SUPERSEDES edges computed by Phase 4
     for s_edge in super_edges:
-        if store.get_node(s_edge.source_decision_id) and store.get_node(s_edge.target_decision_id):
-            store.merge_relationship(
-                rel_type="SUPERSEDES",
-                from_id=s_edge.source_decision_id,
-                to_id=s_edge.target_decision_id,
-                properties={
+        if s_edge.source_decision_id in known_node_ids and s_edge.target_decision_id in known_node_ids:
+            _queue_rel(
+                "SUPERSEDES",
+                s_edge.source_decision_id,
+                s_edge.target_decision_id,
+                {
                     "rule": s_edge.rule,
                     "method": s_edge.method,
                     "confidence": s_edge.confidence,
@@ -525,6 +617,12 @@ def rebuild_graph(
                     "evaluated_at": s_edge.evaluated_at,
                 },
             )
+
+    # Flush all node batches first, then all relationship batches (via Cypher UNWIND on Neo4j)
+    for lbl, rows_map in node_batches.items():
+        store.merge_nodes_batch(lbl, list(rows_map.values()))
+    for rtype, rel_rows in rel_batches.items():
+        store.merge_relationships_batch(rtype, rel_rows)
 
     # Measured, not accumulated.
     counts = graph_state(store, excluded_placeholders=excluded_placeholders)

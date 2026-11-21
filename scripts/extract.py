@@ -44,6 +44,91 @@ TARGET_FILES: tuple[str, ...] = (
 REPO_SLUG = "urllib3__urllib3"
 
 
+def extract_author_and_date(raw_payload: dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
+    """Extract (author_login, decision_date) from normalised or raw GitHub payloads."""
+    raw_author = raw_payload.get("author")
+    if isinstance(raw_author, dict):
+        author = raw_author.get("login") or raw_author.get("username")
+    elif isinstance(raw_author, str):
+        author = raw_author.strip() or None
+    else:
+        author = None
+
+    date_val = (
+        raw_payload.get("mergedAt")
+        or raw_payload.get("closedAt")
+        or raw_payload.get("createdAt")
+        or raw_payload.get("created_at")
+    )
+    decision_date = str(date_val).strip() if date_val else None
+    return author, decision_date
+
+
+def extract_comments_from_payload(raw_payload: dict[str, Any]) -> list[dict[str, str]]:
+    """Collect PR reviews, review thread comments, and issue/PR comments for extraction."""
+    collected: list[dict[str, str]] = []
+    seen_bodies: set[str] = set()
+
+    def _add(author_val: Any, body_val: Any, ts_val: Any) -> None:
+        body = str(body_val or "").strip()
+        if not body or body in seen_bodies:
+            return
+        seen_bodies.add(body)
+        if isinstance(author_val, dict):
+            author_str = str(author_val.get("login") or "")
+        else:
+            author_str = str(author_val or "")
+        collected.append({
+            "author": author_str,
+            "body": body,
+            "createdAt": str(ts_val or ""),
+        })
+
+    for rev in raw_payload.get("reviews") or []:
+        if isinstance(rev, dict):
+            _add(rev.get("author"), rev.get("body"), rev.get("submittedAt"))
+    for tc in raw_payload.get("review_thread_comments") or []:
+        if isinstance(tc, dict):
+            _add(tc.get("author"), tc.get("body"), tc.get("createdAt"))
+    for c in raw_payload.get("comments") or []:
+        if isinstance(c, dict):
+            _add(c.get("author"), c.get("body"), c.get("createdAt"))
+    return collected
+
+
+def backfill_decision_metadata(cache: SqliteCache, repo: str) -> tuple[int, int]:
+    """Backfill null source_author and decision_date on stored decisions from cached raw payloads."""
+    payloads = {
+        row["id"]: row["payload"]
+        for row in cache.fetch_raw_objects(repo, limit=10_000_000)
+    }
+    decisions = cache.decisions_for_repo(repo)
+    updated = 0
+    with cache.transaction() as conn:
+        for dec in decisions:
+            if dec["source_author"] and dec["decision_date"]:
+                continue
+            raw_str = payloads.get(dec["source_id"])
+            if not raw_str:
+                continue
+            try:
+                payload = json.loads(raw_str)
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(payload, dict):
+                continue
+            author, dec_date = extract_author_and_date(payload)
+            new_author = dec["source_author"] or author
+            new_date = dec["decision_date"] or dec_date
+            if new_author != dec["source_author"] or new_date != dec["decision_date"]:
+                conn.execute(
+                    "UPDATE decisions SET source_author = ?, decision_date = ? WHERE id = ?",
+                    (new_author, new_date, dec["id"]),
+                )
+                updated += 1
+    return updated, len(decisions)
+
+
 def _pull_request_number(source_id: str) -> Optional[int]:
     """The number in `pr:owner/name#123`, or None for any other kind of source."""
     if not source_id.startswith("pr:") or "#" not in source_id:
@@ -396,6 +481,18 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             "exit. No model is called and nothing else is changed."
         ),
     )
+    parser.add_argument(
+        "--backfill-metadata",
+        dest="backfill_metadata",
+        action="store_true",
+        help="Backfill null source_author and decision_date from cached payloads and exit.",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=5,
+        help="Maximum concurrent LLM extraction workers (default: 5).",
+    )
     return parser.parse_args(argv)
 
 
@@ -497,6 +594,12 @@ def main(argv: Optional[list[str]] = None) -> int:
             changed, total = rederive_affected_entities(cache, args.repo, args.targets)
             logger.info(
                 "Re-derived affected entities: %d of %d decisions changed", changed, total
+            )
+            return 0
+        if getattr(args, "backfill_metadata", False):
+            updated, total = backfill_decision_metadata(cache, args.repo)
+            logger.info(
+                "Backfilled decision metadata: %d of %d decisions updated", updated, total
             )
             return 0
         return run_extraction(args, cache)
@@ -609,89 +712,114 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
         decisions: int = 0,
         finish_reason: str = "",
         detail: str = "",
+        meta: Optional[dict[str, Any]] = None,
     ) -> None:
-        """Write one row per source per run, whatever the outcome.
-
-        Without this, a source that answered correctly with no decisions left no
-        trace at all: its failure row was cleared and no decision row existed, so it
-        looked untried and was neither retried nor skipped.
-        """
-        meta = last_call_metadata() if status != "failed" else {}
+        """Write one row per source per run, whatever the outcome."""
+        call_meta = (meta if meta is not None else last_call_metadata()) if status != "failed" else {}
         cache.record_extraction_source(
             repo=args.repo,
             source_id=source_id,
             extraction_version=EXTRACTION_VERSION,
             status=status,
             run_id=args.run_id,
-            model=str(meta.get("model") or settings.llm_model),
-            response_format_mode=str(meta.get("response_format_mode") or ""),
-            finish_reason=finish_reason or str(meta.get("finish_reason") or ""),
+            model=str(call_meta.get("model") or settings.llm_model),
+            response_format_mode=str(call_meta.get("response_format_mode") or ""),
+            finish_reason=finish_reason or str(call_meta.get("finish_reason") or ""),
             decisions=decisions,
-            tokens=int(meta.get("tokens") or 0) or (budget.total_tokens - tokens_before),
+            tokens=int(call_meta.get("tokens") or 0) or (budget.total_tokens - tokens_before),
             detail=detail,
         )
 
-    for position, row in enumerate(pending, start=1):
+    def _prepare_item(row: dict[str, Any]) -> dict[str, Any]:
         source_id = row["id"]
         raw_payload = json.loads(row["payload"])
         source_type = row["kind"]
         source_url = source_url_for(source_id, args.repo, raw_payload)
         title = raw_payload.get("title", "")
         body = raw_payload.get("body", "")
-        author = raw_payload.get("author", {}).get("login") if isinstance(raw_payload.get("author"), dict) else None
-        created_at = raw_payload.get("createdAt") or raw_payload.get("created_at")
+        author, created_at = extract_author_and_date(raw_payload)
+        comments = extract_comments_from_payload(raw_payload)
         changed_files = changed_files_from_payload(raw_payload)
+        return {
+            "source_id": source_id,
+            "source_type": source_type,
+            "source_url": source_url,
+            "title": title,
+            "body": body,
+            "author": author,
+            "created_at": created_at,
+            "comments": comments,
+            "changed_files": changed_files,
+        }
 
-        if args.dry_run:
-            logger.info("[DRY-RUN] %d/%d %s (%s) %s", position, len(pending), source_id, title[:50], source_url)
-            continue
-
+    def _run_one(item: dict[str, Any]):
         tokens_before = budget.total_tokens
-        logger.info("%d/%d extracting %s", position, len(pending), source_id)
-
         try:
             records = extract_decisions_from_source(
                 provider=provider,
-                source_id=source_id,
-                source_type=source_type,
-                source_url=source_url,
+                source_id=item["source_id"],
+                source_type=item["source_type"],
+                source_url=item["source_url"],
                 repo=args.repo,
-                title=title,
-                body=body,
-                author=author,
-                created_at=created_at,
-                changed_files=changed_files,
+                title=item["title"],
+                body=item["body"],
+                author=item["author"],
+                created_at=item["created_at"],
+                comments=item["comments"],
+                changed_files=item["changed_files"],
                 extraction_version=EXTRACTION_VERSION,
             )
-        except TokenBudgetExhaustedError:
-            # The budget is a deliberate stop, not a failure of this source.
-            logger.warning(
-                "Token budget exhausted (used=%d/%d). Halting extraction as PARTIAL.",
-                budget.total_tokens,
-                budget.max_tokens,
-            )
-            break
-        except ExtractionSchemaRejected as rejected:
-            # A reply that is valid JSON but not the agreed shape. Recorded rather
-            # than dropped: silently returning nothing here is what made a good
-            # extraction disappear from the real run.
-            schema_rejected_count += 1
-            logger.warning(
-                "Source %s schema_rejected: %s; keys received: %s",
-                source_id, rejected.reason, ", ".join(rejected.received_keys) or "(none)",
-            )
-            cache.record_extraction_failure(
-                source_id=source_id,
-                repo=args.repo,
-                extraction_version=EXTRACTION_VERSION,
-                final_status="schema_rejected",
-                error=str(rejected),
-            )
-            record_source_outcome(source_id, "schema_rejected", tokens_before)
-            continue
-        except Exception as exc:  # noqa: BLE001 - one bad source must not end the run
-            # Recorded so a rerun can retry exactly this source. The exception text
-            # may quote the credential, so it is scrubbed before it is stored.
+            return item, tokens_before, records, last_call_metadata(), last_rejected_quotes(), None
+        except Exception as exc:  # noqa: BLE001
+            return item, tokens_before, None, {}, [], exc
+
+    prepared = [_prepare_item(row) for row in pending]
+    if args.dry_run:
+        for position, item in enumerate(prepared, start=1):
+            logger.info("[DRY-RUN] %d/%d %s (%s) %s", position, len(prepared), item["source_id"], item["title"][:50], item["source_url"])
+        return 0
+
+    workers = max(1, int(getattr(args, "workers", 5) or 1))
+    use_pool = workers > 1 and len(prepared) > 1 and bool(getattr(provider, "is_real", True))
+    if use_pool:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=min(workers, len(prepared))) as pool:
+            results = list(pool.map(_run_one, prepared))
+    else:
+        results = []
+        for position, item in enumerate(prepared, start=1):
+            logger.info("%d/%d extracting %s", position, len(prepared), item["source_id"])
+            res = _run_one(item)
+            results.append(res)
+            if isinstance(res[5], TokenBudgetExhaustedError):
+                break
+
+    for position, (item, tokens_before, records, call_meta, rejected, exc) in enumerate(results, start=1):
+        source_id = item["source_id"]
+        source_url = item["source_url"]
+        if exc is not None:
+            if isinstance(exc, TokenBudgetExhaustedError):
+                logger.warning(
+                    "Token budget exhausted (used=%d/%d). Halting extraction as PARTIAL.",
+                    budget.total_tokens,
+                    budget.max_tokens,
+                )
+                break
+            if isinstance(exc, ExtractionSchemaRejected):
+                schema_rejected_count += 1
+                logger.warning(
+                    "Source %s schema_rejected: %s; keys received: %s",
+                    source_id, exc.reason, ", ".join(exc.received_keys) or "(none)",
+                )
+                cache.record_extraction_failure(
+                    source_id=source_id,
+                    repo=args.repo,
+                    extraction_version=EXTRACTION_VERSION,
+                    final_status="schema_rejected",
+                    error=str(exc),
+                )
+                record_source_outcome(source_id, "schema_rejected", tokens_before, meta=call_meta)
+                continue
             failed_count += 1
             logger.warning("Source %s failed: %s", source_id, type(exc).__name__)
             cache.record_extraction_failure(
@@ -704,6 +832,7 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
             record_source_outcome(
                 source_id, "failed", tokens_before,
                 finish_reason=getattr(exc, "finish_reason", ""),
+                meta=call_meta,
             )
             continue
 
@@ -717,6 +846,7 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
             "ok" if records else "no_decision",
             tokens_before,
             decisions=len(records),
+            meta=call_meta,
         )
 
         for dec in records:
@@ -774,7 +904,19 @@ def run_extraction(args: argparse.Namespace, cache: SqliteCache) -> int:
                         "verified": "yes" if ev.quote_verified else "no",
                     })
 
-        rejected_quote_count += persist_rejected_quotes(cache, args, source_id, source_url)
+        if rejected:
+            now = datetime.now(timezone.utc).isoformat()
+            rejected_quote_count += cache.put_rejected_quotes([
+                {
+                    "run_id": args.run_id,
+                    "repo": args.repo,
+                    "source_id": source_id,
+                    "source_url": source_url,
+                    "created_at": now,
+                    **entry,
+                }
+                for entry in rejected
+            ])
 
     # A dry run makes no change at all: the linking pass writes the `links` table and
     # must be stopped before it runs, not after.
@@ -889,6 +1031,32 @@ def build_links(cache: SqliteCache, repo: str, source_rows: list[Any]) -> int:
     file_paths = sorted({commit.get("path") for commit in cache.iter_commit_files(repo)
                          if commit.get("path")})
     collected.extend(linking.extract_containment_links(repo, file_paths))
+
+    # Stage 3C: Scan cached PR bodies for reverts, issue refs, Jira/Linear tickets, and incidents
+    for raw_obj in cache.fetch_raw_objects(repo, limit=10_000):
+        if raw_obj.get("kind") != "pr":
+            continue
+        try:
+            payload = json.loads(raw_obj.get("payload") or "{}")
+        except (TypeError, ValueError):
+            continue
+        pr_num = payload.get("number")
+        if isinstance(pr_num, int):
+            collected.extend(
+                linking.extract_pr_links(
+                    pr_number=pr_num,
+                    title=str(payload.get("title") or ""),
+                    body=str(payload.get("body") or ""),
+                    repo=repo,
+                )
+            )
+
+    # Stage 3C (C.1): AST Import Graph if local clone is present
+    if "/" in repo:
+        owner, name = repo.split("/", 1)
+        clone_dir = REPO_ROOT / "data" / "clones" / f"{owner}__{name}"
+        if clone_dir.is_dir():
+            collected.extend(linking.extract_import_links(repo, file_paths, clone_dir))
 
     rows = [record.as_row() for record in collected]
     return cache.put_links(rows) if rows else 0

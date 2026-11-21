@@ -66,6 +66,8 @@ ALLOWED_REL_TYPES: frozenset[str] = frozenset({
     "REAFFIRMS",
     "MOTIVATED_BY",
     "HAS_DISCUSSION",
+    "IMPORTS",
+    "TRIGGERED_BY",
 })
 
 
@@ -104,6 +106,31 @@ class BaseGraphStore(ABC):
     ) -> None:
         """Idempotently MERGE a relationship between two nodes."""
         ...
+
+    def merge_nodes_batch(
+        self,
+        label: str,
+        rows: Sequence[dict[str, Any]],
+        batch_size: int = 500,
+    ) -> None:
+        """Batch-merge nodes; subclasses override with UNWIND for bulk speed."""
+        for props in rows:
+            self.merge_node(label, props)
+
+    def merge_relationships_batch(
+        self,
+        rel_type: str,
+        rows: Sequence[dict[str, Any]],
+        batch_size: int = 500,
+    ) -> None:
+        """Batch-merge relationships (`{from_id, to_id, props?}`); subclasses override with UNWIND."""
+        for row in rows:
+            self.merge_relationship(
+                rel_type=rel_type,
+                from_id=row["from_id"],
+                to_id=row["to_id"],
+                properties=row.get("props"),
+            )
 
     @abstractmethod
     def get_entity(self, repo: str, identifier: str) -> Optional[dict[str, Any]]:
@@ -636,6 +663,53 @@ class Neo4jGraphStore(BaseGraphStore):
         props = properties or {}
         with self.driver.session(database=self.database) as session:
             session.run(query, from_id=from_id, to_id=to_id, props=props)
+
+    def merge_nodes_batch(
+        self,
+        label: str,
+        rows: Sequence[dict[str, Any]],
+        batch_size: int = 500,
+    ) -> None:
+        if not rows:
+            return
+        _require_allowed(label, ALLOWED_NODE_LABELS, "node label")
+        node_id_field = "login" if label == "Person" else "id"
+        query = (
+            f"UNWIND $batch AS row "
+            f"MERGE (n:{label} {{{node_id_field}: row.{node_id_field}}}) "
+            f"SET n += row"
+        )
+        items = list(rows)
+        with self.driver.session(database=self.database) as session:
+            for start in range(0, len(items), batch_size):
+                session.run(query, batch=items[start : start + batch_size])
+
+    def merge_relationships_batch(
+        self,
+        rel_type: str,
+        rows: Sequence[dict[str, Any]],
+        batch_size: int = 500,
+    ) -> None:
+        if not rows:
+            return
+        _require_allowed(rel_type, ALLOWED_REL_TYPES, "relationship type")
+        query = (
+            f"UNWIND $batch AS row "
+            f"MATCH (a {{id: row.from_id}}), (b {{id: row.to_id}}) "
+            f"MERGE (a)-[r:{rel_type}]->(b) "
+            f"SET r += coalesce(row.props, {{}})"
+        )
+        items = [
+            {
+                "from_id": str(r["from_id"]),
+                "to_id": str(r["to_id"]),
+                "props": r.get("props") or {},
+            }
+            for r in rows
+        ]
+        with self.driver.session(database=self.database) as session:
+            for start in range(0, len(items), batch_size):
+                session.run(query, batch=items[start : start + batch_size])
 
     def get_node(self, node_id: str) -> Optional[dict[str, Any]]:
         """Fetch any node by id across labels.

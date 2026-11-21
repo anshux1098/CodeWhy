@@ -500,3 +500,198 @@ def extract_containment_links(
             )
 
     return links
+
+
+_PR_REVERT_REF = re.compile(r"\breverts?\s+(?:[^\s#]*#)?(?P<num>\d{1,6})\b", re.IGNORECASE)
+
+
+def extract_pr_links(
+    pr_number: int,
+    title: str,
+    body: str,
+    repo: str,
+) -> list[LinkRecord]:
+    """Extract deterministic links from PR title & body (REVERTS, REFERENCES, Jira/Linear, Incident)."""
+    from app.services.ingest.connectors import detect_incident_from_source, extract_external_tickets
+
+    links: list[LinkRecord] = []
+    source_id = stable_id("pr", repo, str(pr_number))
+    combined = f"{title or ''}\n{body or ''}"
+    clean = strip_code(combined)
+
+    # 1. Explicit PR reverts (e.g. "Reverts #3456" or "Revert owner/repo#3456")
+    seen_reverts: set[int] = set()
+    for match in _PR_REVERT_REF.finditer(clean):
+        target_num = int(match.group("num"))
+        if target_num != pr_number and target_num not in seen_reverts:
+            seen_reverts.add(target_num)
+            target_id = stable_id("pr", repo, str(target_num))
+            links.append(
+                LinkRecord(
+                    id=make_link_id(source_id, "REVERTS", target_id),
+                    repo=repo,
+                    source_id=source_id,
+                    source_type=SourceType.PULL_REQUEST.value,
+                    rel_type="REVERTS",
+                    target_id=target_id,
+                    target_type=SourceType.PULL_REQUEST.value,
+                    is_direct=True,
+                    derivation_method="pr_revert_text",
+                    confidence=1.0,
+                    metadata={"target_pr": target_num},
+                )
+            )
+
+    # 2. Issue / PR references inside PR body
+    links.extend(
+        extract_issue_links(
+            source_id=source_id,
+            source_type=SourceType.PULL_REQUEST.value,
+            text=body or "",
+            repo=repo,
+        )
+    )
+
+    # 3. External Jira/Linear tickets (e.g. ENG-1420)
+    for ticket in extract_external_tickets(clean):
+        target_id = stable_id("issue", repo, ticket)
+        links.append(
+            LinkRecord(
+                id=make_link_id(source_id, "REFERENCES", target_id),
+                repo=repo,
+                source_id=source_id,
+                source_type=SourceType.PULL_REQUEST.value,
+                rel_type="REFERENCES",
+                target_id=target_id,
+                target_type=SourceType.ISSUE.value,
+                is_direct=True,
+                derivation_method="external_ticket",
+                confidence=0.9,
+                metadata={"ticket": ticket},
+            )
+        )
+
+    # 4. Incident postmortem / hotfix linkage (TRIGGERED_BY)
+    inc = detect_incident_from_source(
+        repo=repo,
+        source_id=source_id,
+        title=title or "",
+        body=body or "",
+    )
+    if inc is not None:
+        links.append(
+            LinkRecord(
+                id=make_link_id(source_id, "TRIGGERED_BY", inc.id),
+                repo=repo,
+                source_id=source_id,
+                source_type=SourceType.PULL_REQUEST.value,
+                rel_type="TRIGGERED_BY",
+                target_id=inc.id,
+                target_type="Incident",
+                is_direct=True,
+                derivation_method="incident_marker",
+                confidence=0.95,
+                metadata={"incident_key": inc.key, "severity": inc.severity},
+            )
+        )
+
+    return links
+
+
+def extract_import_links(
+    repo: str,
+    file_paths: Sequence[str],
+    clone_path: Path,
+) -> list[LinkRecord]:
+    """Parse Python AST imports across repository files to emit File -[IMPORTS]-> File links."""
+    import ast
+
+    if not clone_path.is_dir():
+        return []
+
+    py_files = [p for p in file_paths if p.endswith(".py")]
+    if not py_files:
+        return []
+
+    # Map dotted module paths (with and without leading src.) -> relative file path
+    module_to_file: dict[str, str] = {}
+    for rel in py_files:
+        norm = Path(rel).as_posix()
+        no_ext = norm[:-3]
+        if no_ext.endswith("/__init__"):
+            no_ext = no_ext[:-9]
+        dotted = no_ext.replace("/", ".")
+        module_to_file[dotted] = norm
+        if dotted.startswith("src."):
+            module_to_file[dotted[4:]] = norm
+
+    links: list[LinkRecord] = []
+    seen_pairs: set[tuple[str, str]] = set()
+
+    for rel in py_files:
+        full_path = clone_path / rel
+        if not full_path.is_file():
+            continue
+        try:
+            tree = ast.parse(full_path.read_text(encoding="utf-8", errors="replace"))
+        except SyntaxError:
+            continue
+
+        rel_posix = Path(rel).as_posix()
+        pkg_parts = rel_posix.split("/")[:-1]
+        if pkg_parts and pkg_parts[0] == "src":
+            pkg_parts = pkg_parts[1:]
+
+        imported_modules: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    imported_modules.add(alias.name)
+            elif isinstance(node, ast.ImportFrom):
+                mod = node.module or ""
+                if node.level > 0:
+                    up = max(0, len(pkg_parts) - (node.level - 1))
+                    base = ".".join(pkg_parts[:up])
+                    full_mod = f"{base}.{mod}".strip(".") if mod else base
+                    if full_mod:
+                        imported_modules.add(full_mod)
+                    for alias in node.names:
+                        cand = f"{full_mod}.{alias.name}".strip(".")
+                        imported_modules.add(cand)
+                elif mod:
+                    matched_submodule = False
+                    for alias in node.names:
+                        cand = f"{mod}.{alias.name}"
+                        if cand in module_to_file:
+                            imported_modules.add(cand)
+                            matched_submodule = True
+                    if not matched_submodule:
+                        imported_modules.add(mod)
+
+        src_id = f"file:{repo}:{rel_posix}"
+        for mod_name in sorted(imported_modules):
+            target_rel = module_to_file.get(mod_name)
+            if not target_rel or target_rel == rel_posix:
+                continue
+            pair = (rel_posix, target_rel)
+            if pair in seen_pairs:
+                continue
+            seen_pairs.add(pair)
+            tgt_id = f"file:{repo}:{target_rel}"
+            links.append(
+                LinkRecord(
+                    id=make_link_id(src_id, "IMPORTS", tgt_id),
+                    repo=repo,
+                    source_id=src_id,
+                    source_type=EntityType.FILE.value,
+                    rel_type="IMPORTS",
+                    target_id=tgt_id,
+                    target_type=EntityType.FILE.value,
+                    is_direct=True,
+                    derivation_method="python_ast_import",
+                    confidence=1.0,
+                    metadata={"module": mod_name},
+                )
+            )
+
+    return links

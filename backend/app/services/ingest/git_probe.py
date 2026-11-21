@@ -168,6 +168,33 @@ def clone_url(repo: str) -> str:
     return f"{GITHUB_CLONE_BASE}/{owner}/{name}"
 
 
+def normalize_repo_slug(repo: str) -> str:
+    """Normalize a GitHub URL or owner/name string into canonical `owner/name`."""
+    raw = str(repo).strip()
+    if raw.startswith(("https://github.com/", "http://github.com/")):
+        from urllib.parse import urlsplit
+        parsed = urlsplit(raw)
+        if parsed.hostname != "github.com":
+            raise InvalidRepositoryError(
+                f"{repo!r} is not on github.com; only GitHub repositories are supported"
+            )
+        raw = parsed.path
+    raw = raw.strip("/")
+    if raw.endswith(".git"):
+        raw = raw[:-4]
+    parts = raw.split("/")
+    if len(parts) < 2:
+        raise InvalidRepositoryError(
+            f"{repo!r} is not in owner/name form; only GitHub repositories are supported"
+        )
+    owner, name = parts[0], parts[1]
+    if not owner or not name or len(parts) > 2:
+        raise InvalidRepositoryError(
+            f"{repo!r} is not in owner/name form; only GitHub repositories are supported"
+        )
+    return f"{owner}/{name}"
+
+
 def parse_slug(repo: str) -> tuple[str, str]:
     parts = str(repo).strip().strip("/").split("/")
     if len(parts) != 2 or not all(parts):
@@ -196,6 +223,7 @@ def clone_repository(
     runner: CommandRunner = default_runner,
     size_limit_mb: Optional[int] = None,
     size_hint_mb: Optional[float] = None,
+    fast_clone: bool = False,
 ) -> Path:
     owner, name = parse_slug(repo)
     if size_limit_mb is not None and size_hint_mb is not None and size_hint_mb > size_limit_mb:
@@ -214,9 +242,13 @@ def clone_repository(
         "core.hooksPath=",
         "clone",
         "--no-recurse-submodules",
+    ]
+    if fast_clone:
+        command.append("--filter=blob:none")
+    command.extend([
         f"{GITHUB_CLONE_BASE}/{owner}/{name}",
         str(destination),
-    ]
+    ])
     result = runner(command, Path.cwd())
     if result.returncode != 0:
         raise GitProbeError(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -69,6 +70,8 @@ def backoff_seconds(attempt: int, rng: Callable[[], float]) -> float:
 
 
 class GitHubGraphQLClient:
+    supports_concurrency: bool = True
+
     def __init__(
         self,
         settings: Settings,
@@ -83,6 +86,7 @@ class GitHubGraphQLClient:
         self._sleep = sleep
         self._rng = rng
         self._rate_limit: Optional[RateLimitSnapshot] = None
+        self._lock = threading.Lock()
         self._client = httpx.Client(
             timeout=settings.github_timeout_s,
             follow_redirects=False,
@@ -118,7 +122,8 @@ class GitHubGraphQLClient:
                 continue
             snapshot = self._read_rate_limit(response)
             if snapshot is not None:
-                self._rate_limit = snapshot
+                with self._lock:
+                    self._rate_limit = snapshot
             if response.status_code in {401, 403} and not self._looks_rate_limited(response, snapshot):
                 raise GitHubAuthError(
                     self._redact(

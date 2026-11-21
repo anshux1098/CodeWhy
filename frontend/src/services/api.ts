@@ -325,11 +325,22 @@ export interface IngestJobStatus {
   result_repo_id: string | null;
 }
 
-export async function startIngest(repo: string, maxPrs = 100): Promise<IngestJobStatus> {
+export type IngestMode = 'quick' | 'deep';
+
+export async function startIngest(
+  repo: string,
+  options: { mode?: IngestMode; maxPrs?: number; files?: string[] } = {},
+): Promise<IngestJobStatus> {
+  const mode = options.mode ?? 'quick';
   const res = await fetch('/api/v1/repositories/ingest', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ repo, max_prs: maxPrs }),
+    body: JSON.stringify({
+      repo,
+      mode,
+      ...(options.maxPrs !== undefined ? { max_prs: options.maxPrs } : {}),
+      ...(options.files && options.files.length > 0 ? { files: options.files } : {}),
+    }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

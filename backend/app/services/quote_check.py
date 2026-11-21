@@ -283,6 +283,41 @@ class QuoteVerificationResult:
     failure_reason: Optional[str] = None
 
 
+def expand_ellipsis_quote(
+    quote: str,
+    source_text: str,
+    *,
+    max_gap: int = 300,
+    min_side: int = 20,
+) -> Optional[str]:
+    """Deterministically expand an abridged quote (`prefix ... suffix` or `prefix … suffix`)
+    into the exact contiguous substring of `source_text` when both sides are >= `min_side`
+    characters and appear in order within `max_gap` characters.
+    """
+    if not quote or not source_text:
+        return None
+    parts = re.split(r"\s*(?:\.\.\.|…)\s*", quote.strip())
+    if len(parts) != 2:
+        return None
+    prefix, suffix = parts[0].strip(), parts[1].strip()
+    if len(prefix) < min_side or len(suffix) < min_side:
+        return None
+
+    prefix_loc = _locate(prefix, source_text)
+    if prefix_loc is None:
+        return None
+    p_start, p_end = prefix_loc
+
+    suffix_loc = _locate(suffix, source_text[p_end:])
+    if suffix_loc is None:
+        return None
+    s_rel_start, s_rel_end = suffix_loc
+    if s_rel_start > max_gap:
+        return None
+
+    return source_text[p_start : p_end + s_rel_end].strip()
+
+
 def verify_quote(quote: str, source_text: str) -> QuoteVerificationResult:
     """Verifies that `quote` is a legitimate substring of `source_text`.
 
@@ -326,6 +361,11 @@ def verify_quote(quote: str, source_text: str) -> QuoteVerificationResult:
     md_norm_source = normalize_for_quote_check(source_text)
     if md_norm_quote in md_norm_source:
         return QuoteVerificationResult(is_verified=True, quote=clean_quote)
+
+    # 5. Deterministic ellipsis span expansion (`prefix ... suffix` -> exact source span)
+    expanded = expand_ellipsis_quote(clean_quote, source_text)
+    if expanded:
+        return QuoteVerificationResult(is_verified=True, quote=expanded)
 
     return QuoteVerificationResult(
         is_verified=False,

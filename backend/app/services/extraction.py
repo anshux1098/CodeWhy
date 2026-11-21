@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import re
-
 import hashlib
 import logging
+import re
+import threading
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Final, Literal, Optional, Sequence
@@ -20,31 +20,83 @@ from app.services.quote_check import (
     MAX_QUOTE_CHARS,
     complete_quote,
     deepest_rung_over_sources,
-    verify_quote_against_sources,
+    verify_quote,
 )
 
 logger = logging.getLogger(__name__)
 
 EXTRACTION_VERSION: Final[str] = "v1"
 
-#: A change that explains a decision lives in the library itself, so only a path
-#: under the package is kept as an affected entity.
-LIBRARY_SOURCE_PREFIX: Final[str] = "src/urllib3/"
+#: Universal non-library directories dropped from entity attribution so tests,
+#: docs, CI scripts, build tooling, and vendored third-party bundles never
+#: pollute a decision's GOVERNS edges.
+NON_LIBRARY_DIRS: frozenset[str] = frozenset({
+    "test", "tests", "testing", "__tests__", "spec",
+    "doc", "docs", "documentation",
+    "example", "examples", "sample", "samples",
+    "benchmark", "benchmarks",
+    "script", "scripts",
+    "dummyserver",
+    "packages", "vendor", "third_party", "node_modules", "dist", "build",
+    ".github", ".circleci", ".gitlab", "_travis",
+})
 
-#: Vendored third-party code is not urllib3's own decision, so it is dropped even
-#: though it sits under the package.
-VENDORED_SOURCE_PREFIX: Final[str] = "src/urllib3/packages/"
+NON_LIBRARY_SUFFIXES: frozenset[str] = frozenset({
+    ".pyi", ".md", ".rst", ".txt", ".adoc", ".markdown",
+    ".sh", ".bat", ".ps1", ".lock",
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".woff", ".woff2",
+})
+
+NON_LIBRARY_FILENAMES: frozenset[str] = frozenset({
+    "setup.py", "noxfile.py", "conftest.py", "tox.ini",
+    "pyproject.toml", "setup.cfg", "package-lock.json", "pnpm-lock.yaml", "yarn.lock",
+})
+
+
+def is_library_source_file(
+    path: str,
+    excluded_globs: Sequence[str] = (),
+) -> bool:
+    """Return True when a path is part of the repository's own source code (repo-agnostic)."""
+    clean = path.strip().replace("\\", "/").lstrip("./")
+    if not clean:
+        return False
+    parts = [p for p in clean.split("/") if p]
+    if not parts:
+        return False
+    # Root-level files (e.g. setup.py, noxfile.py, CHANGES.rst) are build/meta, not package source
+    if len(parts) == 1:
+        return False
+    filename = parts[-1]
+    if filename in NON_LIBRARY_FILENAMES:
+        return False
+    lower_name = filename.lower()
+    if any(lower_name.endswith(sfx) for sfx in NON_LIBRARY_SUFFIXES):
+        return False
+    if lower_name.startswith("test_") or lower_name.endswith("_test.py") or ".test." in lower_name or ".spec." in lower_name:
+        return False
+    dir_parts = {p.lower() for p in parts[:-1]}
+    if dir_parts & NON_LIBRARY_DIRS:
+        return False
+    if any(p.startswith((".", "_")) and p != "__init__.py" for p in parts[:-1]):
+        return False
+    if excluded_globs:
+        from fnmatch import fnmatch
+        if any(fnmatch(clean, pat) for pat in excluded_globs):
+            return False
+    return True
 
 
 def filter_affected_entities(
     changed_files: Sequence[str],
     config_keys: Sequence[str] = (),
+    *,
+    excluded_globs: Sequence[str] = (),
 ) -> list[str]:
     """The entities that explain a decision, narrowed to what actually matters.
 
-    A path is kept only when it is the library's own source: a test, a doc, a build
-    file or vendored code records no decision, and keeping them turned a one-file
-    change into a Governs edge to every file a large pull request happened to touch.
+    Works for any repository layout (`src/urllib3/`, `alembic/`, `src/flask/`, `app/`,
+    etc.) while excluding tests, docs, build scripts, and vendored third-party code.
     A configuration key is kept as given — the caller supplies only keys read from a
     target file, so a key that merely appears in some diff is not attributed here.
 
@@ -56,9 +108,7 @@ def filter_affected_entities(
         if not isinstance(name, str):
             continue
         candidate = name.strip()
-        if candidate.startswith(LIBRARY_SOURCE_PREFIX) and not candidate.startswith(
-            VENDORED_SOURCE_PREFIX
-        ):
+        if is_library_source_file(candidate, excluded_globs=excluded_globs):
             kept.add(candidate)
     for key in config_keys:
         if isinstance(key, str) and key.strip():
@@ -271,27 +321,33 @@ def attribution_for(author: Optional[str]) -> Optional[str]:
     return cleaned
 
 
+_THREAD_LOCAL = threading.local()
+
+
+def _last_call_store() -> dict[str, Any]:
+    store = getattr(_THREAD_LOCAL, "last_call", None)
+    if store is None:
+        store = {}
+        _THREAD_LOCAL.last_call = store
+    return store
+
+
+def _last_rejected_store() -> list[dict[str, Any]]:
+    store = getattr(_THREAD_LOCAL, "last_rejected", None)
+    if store is None:
+        store = []
+        _THREAD_LOCAL.last_rejected = store
+    return store
+
+
 def last_call_metadata() -> dict[str, Any]:
-    """Model, mode, finish reason and tokens for the most recent extraction call.
-
-    Kept on the module because the records themselves deliberately carry none of
-    it: the caller needs it to record what produced a result, and putting it on the
-    decision would make the model an attribute of the thing it inferred.
-    """
-    return dict(_LAST_CALL)
-
-
-_LAST_CALL: dict[str, Any] = {}
-
-#: Candidate quotes the most recent call rejected. Kept so the caller can persist
-#: them: the reply that proposed them is gone once the call returns, and a dropped
-#: quote is otherwise indistinguishable from one the model never offered.
-_LAST_REJECTED: list[dict[str, Any]] = []
+    """Model, mode, finish reason and tokens for the most recent extraction call."""
+    return dict(_last_call_store())
 
 
 def last_rejected_quotes() -> list[dict[str, Any]]:
     """Candidate quotes dropped by the most recent extraction call (defensive copy)."""
-    return [dict(item) for item in _LAST_REJECTED]
+    return [dict(item) for item in _last_rejected_store()]
 
 
 def extract_decisions_from_source(
@@ -321,16 +377,26 @@ def extract_decisions_from_source(
     4. If no verified quote remains for a decision, it is marked as
        "change recorded, rationale unknown" with quote_verified=False.
     """
-    # 1. Compile source text for quote verification
-    all_source_texts = [title or "", body or ""]
+    # 1. Compile tagged source sections for quote verification & per-section attribution
+    tagged_sections: list[tuple[str, Optional[str], Optional[str]]] = [
+        (title or "", author, created_at),
+        (body or "", author, created_at),
+    ]
     for c in comments:
-        if c.get("body"):
-            all_source_texts.append(c["body"])
+        c_body = c.get("body")
+        if c_body:
+            c_author = c.get("author") or author
+            c_ts = c.get("createdAt") or c.get("submittedAt") or created_at
+            tagged_sections.append((c_body, c_author, c_ts))
     if diff_or_patch:
-        all_source_texts.append(diff_or_patch)
+        tagged_sections.append((diff_or_patch, author, created_at))
+
+    all_source_texts = [sec_text for sec_text, _, _ in tagged_sections]
 
     full_text_corpus = "\n".join(all_source_texts)
     content_hash = compute_content_hash(full_text_corpus)
+    _LAST_REJECTED = _last_rejected_store()
+    _LAST_CALL = _last_call_store()
     _LAST_REJECTED.clear()
 
     # 2. Build prompt
@@ -394,16 +460,23 @@ def extract_decisions_from_source(
     for idx, raw_dec in enumerate(parsed.decisions):
         dec_id = make_decision_id(source_id, extraction_version, idx)
 
-        # Verify candidate supporting quotes
+        # Verify candidate supporting quotes against tagged sections for accurate attribution
         verified_evidence: list[VerifiedEvidence] = []
         for ev_idx, raw_ev in enumerate(raw_dec.supporting_evidence):
-            q_res = verify_quote_against_sources(raw_ev.quote, all_source_texts)
-            if q_res.is_verified:
-                # Complete the quote to the end of its sentence before storing it.
-                # The model sometimes returns a prefix of the sentence it means, and
-                # a prefix still verifies as a substring, so nothing downstream could
-                # tell a whole quote from a cut one.
-                completed = complete_quote(q_res.quote, "\n".join(all_source_texts))
+            q_res = None
+            matched_author: Optional[str] = author
+            matched_ts: Optional[str] = created_at
+            matched_section_text: str = "\n".join(all_source_texts)
+            for sec_text, sec_author, sec_ts in tagged_sections:
+                res = verify_quote(raw_ev.quote, sec_text)
+                if res.is_verified:
+                    q_res = res
+                    matched_author = sec_author or author
+                    matched_ts = sec_ts or created_at
+                    matched_section_text = sec_text
+                    break
+            if q_res is not None and q_res.is_verified:
+                completed = complete_quote(q_res.quote, matched_section_text)
                 if completed.status == "quote_incomplete":
                     logger.debug(
                         "Dropped quote for %s: could not be completed to a whole sentence",
@@ -438,8 +511,8 @@ def extract_decisions_from_source(
                         source_type=source_type,
                         source_url=source_url,
                         quote=completed.quote,
-                        author=attribution_for(author),
-                        timestamp=raw_ev.timestamp or created_at,
+                        author=attribution_for(matched_author),
+                        timestamp=raw_ev.timestamp or matched_ts,
                         classification="explicit",
                         claim=raw_ev.claim,
                         quote_verified=True,
@@ -447,17 +520,16 @@ def extract_decisions_from_source(
                 )
             else:
                 logger.debug(
-                    "Dropped unverified quote for %s: %r (%s)",
+                    "Dropped unverified quote for %s: %r",
                     dec_id,
                     raw_ev.quote,
-                    q_res.failure_reason,
                 )
                 _LAST_REJECTED.append({
                     "decision_id": dec_id,
                     "decision_summary": raw_dec.summary.strip(),
                     "candidate": raw_ev.quote,
                     "failed_rung": deepest_rung_over_sources(raw_ev.quote, all_source_texts),
-                    "failure_reason": q_res.failure_reason or "",
+                    "failure_reason": "Quote not found in any source section",
                     "claim": raw_ev.claim,
                 })
 

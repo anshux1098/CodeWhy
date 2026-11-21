@@ -306,6 +306,8 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
 
   // Ingest state
   const [ingestRepo, setIngestRepo] = useState('');
+  const [ingestMode, setIngestMode] = useState<'quick' | 'deep'>('quick');
+  const [ingestFiles, setIngestFiles] = useState('');
   const [ingestJobId, setIngestJobId] = useState<string | null>(null);
   const [ingestStatus, setIngestStatus] = useState<IngestJobStatus | null>(null);
   const [ingestError, setIngestError] = useState<string | null>(null);
@@ -612,12 +614,12 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
             <div className="space-y-3">
               <div>
                 <label htmlFor="ingest-repo-input" className="block text-xs font-semibold text-[#292b25] mb-1.5">
-                  Add GitHub Repository
+                  GitHub Repository URL or owner/repo
                 </label>
                 <input
                   id="ingest-repo-input"
                   type="text"
-                  placeholder="owner/repo (e.g. pallets/flask)"
+                  placeholder="https://github.com/pallets/flask or pallets/flask"
                   value={ingestRepo}
                   onChange={(e) => {
                     setIngestRepo(e.target.value);
@@ -628,17 +630,73 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-[#292b25] mb-1.5">
+                  Scan Mode
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={isSubmitting || !!ingestJobId}
+                    onClick={() => setIngestMode('quick')}
+                    className={`p-2.5 rounded border text-left transition-colors cursor-pointer ${
+                      ingestMode === 'quick'
+                        ? 'bg-[#efede5] border-[#718d5e] text-[#292b25]'
+                        : 'bg-[#f5f3ed] border-[#d7d2c6] text-[#77776e]'
+                    }`}
+                  >
+                    <div className="text-xs font-semibold">Quick Start (~30–45s)</div>
+                    <div className="text-[11px] opacity-80">Top 8 hotspot files · 25 high-signal PRs</div>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSubmitting || !!ingestJobId}
+                    onClick={() => setIngestMode('deep')}
+                    className={`p-2.5 rounded border text-left transition-colors cursor-pointer ${
+                      ingestMode === 'deep'
+                        ? 'bg-[#efede5] border-[#718d5e] text-[#292b25]'
+                        : 'bg-[#f5f3ed] border-[#d7d2c6] text-[#77776e]'
+                    }`}
+                  >
+                    <div className="text-xs font-semibold">Deep Scan</div>
+                    <div className="text-[11px] opacity-80">Top 20 files · up to 200 PRs</div>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="ingest-files-input" className="block text-xs font-semibold text-[#292b25] mb-1">
+                  Target Files <span className="font-normal text-[#77776e]">(optional — leave blank for zero-config auto-discovery)</span>
+                </label>
+                <input
+                  id="ingest-files-input"
+                  type="text"
+                  placeholder="Leave blank to auto-discover hotspot files, or comma-separate paths"
+                  value={ingestFiles}
+                  onChange={(e) => setIngestFiles(e.target.value)}
+                  disabled={isSubmitting || !!ingestJobId}
+                  className="w-full px-3 py-2 bg-[#f5f3ed] border border-[#d7d2c6] rounded text-xs font-mono text-[#292b25] placeholder-[#929086] focus:outline-none focus:border-[#718d5e]"
+                />
+              </div>
+
               <button
                 onClick={async () => {
                   const repo = ingestRepo.trim();
                   if (!repo || !repo.includes('/')) {
-                    setIngestError('Please enter a valid owner/repo (e.g. pallets/flask)');
+                    setIngestError('Please enter a valid GitHub URL or owner/repo (e.g. pallets/flask)');
                     return;
                   }
+                  const parsedFiles = ingestFiles
+                    .split(',')
+                    .map((s) => s.trim())
+                    .filter(Boolean);
                   setIngestError(null);
                   setIsSubmitting(true);
                   try {
-                    const job = await startIngest(repo);
+                    const job = await startIngest(repo, {
+                      mode: ingestMode,
+                      files: parsedFiles,
+                    });
                     setIngestJobId(job.job_id);
                     setIngestStatus(job);
                   } catch (e) {
@@ -650,7 +708,7 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
                 disabled={isSubmitting || !!ingestJobId || !ingestRepo.trim()}
                 className="px-4 py-2 bg-[#718d5e] text-white text-xs font-semibold rounded hover:bg-[#617c50] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? 'Starting…' : 'Analyze Repository'}
+                {isSubmitting ? 'Starting…' : ingestMode === 'quick' ? 'Quick Analyze Repository' : 'Deep Analyze Repository'}
               </button>
 
               {ingestError && (

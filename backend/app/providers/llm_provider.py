@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import threading
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -154,6 +155,7 @@ class TokenBudget:
     max_tokens: int = field(default_factory=lambda: settings.max_llm_tokens_per_run)
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False, compare=False)
 
     @property
     def total_tokens(self) -> int:
@@ -169,22 +171,24 @@ class TokenBudget:
 
     def can_afford(self, estimated_tokens: int = 0) -> bool:
         """Returns True if the budget has room for estimated_tokens."""
-        return (self.total_tokens + estimated_tokens) <= self.max_tokens
+        with self._lock:
+            return (self.total_tokens + estimated_tokens) <= self.max_tokens
 
     def consume(self, prompt_tokens: int, completion_tokens: int) -> None:
         """Records token usage and raises TokenBudgetExhaustedError if the limit is exceeded."""
         requested = prompt_tokens + completion_tokens
-        if self.total_tokens + requested > self.max_tokens:
-            # Still record what we tried to consume for auditability
+        with self._lock:
+            if self.total_tokens + requested > self.max_tokens:
+                # Still record what we tried to consume for auditability
+                self.prompt_tokens += prompt_tokens
+                self.completion_tokens += completion_tokens
+                raise TokenBudgetExhaustedError(
+                    limit=self.max_tokens,
+                    used=self.total_tokens,
+                    requested=requested,
+                )
             self.prompt_tokens += prompt_tokens
             self.completion_tokens += completion_tokens
-            raise TokenBudgetExhaustedError(
-                limit=self.max_tokens,
-                used=self.total_tokens,
-                requested=requested,
-            )
-        self.prompt_tokens += prompt_tokens
-        self.completion_tokens += completion_tokens
 
     def summary(self) -> dict[str, Any]:
         return {

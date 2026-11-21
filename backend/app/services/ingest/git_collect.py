@@ -80,6 +80,11 @@ class CollectedDocument:
     content_hash: str
     sha: str
     truncated: bool = False
+    doc_kind: str = "markdown"
+    status: Optional[str] = None
+    superseded_by: Optional[str] = None
+    external_tickets: list[str] = field(default_factory=list)
+    incident_keys: list[str] = field(default_factory=list)
 
 
 def extract_pull_request_numbers(subject: str) -> list[int]:
@@ -352,15 +357,22 @@ def collect_documents(
 
 def _read_document(clone: Path, path: Path, head_sha: str) -> CollectedDocument:
     import hashlib
+    from app.services.ingest.connectors import parse_document_metadata
 
     relative = path.relative_to(clone).as_posix()
     raw = path.read_bytes()
     truncated = len(raw) > DOC_MAX_BYTES
     content = raw[:DOC_MAX_BYTES].decode("utf-8", errors="ignore")
+    meta = parse_document_metadata(relative, content)
     return CollectedDocument(
         path=relative,
         content=content,
         content_hash=hashlib.sha256(content.encode("utf-8")).hexdigest(),
         sha=head_sha,
         truncated=truncated,
+        doc_kind=meta.doc_kind,
+        status=meta.status,
+        superseded_by=meta.superseded_by,
+        external_tickets=meta.external_tickets,
+        incident_keys=meta.incident_keys,
     )

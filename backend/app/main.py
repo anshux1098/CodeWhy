@@ -20,7 +20,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import routes_decisions, routes_health, routes_ingest, routes_repositories
+from app.api import routes_decisions, routes_extract, routes_health, routes_ingest, routes_repositories
 from app.api.deps import get_settings
 from app.config import Settings
 from app.services.data_source import NotFoundError
@@ -138,6 +138,7 @@ def create_app(config: Optional[Settings] = None) -> FastAPI:
     application.include_router(routes_repositories.router, prefix=API_PREFIX)
     application.include_router(routes_decisions.router, prefix=API_PREFIX)
     application.include_router(routes_ingest.router, prefix=API_PREFIX)
+    application.include_router(routes_extract.router, prefix=API_PREFIX)
 
     @application.exception_handler(NotFoundError)
     async def _not_found(request: Request, exc: NotFoundError) -> JSONResponse:

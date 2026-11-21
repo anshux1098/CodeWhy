@@ -337,12 +337,16 @@ class SqliteCache:
         self.read_only = read_only
         if read_only:
             uri = f"file:{self.path.resolve().as_posix()}?mode=ro"
-            self._connection = sqlite3.connect(uri, uri=True)
+            self._connection = sqlite3.connect(uri, uri=True, check_same_thread=False)
             self._connection.row_factory = sqlite3.Row
+            self._connection.execute("PRAGMA busy_timeout=10000;")
             return
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._connection = sqlite3.connect(str(self.path))
+        self._connection = sqlite3.connect(str(self.path), check_same_thread=False)
         self._connection.row_factory = sqlite3.Row
+        self._connection.execute("PRAGMA journal_mode=WAL;")
+        self._connection.execute("PRAGMA synchronous=NORMAL;")
+        self._connection.execute("PRAGMA busy_timeout=10000;")
         self._connection.executescript(SCHEMA)
         self._migrate()
         self._connection.commit()
@@ -473,9 +477,16 @@ class SqliteCache:
             ).fetchone()
         return int(row["n"])
 
-    def count_commit_files(self) -> int:
-        """Count stored commit_files rows, which are per commit and path."""
-        row = self._connection.execute("SELECT COUNT(*) AS n FROM commit_files").fetchone()
+    def count_commit_files(self, repo: Optional[str] = None) -> int:
+        """Count stored commit_files rows, optionally scoped to one repository."""
+        if repo is None:
+            row = self._connection.execute("SELECT COUNT(*) AS n FROM commit_files").fetchone()
+        else:
+            row = self._connection.execute(
+                "SELECT COUNT(*) AS n FROM commit_files cf "
+                "JOIN commits c ON c.sha = cf.sha WHERE c.repo = ?",
+                (repo,),
+            ).fetchone()
         return int(row["n"])
 
     def put_commit(self, repo: str, record: dict[str, Any]) -> bool:
@@ -533,6 +544,74 @@ class SqliteCache:
                     1 if record.get("diff_truncated") else 0,
                 ),
             )
+
+    def put_commits_and_files_batch(
+        self,
+        repo: str,
+        commit_records: list[dict[str, Any]],
+        file_records: list[tuple[str, dict[str, Any]]],
+    ) -> int:
+        """Insert/update commits and commit_files inside a single WAL transaction."""
+        inserted = 0
+        with self.transaction() as connection:
+            existing_rows = {
+                row[0]: row[1]
+                for row in connection.execute(
+                    "SELECT sha, message FROM commits WHERE repo = ?", (repo,)
+                ).fetchall()
+            }
+            for record in commit_records:
+                sha = record["sha"]
+                if sha in existing_rows:
+                    old_msg = existing_rows[sha]
+                    new_message = redact_emails(record.get("message"))
+                    if (not old_msg or not str(old_msg).strip()) and new_message and new_message.strip():
+                        connection.execute(
+                            "UPDATE commits SET message = ? WHERE sha = ?",
+                            (new_message, sha),
+                        )
+                    continue
+                connection.execute(
+                    "INSERT OR IGNORE INTO commits (sha, repo, authored_at, committed_at, author_name, subject, "
+                    "message, parent_shas, pull_requests, closing, mentions, trailers) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        sha,
+                        repo,
+                        record.get("authored_at"),
+                        record.get("committed_at"),
+                        record.get("author_name"),
+                        redact_emails(record.get("subject")),
+                        redact_emails(record.get("message")),
+                        json.dumps(record.get("parent_shas") or []),
+                        json.dumps(record.get("pull_requests") or []),
+                        json.dumps(record.get("closing") or []),
+                        json.dumps(record.get("mentions") or []),
+                        json.dumps(redact_trailers(record.get("trailers") or {})),
+                    ),
+                )
+                existing_rows[sha] = record.get("message")
+                inserted += 1
+
+            connection.executemany(
+                "INSERT INTO commit_files (sha, path, old_path, status, diff, diff_truncated) "
+                "VALUES (?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(sha, path) DO UPDATE SET old_path = excluded.old_path, "
+                "status = excluded.status, diff = excluded.diff, "
+                "diff_truncated = excluded.diff_truncated",
+                [
+                    (
+                        sha,
+                        rec["path"],
+                        rec.get("old_path"),
+                        rec.get("status"),
+                        rec.get("diff"),
+                        1 if rec.get("diff_truncated") else 0,
+                    )
+                    for sha, rec in file_records
+                ],
+            )
+        return inserted
 
     def commit_files_for(self, path: str) -> list[sqlite3.Row]:
         return list(
@@ -875,6 +954,40 @@ class SqliteCache:
                 ),
             )
         return True
+
+    def put_config_value_changes(self, rows: Sequence[dict[str, Any]]) -> int:
+        """Batch-upsert config key value changes inside a single WAL transaction."""
+        if not rows:
+            return 0
+        with self.transaction() as connection:
+            connection.executemany(
+                "INSERT INTO config_value_changes "
+                "(id, config_id, repo, file_path, name, commit_sha, old_value, new_value, "
+                "authored_at, author_name, diff_snippet, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(id) DO UPDATE SET "
+                "old_value = excluded.old_value, "
+                "new_value = excluded.new_value, "
+                "diff_snippet = excluded.diff_snippet",
+                [
+                    (
+                        row["id"],
+                        row["config_id"],
+                        row["repo"],
+                        row["file_path"],
+                        row["name"],
+                        row["commit_sha"],
+                        row.get("old_value"),
+                        row["new_value"],
+                        row.get("authored_at"),
+                        row.get("author_name"),
+                        row.get("diff_snippet"),
+                        row.get("created_at", utc_now()),
+                    )
+                    for row in rows
+                ],
+            )
+        return len(rows)
 
     def value_history_for(self, config_id: str) -> list[sqlite3.Row]:
         """Return all value changes for a config key, oldest-first."""

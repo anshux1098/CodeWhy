@@ -32,6 +32,9 @@ class IngestJobStore:
     def _connection(self) -> Iterator[sqlite3.Connection]:
         conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA busy_timeout=10000;")
         try:
             with conn:
                 yield conn

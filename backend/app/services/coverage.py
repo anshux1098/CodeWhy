@@ -125,12 +125,25 @@ def module_counts(coverage: Coverage, module: str, file_paths: Sequence[str]) ->
 
 def repository_counts(cache: Any, repo: str, coverage: Coverage) -> dict[str, Any]:
     """Stored on the Repository node: scope and repository-wide totals."""
+    all_decs = cache.decisions_for_repo(repo) if hasattr(cache, "decisions_for_repo") else []
+    candidate_count = len(all_decs)
+    verified_count = len(coverage.verified)
+    unverified_blocked = max(0, candidate_count - verified_count)
+    rejected_quotes_count = 0
+    if hasattr(cache, "rejected_quotes_for_repo"):
+        try:
+            rejected_quotes_count = len(cache.rejected_quotes_for_repo(repo))
+        except Exception:  # noqa: BLE001
+            rejected_quotes_count = 0
     return {
         "scope": scope_text(cache, repo, coverage),
         "prs_fetched": len(coverage.pr_ids),
         "sources_analyzed": len(coverage.analyzed),
         "prs_noise_skipped": len(coverage.noise & coverage.pr_ids),
-        "verified_decisions": len(coverage.verified),
+        "verified_decisions": verified_count,
+        "candidate_decisions": candidate_count,
+        "unverified_blocked": unverified_blocked,
+        "rejected_quotes_count": rejected_quotes_count,
     }
 
 

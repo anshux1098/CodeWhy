@@ -308,6 +308,9 @@ class GraphDataSource:
             sources_analyzed=_clean_int(node.get("sources_analyzed")),
             prs_noise_skipped=_clean_int(node.get("prs_noise_skipped")),
             verified_decisions=_clean_int(node.get("verified_decisions")),
+            candidate_decisions=_clean_int(node.get("candidate_decisions")),
+            unverified_blocked=_clean_int(node.get("unverified_blocked")),
+            rejected_quotes_count=_clean_int(node.get("rejected_quotes_count")),
             last_rebuilt_at=_clean_text(node.get("last_rebuilt_at")),
             fixture=not self.is_real,
         )
