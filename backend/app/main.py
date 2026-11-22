@@ -146,7 +146,11 @@ def create_app(config: Optional[Settings] = None) -> FastAPI:
 
     @application.middleware("http")
     async def _security_headers(request: Request, call_next):
+        import uuid as _uuid
+
+        req_id = request.headers.get("x-request-id") or _uuid.uuid4().hex
         response = await call_next(request)
+        response.headers.setdefault("X-Request-Id", req_id)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")

@@ -20,6 +20,12 @@
       }
     },
     {
+      "source": "/mcp(.*)",
+      "destination": {
+        "service": "app"
+      }
+    },
+    {
       "source": "/(.*)",
       "destination": {
         "service": "frontend"

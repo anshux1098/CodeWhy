@@ -31,6 +31,12 @@ def test_openapi_lists_every_route(client) -> None:
         f"{API}/repositories/{{repository_id}}/ask",
         f"{API}/repositories/{{repository_id}}/graph",
         f"{API}/repositories/{{repository_id}}/decisions",
+        f"{API}/repositories/{{repository_id}}/prompts",
+        f"{API}/repositories/{{repository_id}}/audit",
+        f"{API}/repositories/ingest",
+        f"{API}/repositories/ingest/{{job_id}}",
+        f"{API}/repositories/ingest/{{job_id}}/stream",
+        f"{API}/extract/preview",
         f"{API}/decisions/{{decision_id}}",
     }
 
