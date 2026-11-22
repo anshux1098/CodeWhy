@@ -86,32 +86,32 @@ function DecisionItem({
   note?: string;
 }) {
   return (
-    <article className="rounded-xl border border-[#292A23] bg-[#12130F] p-4 shadow-sm hover:border-[#8C806F]/50 transition-all">
+    <article className="rounded-xl border border-[#CAC4CE]/20 bg-[#242038] p-4 shadow-sm hover:border-[#9067C6]/65 transition-all">
       <div className="flex flex-wrap items-start justify-between gap-2.5">
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <span
               className={`rounded border px-2 py-0.5 text-[10px] font-mono font-medium ${
                 decision.state === 'ACTIVE'
-                  ? 'border-[#2ea043]/30 bg-[#2ea043]/15 text-[#3fb950] status-badge-active'
+                  ? 'border-[#3fb950]/35 bg-[#3fb950]/15 text-[#3fb950] status-badge-active'
                   : decision.state === 'REJECTED'
-                    ? 'border-[#da3633]/30 bg-[#da3633]/15 text-[#f85149] status-badge-rejected'
+                    ? 'border-[#f85149]/35 bg-[#f85149]/15 text-[#f85149] status-badge-rejected'
                     : decision.state === 'SUPERSEDED'
-                      ? 'border-[#8C806F]/40 bg-[#8C806F]/20 text-[#D4CBBF] status-badge-superseded'
-                      : 'border-[#d29922]/30 bg-[#d29922]/15 text-[#e3b341] status-badge-unresolved'
+                      ? 'border-[#CAC4CE]/35 bg-[#CAC4CE]/15 text-[#CAC4CE] status-badge-superseded'
+                      : 'border-[#e3b341]/35 bg-[#e3b341]/15 text-[#e3b341] status-badge-unresolved'
               }`}
             >
               {decision.state}
             </span>
-            <span className="text-[11px] font-mono text-[#A5A69D]">{decision.id}</span>
-            <span className="text-[11px] font-mono text-[#8C806F]">
+            <span className="text-[11px] font-mono text-[#CAC4CE]">{decision.id}</span>
+            <span className="text-[11px] font-mono text-[#8D86C9]">
               {decision.date ? new Date(decision.date).toLocaleDateString() : 'date unknown'}
             </span>
           </div>
-          <p className="text-sm leading-relaxed text-[#F5F3ED]">{decision.summary}</p>
-          {note && <p className="mt-1.5 text-xs font-mono text-[#A5A69D]">{note}</p>}
+          <p className="text-sm leading-relaxed text-[#F7ECE1]">{decision.summary}</p>
+          {note && <p className="mt-1.5 text-xs font-mono text-[#CAC4CE]">{note}</p>}
           {decision.supersedes.length > 0 && (
-            <p className="mt-1.5 text-[11px] font-mono text-[#8C806F]">
+            <p className="mt-1.5 text-[11px] font-mono text-[#8D86C9]">
               Supersedes: {decision.supersedes.join(', ')}
             </p>
           )}
@@ -122,7 +122,7 @@ function DecisionItem({
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`Open source for ${decision.id}`}
-            className="shrink-0 rounded p-1 text-[#757F6C] hover:bg-[#181914] hover:text-[#AFD2FA] transition-colors"
+            className="shrink-0 rounded p-1 text-[#C5B0E6] hover:bg-[#322D4D] hover:text-[#F7ECE1] transition-colors"
           >
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
@@ -148,8 +148,8 @@ function DecisionSection({
   return (
     <section className="space-y-2.5">
       <div>
-        <h2 className="text-sm font-semibold text-[#F5F3ED]">{title}</h2>
-        <p className="mt-0.5 text-xs text-[#A5A69D]">{description}</p>
+        <h2 className="text-sm font-semibold text-[#F7ECE1]">{title}</h2>
+        <p className="mt-0.5 text-xs text-[#CAC4CE]">{description}</p>
       </div>
       {decisions.length > 0 ? (
         <div className="space-y-2">
@@ -162,7 +162,7 @@ function DecisionSection({
           ))}
         </div>
       ) : (
-        <p className="rounded-xl border border-dashed border-[#292A23] bg-[#12130F]/40 px-3.5 py-3 text-xs text-[#A5A69D]">
+        <p className="rounded-xl border border-dashed border-[#CAC4CE]/25 bg-[#242038]/60 px-3.5 py-3 text-xs text-[#CAC4CE]">
           {emptyMessage}
         </p>
       )}
@@ -411,13 +411,13 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] w-full overflow-y-auto bg-[#080907] text-[#F5F3ED]">
-      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-[#292A23] bg-[#0B0C09] px-4 py-3 sm:px-6">
+    <div className="h-[calc(100vh-4rem)] w-full overflow-y-auto bg-[#191628] text-[#F7ECE1]">
+      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-[#CAC4CE]/20 bg-[#242038] px-4 py-3 sm:px-6">
         <div className="flex items-center gap-2.5">
-          <FileCode2 className="h-4 w-4 text-[#B9915E]" />
+          <FileCode2 className="h-4 w-4 text-[#9067C6]" />
           <div>
-            <h1 className="text-sm font-semibold text-[#F5F3ED]">Before You Change This File</h1>
-            <p className="text-[11px] font-mono text-[#A5A69D]">{selectedRepo?.name ?? repoId}</p>
+            <h1 className="text-sm font-semibold text-[#F7ECE1]">Before You Change This File</h1>
+            <p className="text-[11px] font-mono text-[#CAC4CE]">{selectedRepo?.name ?? repoId}</p>
           </div>
         </div>
         {selectedEntity && history && (
@@ -437,12 +437,12 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
             <button
               type="button"
               onClick={handleCopyGuardrails}
-              className="inline-flex items-center gap-1.5 rounded border border-[#292A23] bg-[#12130F] px-2.5 py-1 text-[11px] font-mono text-[#F5F3ED] hover:border-[#B9915E] transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded border border-[#CAC4CE]/25 bg-[#161324] px-2.5 py-1 text-[11px] font-mono text-[#F7ECE1] hover:border-[#9067C6] transition-colors cursor-pointer"
             >
-              {copiedGuardrails ? <Check className="h-3 w-3 text-[#3fb950]" /> : <Copy className="h-3 w-3 text-[#B9915E]" />}
+              {copiedGuardrails ? <Check className="h-3 w-3 text-[#3fb950]" /> : <Copy className="h-3 w-3 text-[#9067C6]" />}
               {copiedGuardrails ? 'Copied Guardrails' : 'Copy AI Guardrails'}
             </button>
-            <span className="text-xs font-mono text-[#A5A69D]">
+            <span className="text-xs font-mono text-[#CAC4CE]">
               Derived from {linkedDecisions.length} decisions
             </span>
           </div>
@@ -452,38 +452,38 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
       <main className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
         <section className="space-y-3">
           <div>
-            <h2 className="text-sm font-semibold text-[#F5F3ED]">Find a file</h2>
-            <p className="mt-1 text-xs text-[#A5A69D]">
+            <h2 className="text-sm font-semibold text-[#F7ECE1]">Find a file</h2>
+            <p className="mt-1 text-xs text-[#CAC4CE]">
               Search repository files by entity label to inspect their recorded decision history.
             </p>
           </div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#B9915E]" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9067C6]" />
             <input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search files by name"
               aria-label="Search files by name"
-              className="w-full rounded-lg border border-[#292A23] bg-[#12130F] py-2.5 pl-9 pr-3 text-sm font-mono text-[#F5F3ED] placeholder:text-[#A5A69D]/50 focus:border-[#B9915E]/70 focus:outline-none focus:ring-1 focus:ring-[#B9915E]/30 transition-all"
+              className="w-full rounded-lg border border-[#CAC4CE]/25 bg-[#161324] py-2.5 pl-9 pr-3 text-sm font-mono text-[#F7ECE1] placeholder:text-[#CAC4CE]/65 focus:border-[#9067C6] focus:outline-none focus:ring-1 focus:ring-[#9067C6]/40 transition-all"
             />
           </div>
           {searchingQuery === query.trim() && query.trim() && (
-            <p className="flex items-center gap-2 text-xs text-[#A5A69D]" role="status">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-[#757F6C]" />
+            <p className="flex items-center gap-2 text-xs text-[#CAC4CE]" role="status">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-[#9067C6]" />
               Searching files…
             </p>
           )}
           {searchedQuery === query.trim() && searchError && (
-            <p className="rounded-xl border border-[#da3633]/40 bg-[#12130F] p-3 text-xs text-[#f85149]" role="alert">
+            <p className="rounded-xl border border-[#f85149]/45 bg-[#242038] p-3 text-xs text-[#f85149]" role="alert">
               {searchError}
             </p>
           )}
           {searchedQuery === query.trim() && query.trim() && !searchError && entities.length === 0 && (
-            <p className="text-xs text-[#A5A69D]">No matching files found.</p>
+            <p className="text-xs text-[#CAC4CE]">No matching files found.</p>
           )}
           {searchedQuery === query.trim() && entities.length > 0 && (
-            <ul className="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-[#292A23] bg-[#0B0C09] p-1.5 shadow-lg">
+            <ul className="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-[#CAC4CE]/25 bg-[#242038] p-1.5 shadow-lg">
               {entities.map((entity) => {
                 const isSelected = selectedEntity?.id === entity.id;
                 return (
@@ -500,16 +500,16 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
                       }}
                       className={`flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left transition-colors cursor-pointer ${
                         isSelected
-                          ? 'bg-[#181914] text-[#F5F3ED] border border-[#B9915E]/40 shadow-sm'
-                          : 'text-[#A5A69D] hover:bg-[#12130F] hover:text-[#F5F3ED] border border-transparent'
+                          ? 'bg-[#322D4D] text-[#F7ECE1] border border-[#9067C6] shadow-sm'
+                          : 'text-[#CAC4CE] hover:bg-[#161324] hover:text-[#F7ECE1] border border-transparent'
                       }`}
                     >
-                      <FileCode2 className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${isSelected ? 'text-[#B9915E]' : 'text-[#757F6C]'}`} />
+                      <FileCode2 className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${isSelected ? 'text-[#9067C6]' : 'text-[#8D86C9]'}`} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-xs font-medium text-[#F5F3ED]">{entity.path || entity.label}</span>
-                        <span className="block truncate text-[10px] font-mono text-[#A5A69D]">{entity.id}</span>
+                        <span className="block truncate text-xs font-medium text-[#F7ECE1]">{entity.path || entity.label}</span>
+                        <span className="block truncate text-[10px] font-mono text-[#CAC4CE]">{entity.id}</span>
                       </span>
-                      <span className="shrink-0 rounded border border-[#292A23] bg-[#12130F] px-1.5 py-0.5 text-[10px] font-mono text-[#A5A69D]">
+                      <span className="shrink-0 rounded border border-[#CAC4CE]/20 bg-[#161324] px-1.5 py-0.5 text-[10px] font-mono text-[#CAC4CE]">
                         {entity.decision_count ?? 0} linked
                       </span>
                     </button>
@@ -522,32 +522,32 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
 
         {selectedEntity && (
           <div className="space-y-5">
-            <section className="rounded-xl border border-[#292A23] bg-[#12130F] p-4 shadow-sm space-y-1">
-              <p className="text-[10px] font-mono uppercase tracking-wider text-[#A5A69D] font-semibold">Selected file</p>
-              <p className="mt-1 break-all text-sm font-medium text-[#F5F3ED] font-mono">
+            <section className="rounded-xl border border-[#CAC4CE]/20 bg-[#242038] p-4 shadow-sm space-y-1">
+              <p className="text-[10px] font-mono uppercase tracking-wider text-[#CAC4CE] font-semibold">Selected file</p>
+              <p className="mt-1 break-all text-sm font-medium text-[#F7ECE1] font-mono">
                 {selectedEntity.path || selectedEntity.label}
               </p>
-              <p className="mt-1 break-all text-[11px] font-mono text-[#757F6C]">{selectedEntity.id}</p>
+              <p className="mt-1 break-all text-[11px] font-mono text-[#8D86C9]">{selectedEntity.id}</p>
             </section>
 
             {/* F2: Line-Level "Why Blame" Code Viewer */}
             {blameData && blameData.lines.length > 0 && (
-              <section className="rounded-xl border border-[#292A23] bg-[#12130F] p-4 space-y-3 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#292A23] pb-2.5">
+              <section className="rounded-xl border border-[#CAC4CE]/20 bg-[#242038] p-4 space-y-3 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#CAC4CE]/20 pb-2.5">
                   <div>
-                    <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-[#B9915E]">
+                    <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-[#C5B0E6]">
                       Line-Level "Why Blame" Inspector — {blameData.path}
                     </h3>
-                    <p className="text-[11px] text-[#A5A69D]">
+                    <p className="text-[11px] text-[#CAC4CE]">
                       Click any decision-governed line to inspect its commit → PR → Decision &amp; revert lineage.
                     </p>
                   </div>
-                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#080907] border border-[#292A23] text-[#757F6C]">
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#161324] border border-[#CAC4CE]/20 text-[#CAC4CE]">
                     {blameData.governed_decisions_count} governing decision(s)
                   </span>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-                  <div className="lg:col-span-7 max-h-64 overflow-y-auto rounded-lg bg-[#080907] border border-[#292A23] font-mono text-xs divide-y divide-[#181914]">
+                  <div className="lg:col-span-7 max-h-64 overflow-y-auto rounded-lg bg-[#161324] border border-[#CAC4CE]/20 font-mono text-xs divide-y divide-[#242038]">
                     {blameData.lines.map((ln) => {
                       const isSel = selectedBlameLine?.line_number === ln.line_number;
                       const state = ln.decision?.state || '';
@@ -558,13 +558,13 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
                           onClick={() => setSelectedBlameLine(ln)}
                           className={`w-full text-left px-3 py-1.5 flex items-center gap-2.5 transition-colors cursor-pointer ${
                             isSel
-                              ? 'bg-[#B9915E]/20 text-[#F5F3ED]'
+                              ? 'bg-[#9067C6]/20 text-[#F7ECE1]'
                               : ln.governed
-                              ? 'hover:bg-[#181914] text-[#D4CBBF]'
-                              : 'text-[#757F6C] hover:bg-[#12130F]'
+                              ? 'hover:bg-[#322D4D] text-[#CAC4CE]'
+                              : 'text-[#8D86C9]/70 hover:bg-[#242038]'
                           }`}
                         >
-                          <span className="w-7 shrink-0 text-right text-[10px] text-[#757F6C]">
+                          <span className="w-7 shrink-0 text-right text-[10px] text-[#8D86C9]">
                             {ln.line_number}
                           </span>
                           <span
@@ -573,10 +573,10 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
                                 ? 'bg-transparent'
                                 : state === 'ACTIVE'
                                 ? 'bg-[#3fb950]'
-                                : 'bg-[#B9915E]'
+                                : 'bg-[#9067C6]'
                             }`}
                           />
-                          <span className="w-16 shrink-0 text-[10px] text-[#A5A69D] truncate">
+                          <span className="w-16 shrink-0 text-[10px] text-[#CAC4CE] truncate">
                             {ln.sha || 'HEAD'}
                           </span>
                           <span className="truncate flex-1">{ln.code || ' '}</span>
@@ -584,31 +584,31 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
                       );
                     })}
                   </div>
-                  <div className="lg:col-span-5 rounded-lg bg-[#080907] border border-[#292A23] p-3.5 space-y-2.5 text-xs">
+                  <div className="lg:col-span-5 rounded-lg bg-[#161324] border border-[#CAC4CE]/20 p-3.5 space-y-2.5 text-xs">
                     {isLoadingBlame ? (
-                      <p className="text-[#A5A69D] font-mono">Loading line blame…</p>
+                      <p className="text-[#CAC4CE] font-mono">Loading line blame…</p>
                     ) : selectedBlameLine?.decision ? (
                       <>
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono text-[11px] text-[#B9915E]">
+                          <span className="font-mono text-[11px] text-[#C5B0E6]">
                             Line {selectedBlameLine.line_number} · @{selectedBlameLine.author}
                           </span>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#12130F] border border-[#292A23] text-[#3fb950]">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#242038] border border-[#CAC4CE]/20 text-[#3fb950]">
                             {selectedBlameLine.decision.state}
                           </span>
                         </div>
-                        <p className="font-semibold text-[#F5F3ED]">{selectedBlameLine.decision.summary}</p>
+                        <p className="font-semibold text-[#F7ECE1]">{selectedBlameLine.decision.summary}</p>
                         {selectedBlameLine.decision.rule && (
-                          <p className="text-[11px] font-mono text-[#D4CBBF] bg-[#12130F] p-2 rounded border border-[#292A23]">
+                          <p className="text-[11px] font-mono text-[#CAC4CE] bg-[#242038] p-2 rounded border border-[#CAC4CE]/20">
                             Rule: {selectedBlameLine.decision.rule}
                           </p>
                         )}
                         {selectedBlameLine.decision.quote && (
-                          <blockquote className="text-[11px] italic text-[#A5A69D] border-l-2 border-[#B9915E] pl-2.5">
+                          <blockquote className="text-[11px] italic text-[#CAC4CE] border-l-2 border-[#9067C6] pl-2.5">
                             "{selectedBlameLine.decision.quote}"
                           </blockquote>
                         )}
-                        <div className="text-[10px] font-mono text-[#757F6C] flex flex-wrap gap-2 pt-1">
+                        <div className="text-[10px] font-mono text-[#8D86C9] flex flex-wrap gap-2 pt-1">
                           <span>ID: {selectedBlameLine.decision.id}</span>
                           {selectedBlameLine.decision.supersedes && (
                             <span>· Supersedes: {selectedBlameLine.decision.supersedes}</span>
@@ -619,7 +619,7 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
                         </div>
                       </>
                     ) : (
-                      <p className="text-[#A5A69D] font-mono">
+                      <p className="text-[#CAC4CE] font-mono">
                         Select a highlighted line to inspect its governing decision and verbatim PR quote.
                       </p>
                     )}
@@ -628,24 +628,24 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
               </section>
             )}
 
-            <div className="flex items-start gap-2.5 rounded-xl border border-[#B9915E]/30 bg-[#12130F] p-3.5 text-xs leading-relaxed text-[#A5A69D] shadow-sm">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#B9915E]" />
+            <div className="flex items-start gap-2.5 rounded-xl border border-[#9067C6]/35 bg-[#242038] p-3.5 text-xs leading-relaxed text-[#CAC4CE] shadow-sm">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#9067C6]" />
               <p>
                 A file-level view can include unrelated repository decisions. Only a decision whose
-                <code className="mx-1 rounded bg-[#080907] border border-[#292A23] px-1.5 py-0.5 font-mono text-[#B9915E]">entities</code>
+                <code className="mx-1 rounded bg-[#161324] border border-[#CAC4CE]/25 px-1.5 py-0.5 font-mono text-[#C5B0E6]">entities</code>
                 list explicitly contains this file is treated as supported for it; recent repository
                 decisions without that link are labeled as unlinked.
               </p>
             </div>
 
             {isLoadingHistory && (
-              <p className="flex items-center gap-2 py-4 text-xs text-[#A5A69D]" role="status">
-                <Loader2 className="h-4 w-4 animate-spin text-[#757F6C]" />
+              <p className="flex items-center gap-2 py-4 text-xs text-[#CAC4CE]" role="status">
+                <Loader2 className="h-4 w-4 animate-spin text-[#9067C6]" />
                 Loading repository decision history…
               </p>
             )}
             {historyError && (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#da3633]/40 bg-[#12130F] p-3 text-xs text-[#f85149]" role="alert">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#f85149]/45 bg-[#242038] p-3 text-xs text-[#f85149]" role="alert">
                 <p>{historyError}</p>
                 <button
                   type="button"
@@ -654,7 +654,7 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
                     setIsLoadingHistory(true);
                     setHistoryReload((reload) => reload + 1);
                   }}
-                  className="rounded-lg border border-[#da3633]/40 px-2.5 py-1 text-xs text-[#f85149] hover:bg-[#da3633]/15 transition-colors cursor-pointer"
+                  className="rounded-lg border border-[#f85149]/45 px-2.5 py-1 text-xs text-[#f85149] hover:bg-[#f85149]/15 transition-colors cursor-pointer"
                 >
                   Retry
                 </button>
@@ -701,7 +701,7 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
                     return `Read ${index + 1} of ${readingOrder.length}`;
                   }}
                 />
-                <p className="flex items-center gap-2 border-t border-[#292A23] pt-3 text-[11px] font-mono text-[#A5A69D]">
+                <p className="flex items-center gap-2 border-t border-[#CAC4CE]/20 pt-3 text-[11px] font-mono text-[#CAC4CE]">
                   <Check className="h-3.5 w-3.5 text-[#3fb950]" />
                   Reading order is derived from {linkedDecisions.length} explicitly linked decisions
                   out of {historyCount} repository decisions.
@@ -711,9 +711,9 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
           </div>
         )}
         {!selectedEntity && !query.trim() && (
-          <div className="rounded-xl border border-[#292A23] bg-[#12130F] p-8 text-center space-y-2 shadow-sm">
-            <Search className="mx-auto h-5 w-5 text-[#B9915E]" />
-            <p className="text-xs font-mono text-[#A5A69D]">Search and select a file to build its brief.</p>
+          <div className="rounded-xl border border-[#CAC4CE]/20 bg-[#242038] p-8 text-center space-y-2 shadow-sm">
+            <Search className="mx-auto h-5 w-5 text-[#9067C6]" />
+            <p className="text-xs font-mono text-[#CAC4CE]">Search and select a file to build its brief.</p>
           </div>
         )}
 

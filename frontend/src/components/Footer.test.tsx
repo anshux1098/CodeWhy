@@ -12,8 +12,8 @@ describe('Footer visual refinement', () => {
       screen.getByText(/Git decision archeology engine reconstructing historical rationale/i),
     ).toBeTruthy();
     const footer = container.querySelector('footer');
-    expect(footer?.className).toContain('bg-[#080907]');
-    expect(footer?.className).toContain('border-[#292A23]');
+    expect(footer?.className).toContain('bg-[#242038]');
+    expect(footer?.className).toContain('border-[#CAC4CE]/20');
   });
 
   it('renders all three capability badges with correct labels', () => {

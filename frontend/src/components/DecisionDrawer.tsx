@@ -248,22 +248,22 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
         aria-modal="true"
         aria-labelledby="decision-drawer-title"
         tabIndex={-1}
-        className="relative w-full max-w-lg bg-[#0B0C09] border-l border-[#292A23] h-full shadow-2xl flex flex-col z-10 text-[#F5F3ED]"
+        className="relative w-full max-w-lg bg-[#242038] border-l border-[#CAC4CE]/25 h-full shadow-2xl flex flex-col z-10 text-[#F7ECE1]"
       >
         {/* Header */}
-        <div className="sticky top-0 z-20 p-4 border-b border-[#292A23] flex items-center justify-between bg-[#0B0C09]">
+        <div className="sticky top-0 z-20 p-4 border-b border-[#CAC4CE]/20 flex items-center justify-between bg-[#242038]">
           <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg bg-[#12130F] text-[#B9915E] border border-[#292A23]">
+            <div className="p-1.5 rounded-lg bg-[#161324] text-[#9067C6] border border-[#9067C6]/40">
               <Layers className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span id="decision-drawer-title" className="font-mono text-sm font-semibold text-[#F5F3ED]">
+                <span id="decision-drawer-title" className="font-mono text-sm font-semibold text-[#F7ECE1]">
                   Decision {decisionId}
                 </span>
                 {detail && renderStateBadge(detail.state)}
               </div>
-              <span className="text-[11px] font-mono text-[#A5A69D]">
+              <span className="text-[11px] font-mono text-[#CAC4CE]">
                 Provenance Record
               </span>
             </div>
@@ -276,7 +276,7 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
             </span>
             <button
               onClick={handleCopy}
-              className="p-1.5 rounded-lg bg-[#12130F] hover:bg-[#181914] text-[#A5A69D] hover:text-[#F5F3ED] border border-[#292A23] transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg bg-[#161324] hover:bg-[#322D4D] text-[#CAC4CE] hover:text-[#F7ECE1] border border-[#CAC4CE]/25 transition-colors cursor-pointer"
               title={
                 copyState === 'failed'
                   ? 'Copy failed — clipboard access was blocked'
@@ -297,12 +297,12 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
               ) : copyState === 'failed' ? (
                 <AlertCircle className="w-4 h-4 text-[#f85149]" />
               ) : (
-                <Copy className="w-4 h-4 text-[#A5A69D]" />
+                <Copy className="w-4 h-4 text-[#CAC4CE]" />
               )}
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg bg-[#12130F] hover:bg-[#181914] text-[#A5A69D] hover:text-[#F5F3ED] border border-[#292A23] transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg bg-[#161324] hover:bg-[#322D4D] text-[#CAC4CE] hover:text-[#F7ECE1] border border-[#CAC4CE]/25 transition-colors cursor-pointer"
               title="Close drawer (Esc)"
             >
               <X className="w-4 h-4" />
@@ -311,21 +311,21 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-[#191628]">
           {isLoading && (
-            <div className="py-16 flex flex-col items-center justify-center text-[#A5A69D] gap-2">
-              <Loader2 className="w-6 h-6 animate-spin text-[#757F6C]" />
+            <div className="py-16 flex flex-col items-center justify-center text-[#CAC4CE] gap-2">
+              <Loader2 className="w-6 h-6 animate-spin text-[#9067C6]" />
               <p className="text-xs font-mono">Loading decision record...</p>
             </div>
           )}
 
           {error && (
-            <div className="p-3.5 rounded-xl bg-[#12130F] border border-[#da3633]/40 text-[#f85149] space-y-1">
+            <div className="p-3.5 rounded-xl bg-[#242038] border border-[#f85149]/45 text-[#f85149] space-y-1">
               <div className="flex items-center gap-2 font-medium text-xs">
                 <AlertCircle className="w-4 h-4 text-[#f85149]" />
                 <span>Failed to load decision</span>
               </div>
-              <p className="text-xs font-mono text-[#A5A69D]">{error}</p>
+              <p className="text-xs font-mono text-[#CAC4CE]">{error}</p>
             </div>
           )}
 
@@ -333,25 +333,25 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
             <>
               {/* Summary */}
               <div className="space-y-1.5">
-                <h3 className="text-xs font-mono uppercase tracking-wider text-[#A5A69D]">
+                <h3 className="text-xs font-mono uppercase tracking-wider text-[#CAC4CE]">
                   Summary
                 </h3>
-                <p className="text-sm font-medium text-[#F5F3ED] leading-relaxed bg-[#12130F] p-3 rounded-xl border border-[#292A23]">
+                <p className="text-sm font-medium text-[#F7ECE1] leading-relaxed bg-[#242038] p-3 rounded-xl border border-[#CAC4CE]/20">
                   {detail.summary}
                 </p>
               </div>
 
               {/* Rationale */}
               <div className="space-y-1.5">
-                <h3 className="text-xs font-mono uppercase tracking-wider text-[#A5A69D]">
+                <h3 className="text-xs font-mono uppercase tracking-wider text-[#CAC4CE]">
                   Rationale
                 </h3>
                 {detail.rationale ? (
-                  <div className="quote-text p-3 rounded-xl bg-[#080907] border border-[#292A23] text-[#F5F3ED] leading-relaxed border-l-2 border-l-[#757F6C]">
+                  <div className="quote-text p-3 rounded-xl bg-[#161324] border border-[#CAC4CE]/20 text-[#F7ECE1] leading-relaxed border-l-2 border-l-[#9067C6]">
                     "{detail.rationale}"
                   </div>
                 ) : (
-                  <div className="p-3 rounded-xl bg-[#12130F] border border-[#292A23] text-[#A5A69D] text-xs italic">
+                  <div className="p-3 rounded-xl bg-[#242038] border border-[#CAC4CE]/20 text-[#CAC4CE] text-xs italic">
                     No explicit quoted rationale recorded in the source artifact.
                   </div>
                 )}
@@ -360,8 +360,8 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
               {/* Linked Entities */}
               {linkedEntities && linkedEntities.length > 0 && (
                 <div className="space-y-1.5">
-                  <h3 className="text-xs font-mono uppercase tracking-wider text-[#A5A69D] flex items-center gap-1.5">
-                    <Tag className="w-3.5 h-3.5 text-[#B9915E]" />
+                  <h3 className="text-xs font-mono uppercase tracking-wider text-[#CAC4CE] flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-[#9067C6]" />
                     Linked Code Entities ({linkedEntities.length})
                   </h3>
                   <div className="flex flex-wrap gap-1.5">
@@ -371,7 +371,7 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
                       return (
                         <span
                           key={ent}
-                          className="px-2 py-0.5 rounded bg-[#080907] border border-[#292A23] text-[#757F6C] font-mono text-xs"
+                          className="px-2 py-0.5 rounded bg-[#161324] border border-[#CAC4CE]/25 text-[#C5B0E6] font-mono text-xs"
                         >
                           {label}
                         </span>
@@ -384,17 +384,17 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
               {/* Authors */}
               {authors.length > 0 && (
                 <div className="space-y-1.5">
-                  <h3 className="text-xs font-mono uppercase tracking-wider text-[#A5A69D] flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-[#B9915E]" />
+                  <h3 className="text-xs font-mono uppercase tracking-wider text-[#CAC4CE] flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-[#8D86C9]" />
                     Recorded Authors ({authors.length})
                   </h3>
                   <div className="flex flex-wrap gap-1.5">
                     {authors.map((author) => (
                       <span
                         key={author}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#080907] border border-[#292A23] text-xs font-mono text-[#A5A69D]"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#161324] border border-[#CAC4CE]/20 text-xs font-mono text-[#F7ECE1]"
                       >
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#2ea043]" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#3fb950]" />
                         @{author}
                       </span>
                     ))}
@@ -404,20 +404,20 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
 
               {/* Source Reference & Rule */}
               <div className="grid grid-cols-2 gap-2.5">
-                <div className="p-3 rounded-xl bg-[#12130F] border border-[#292A23] space-y-1">
-                  <span className="text-[10px] font-mono text-[#A5A69D] uppercase">
+                <div className="p-3 rounded-xl bg-[#242038] border border-[#CAC4CE]/20 space-y-1">
+                  <span className="text-[10px] font-mono text-[#CAC4CE] uppercase">
                     Source Artifact
                   </span>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono font-medium text-[#F5F3ED] flex items-center gap-1.5">
+                    <span className="text-xs font-mono font-medium text-[#F7ECE1] flex items-center gap-1.5">
                       {detail.source.type === 'Commit' ? (
-                        <GitCommit className="w-3.5 h-3.5 text-[#8C806F]" />
+                        <GitCommit className="w-3.5 h-3.5 text-[#CAC4CE]" />
                       ) : detail.source.type === 'Issue' ? (
-                        <MessageSquare className="w-3.5 h-3.5 text-[#8C806F]" />
+                        <MessageSquare className="w-3.5 h-3.5 text-[#CAC4CE]" />
                       ) : detail.source.type === 'Document' ? (
-                        <FileText className="w-3.5 h-3.5 text-[#8C806F]" />
+                        <FileText className="w-3.5 h-3.5 text-[#CAC4CE]" />
                       ) : (
-                        <GitPullRequest className="w-3.5 h-3.5 text-[#B9915E]" />
+                        <GitPullRequest className="w-3.5 h-3.5 text-[#9067C6]" />
                       )}
                       {detail.source.type} {detail.source.number ? `#${detail.source.number}` : ''}
                     </span>
@@ -426,7 +426,7 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
                         href={detail.source.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-xs text-[#757F6C] hover:text-[#AFD2FA] hover:underline"
+                        className="text-xs text-[#C5B0E6] hover:text-[#F7ECE1] hover:underline"
                         title="Open Source Link"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
@@ -435,40 +435,40 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
                   </div>
                 </div>
 
-                <div className="p-3 rounded-xl bg-[#12130F] border border-[#292A23] space-y-1">
-                  <span className="text-[10px] font-mono text-[#A5A69D] uppercase">
+                <div className="p-3 rounded-xl bg-[#242038] border border-[#CAC4CE]/20 space-y-1">
+                  <span className="text-[10px] font-mono text-[#CAC4CE] uppercase">
                     Supersession Rule
                   </span>
-                  <div className="text-xs font-mono font-medium text-[#F5F3ED] truncate">
+                  <div className="text-xs font-mono font-medium text-[#F7ECE1] truncate">
                     {detail.rule ? detail.rule : 'Direct ingest'}
                   </div>
                 </div>
               </div>
 
               {/* Temporal Timeline */}
-              <div className="p-3.5 rounded-xl bg-[#12130F] border border-[#292A23] space-y-1.5">
-                <span className="text-[10px] font-mono text-[#A5A69D] uppercase tracking-wider block">
+              <div className="p-3.5 rounded-xl bg-[#242038] border border-[#CAC4CE]/20 space-y-1.5">
+                <span className="text-[10px] font-mono text-[#CAC4CE] uppercase tracking-wider block">
                   Temporal Timeline
                 </span>
                 <div className="space-y-1.5 text-xs font-mono">
-                  <div className="flex items-center justify-between text-[#F5F3ED]">
-                    <span className="text-[#A5A69D] flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-[#2ea043]" /> Effective:
+                  <div className="flex items-center justify-between text-[#F7ECE1]">
+                    <span className="text-[#CAC4CE] flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-[#3fb950]" /> Effective:
                     </span>
                     <span>{detail.effective_at ? new Date(detail.effective_at).toLocaleDateString() : 'date unknown'}</span>
                   </div>
                   {detail.recorded_at && (
-                    <div className="flex items-center justify-between text-[#F5F3ED]">
-                      <span className="text-[#A5A69D] flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-[#8C806F]" /> Recorded:
+                    <div className="flex items-center justify-between text-[#F7ECE1]">
+                      <span className="text-[#CAC4CE] flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-[#8D86C9]" /> Recorded:
                       </span>
                       <span>{new Date(detail.recorded_at).toLocaleDateString()}</span>
                     </div>
                   )}
                   {detail.ended_at && (
                     <div className="flex items-center justify-between text-[#f85149]">
-                      <span className="text-[#A5A69D] flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-[#da3633]" /> Ended:
+                      <span className="text-[#CAC4CE] flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-[#f85149]" /> Ended:
                       </span>
                       <span>{new Date(detail.ended_at).toLocaleDateString()}</span>
                     </div>
@@ -478,12 +478,12 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
 
               {/* Supersession Relationships */}
               <div className="space-y-2">
-                <h3 className="text-xs font-mono uppercase tracking-wider text-[#A5A69D]">
+                <h3 className="text-xs font-mono uppercase tracking-wider text-[#CAC4CE]">
                   Supersession Lineage
                 </h3>
 
-                <div className="p-3 rounded-xl bg-[#12130F] border border-[#B9915E]/30 text-[11px] font-mono text-[#A5A69D] flex items-start gap-2">
-                  <AlertTriangle className="w-3.5 h-3.5 text-[#B9915E] shrink-0 mt-0.5" />
+                <div className="p-3 rounded-xl bg-[#242038] border border-[#9067C6]/35 text-[11px] font-mono text-[#CAC4CE] flex items-start gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#9067C6] shrink-0 mt-0.5" />
                   <span>
                     Supersession is corroborated by actual state and lineage rules rather than timestamps alone.
                   </span>
@@ -491,14 +491,14 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
 
                 <div className="space-y-1.5">
                   {detail.supersedes && detail.supersedes.length > 0 && (
-                    <div className="p-3 rounded-xl bg-[#12130F] border border-[#292A23] text-xs font-mono flex items-center justify-between">
-                      <span className="text-[#A5A69D]">Supersedes:</span>
+                    <div className="p-3 rounded-xl bg-[#242038] border border-[#CAC4CE]/20 text-xs font-mono flex items-center justify-between">
+                      <span className="text-[#CAC4CE]">Supersedes:</span>
                       <div className="flex flex-wrap gap-1.5">
                         {detail.supersedes.map((id) => (
                           <button
                             key={id}
                             onClick={() => onSelectDecision?.(id)}
-                            className="px-2 py-0.5 rounded bg-[#080907] hover:bg-[#181914] text-[#757F6C] hover:text-[#AFD2FA] border border-[#292A23] transition-colors cursor-pointer"
+                            className="px-2 py-0.5 rounded bg-[#161324] hover:bg-[#322D4D] text-[#C5B0E6] hover:text-[#F7ECE1] border border-[#CAC4CE]/25 transition-colors cursor-pointer"
                           >
                             {id}
                           </button>
@@ -508,14 +508,14 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
                   )}
 
                   {detail.superseded_by && detail.superseded_by.length > 0 && (
-                    <div className="p-3 rounded-xl bg-[#12130F] border border-[#292A23] text-xs font-mono flex items-center justify-between">
-                      <span className="text-[#A5A69D]">Superseded by:</span>
+                    <div className="p-3 rounded-xl bg-[#242038] border border-[#CAC4CE]/20 text-xs font-mono flex items-center justify-between">
+                      <span className="text-[#CAC4CE]">Superseded by:</span>
                       <div className="flex flex-wrap gap-1.5">
                         {detail.superseded_by.map((id) => (
                           <button
                             key={id}
                             onClick={() => onSelectDecision?.(id)}
-                            className="px-2 py-0.5 rounded bg-[#080907] hover:bg-[#181914] text-[#B9915E] hover:text-[#AFD2FA] border border-[#292A23] transition-colors cursor-pointer"
+                            className="px-2 py-0.5 rounded bg-[#161324] hover:bg-[#322D4D] text-[#C5B0E6] hover:text-[#F7ECE1] border border-[#9067C6]/40 transition-colors cursor-pointer"
                           >
                             {id}
                           </button>
@@ -529,14 +529,14 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
               {/* Citations Attached */}
               {detail.citations && detail.citations.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="text-xs font-mono uppercase tracking-wider text-[#A5A69D]">
+                  <h3 className="text-xs font-mono uppercase tracking-wider text-[#CAC4CE]">
                     Direct Verified Evidence ({detail.citations.length})
                   </h3>
                   <div className="space-y-2">
                     {citationFeedback && (
                       <div
                         role="status"
-                        className="rounded-lg border border-[#292A23] bg-[#080907] px-3 py-2 text-[11px] font-mono text-[#A5A69D]"
+                        className="rounded-lg border border-[#CAC4CE]/25 bg-[#242038] px-3 py-2 text-[11px] font-mono text-[#CAC4CE]"
                       >
                         {citationFeedback}
                       </div>
@@ -558,13 +558,13 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
                               }
                             : undefined
                         }
-                        className="p-3 rounded-xl bg-[#12130F] border border-[#292A23] hover:border-[#8C806F]/50 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B9915E]"
+                        className="p-3 rounded-xl bg-[#242038] border border-[#CAC4CE]/20 hover:border-[#9067C6] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9067C6]"
                       >
-                        <div className="flex items-center justify-between text-[11px] font-mono text-[#A5A69D] mb-1">
-                          <span className="text-[#757F6C] font-medium">{c.source_type}</span>
+                        <div className="flex items-center justify-between text-[11px] font-mono text-[#CAC4CE] mb-1">
+                          <span className="text-[#C5B0E6] font-medium">{c.source_type}</span>
                           <span>{c.author ? `@${c.author}` : 'Anonymous'}</span>
                         </div>
-                        <p className="quote-text text-xs text-[#F5F3ED] leading-relaxed border-l-2 border-[#757F6C] pl-2.5">
+                        <p className="quote-text text-xs text-[#F7ECE1] leading-relaxed border-l-2 border-[#9067C6] pl-2.5">
                           "{c.quote}"
                         </p>
                         {c.source_url && (
@@ -574,7 +574,7 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
                               target="_blank"
                               rel="noreferrer"
                               onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center gap-1 text-[11px] font-mono text-[#757F6C] hover:text-[#AFD2FA] hover:underline"
+                              className="inline-flex items-center gap-1 text-[11px] font-mono text-[#C5B0E6] hover:text-[#F7ECE1] hover:underline"
                             >
                               <span>View Source</span>
                               <ExternalLink className="w-3 h-3" />
@@ -590,14 +590,14 @@ export const DecisionDrawer: React.FC<DecisionDrawerProps> = ({
               {/* Evidence Gaps */}
               {detail.evidence_gaps && detail.evidence_gaps.length > 0 && (
                 <div className="space-y-1.5">
-                  <h3 className="text-xs font-mono uppercase tracking-wider text-[#d29922] flex items-center gap-1.5">
+                  <h3 className="text-xs font-mono uppercase tracking-wider text-[#e3b341] flex items-center gap-1.5">
                     <ShieldAlert className="w-3.5 h-3.5" />
                     Evidence Gaps ({detail.evidence_gaps.length})
                   </h3>
-                  <ul className="space-y-1 bg-[#12130F] border border-[#d29922]/30 p-2.5 rounded-xl text-xs text-[#e3b341] font-mono">
+                  <ul className="space-y-1 bg-[#242038] border border-[#e3b341]/35 p-2.5 rounded-xl text-xs text-[#e3b341] font-mono">
                     {detail.evidence_gaps.map((gap, i) => (
                       <li key={i} className="flex items-start gap-1.5">
-                        <span className="text-[#d29922]">•</span>
+                        <span className="text-[#e3b341]">•</span>
                         <span>{gap}</span>
                       </li>
                     ))}

@@ -248,31 +248,31 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
       : 'Auto-poll scheduled (30s)';
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-4rem)] bg-[#080907] w-full text-[#F5F3ED]">
+    <div className="flex flex-col min-h-[calc(100vh-4rem)] bg-[#191628] w-full text-[#F7ECE1]">
       {/* Top Header & Breadcrumb Bar */}
-      <div className="border-b border-[#292A23] bg-[#0B0C09]/95 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-5">
+      <div className="border-b border-[#CAC4CE]/20 bg-[#242038]/95 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-5">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-3 pt-1">
-              <div className="p-2 rounded-xl bg-[#080907] text-[#B9915E] border border-[#292A23]">
+              <div className="p-2 rounded-xl bg-[#161324] text-[#9067C6] border border-[#9067C6]/40">
                 <Activity className="w-5 h-5" />
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold font-sans text-[#F5F3ED] tracking-tight flex items-center gap-2.5">
+                <h1 className="text-xl sm:text-2xl font-bold font-sans text-[#F7ECE1] tracking-tight flex items-center gap-2.5">
                   <span>Repository Telemetry & Provenance Pipeline</span>
                   <span
                     className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold ${
                       !hasPolled
-                        ? 'bg-[#181914] text-[#A5A69D] border border-[#292A23]'
+                        ? 'bg-[#161324] text-[#CAC4CE] border border-[#CAC4CE]/25'
                         : isHealthOnline
-                          ? 'bg-[#2ea043]/15 text-[#3fb950] border border-[#2ea043]/30'
-                          : 'bg-[#da3633]/15 text-[#f85149] border border-[#da3633]/30'
+                          ? 'bg-[#3fb950]/15 text-[#3fb950] border border-[#3fb950]/35'
+                          : 'bg-[#f85149]/15 text-[#f85149] border border-[#f85149]/35'
                     }`}
                   >
                     <span
                       className={`w-1.5 h-1.5 rounded-full ${
                         !hasPolled
-                          ? 'bg-[#A5A69D]'
+                          ? 'bg-[#CAC4CE]'
                           : isHealthOnline
                             ? 'bg-[#3fb950] animate-pulse'
                             : 'bg-[#f85149]'
@@ -281,7 +281,7 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
                     {!hasPolled ? 'Checking API…' : isHealthOnline ? 'Live API Online' : 'Service Offline'}
                   </span>
                 </h1>
-                <p className="text-xs text-[#A5A69D] font-mono">
+                <p className="text-xs text-[#CAC4CE] font-mono">
                   Telemetry polled every 30s • Active source: {activeDataSource} • Exact contract schema
                 </p>
               </div>
@@ -303,10 +303,10 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
             <button
               onClick={handleManualRefresh}
               disabled={isManualRefreshing}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#757F6C]/15 hover:bg-[#757F6C]/30 text-[#F5F3ED] border border-[#757F6C]/40 text-xs font-mono transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#9067C6] hover:bg-[#7B52B3] text-white border border-[#9067C6] text-xs font-mono font-semibold transition-colors cursor-pointer disabled:opacity-50"
               title="Manual Poll Telemetry"
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-[#B9915E] ${isManualRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 text-white ${isManualRefreshing ? 'animate-spin' : ''}`} />
               <span>Poll Now</span>
             </button>
           </div>
@@ -317,24 +317,24 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 space-y-8">
         
         {/* Telemetry Polling Header Callout */}
-        <div className="p-4 rounded-xl bg-[#12130F] border border-[#292A23] flex flex-wrap items-center justify-between gap-4 text-xs font-mono shadow-sm">
+        <div className="p-4 rounded-xl bg-[#242038] border border-[#CAC4CE]/20 flex flex-wrap items-center justify-between gap-4 text-xs font-mono shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-[#080907] text-[#B9915E] border border-[#292A23]">
+            <div className="p-2 rounded-xl bg-[#161324] text-[#9067C6] border border-[#CAC4CE]/25">
               <Server className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-[#A5A69D] block text-[10px] uppercase tracking-wider font-semibold">
+              <span className="text-[#CAC4CE] block text-[10px] uppercase tracking-wider font-semibold">
                 Active Engine Core
               </span>
-              <span className="text-sm font-bold text-[#F5F3ED]">
+              <span className="text-sm font-bold text-[#F7ECE1]">
                 CodeWhy Engine {health?.version ? `v${health.version}` : ''} ({activeDataSource} mode)
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 text-[#A5A69D]">
+          <div className="flex items-center gap-4 text-[#CAC4CE]">
             <span className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-[#B9915E]" />
+              <Clock className="w-3.5 h-3.5 text-[#9067C6]" />
               <span>
                 {lastPolledAt
                   ? `Last successful poll: ${lastPolledAt.toLocaleTimeString()}`
@@ -343,17 +343,17 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
                     : 'Awaiting first poll'}
               </span>
             </span>
-            <span className="px-2 py-0.5 rounded bg-[#080907] text-[#F5F3ED] border border-[#292A23]">
+            <span className="px-2 py-0.5 rounded bg-[#161324] text-[#F7ECE1] border border-[#CAC4CE]/25">
               Latency: {hasSuccessfulPoll ? `${latencyMs}ms` : '—'}
             </span>
-            <span className="text-[#757F6C]">{pollingLabel}</span>
+            <span className="text-[#8D86C9]">{pollingLabel}</span>
           </div>
         </div>
 
         {pollError && (
           <div
             role="alert"
-            className="p-3.5 rounded-xl bg-[#12130F] border border-[#da3633]/40 text-[#f85149] text-xs font-mono flex items-start gap-2.5"
+            className="p-3.5 rounded-xl bg-[#242038] border border-[#f85149]/45 text-[#f85149] text-xs font-mono flex items-start gap-2.5"
           >
             <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>
@@ -366,26 +366,26 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono uppercase tracking-wider text-[#A5A69D] font-bold">
+              <span className="text-xs font-mono uppercase tracking-wider text-[#CAC4CE] font-bold">
                 Archeology Pipeline Lifecycle
               </span>
-              <div className="h-px bg-[#292A23] w-24 sm:w-48" />
+              <div className="h-px bg-[#CAC4CE]/20 w-24 sm:w-48" />
             </div>
 
             {/* Visual Pipeline Flow: Ingest → Extract → Graph */}
             <div className="flex items-center gap-2 text-xs font-mono">
-              <span className="px-2.5 py-0.5 rounded-lg bg-[#080907] text-[#AFD2FA] border border-[#AFD2FA]/30 font-semibold flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#AFD2FA]" />
+              <span className="px-2.5 py-0.5 rounded-lg bg-[#161324] text-[#C5B0E6] border border-[#8D86C9]/40 font-semibold flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#8D86C9]" />
                 Ingest
               </span>
-              <ArrowRight className="w-3.5 h-3.5 text-[#8C806F]" />
-              <span className="px-2.5 py-0.5 rounded-lg bg-[#080907] text-[#3fb950] border border-[#2ea043]/30 font-semibold flex items-center gap-1.5">
+              <ArrowRight className="w-3.5 h-3.5 text-[#CAC4CE]" />
+              <span className="px-2.5 py-0.5 rounded-lg bg-[#161324] text-[#3fb950] border border-[#3fb950]/35 font-semibold flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#3fb950]" />
                 Extract
               </span>
-              <ArrowRight className="w-3.5 h-3.5 text-[#8C806F]" />
-              <span className="px-2.5 py-0.5 rounded-lg bg-[#080907] text-[#B9915E] border border-[#B9915E]/30 font-semibold flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#B9915E]" />
+              <ArrowRight className="w-3.5 h-3.5 text-[#CAC4CE]" />
+              <span className="px-2.5 py-0.5 rounded-lg bg-[#161324] text-[#C5B0E6] border border-[#9067C6]/45 font-semibold flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#9067C6]" />
                 Graph
               </span>
             </div>
@@ -394,41 +394,41 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
             {/* Stage 1: Ingest */}
-            <div className="rounded-xl p-5 bg-[#12130F] border border-[#292A23] space-y-4 relative overflow-hidden group shadow-sm">
-              <div className="flex items-center justify-between border-b border-[#292A23] pb-3">
+            <div className="rounded-xl p-5 bg-[#242038] border border-[#CAC4CE]/20 space-y-4 relative overflow-hidden group shadow-sm">
+              <div className="flex items-center justify-between border-b border-[#CAC4CE]/20 pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-lg bg-[#080907] text-[#AFD2FA] flex items-center justify-center font-mono font-bold text-xs border border-[#292A23]">
+                  <span className="w-6 h-6 rounded-lg bg-[#161324] text-[#8D86C9] flex items-center justify-center font-mono font-bold text-xs border border-[#CAC4CE]/25">
                     1
                   </span>
-                  <h3 className="font-mono text-sm font-bold text-[#F5F3ED] tracking-wide">
+                  <h3 className="font-mono text-sm font-bold text-[#F7ECE1] tracking-wide">
                     Ingest
                   </h3>
                 </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#080907] text-[#AFD2FA] border border-[#292A23]">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#161324] text-[#C5B0E6] border border-[#CAC4CE]/25">
                   Raw Sources
                 </span>
               </div>
 
-              <p className="text-xs text-[#A5A69D] font-sans leading-relaxed">
+              <p className="text-xs text-[#CAC4CE] font-sans leading-relaxed">
                 Ingests Git commits, merged and unmerged pull requests, and documentation artifacts.
               </p>
 
               {/* Exact returned counts */}
               <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                <div className="p-3 rounded-lg bg-[#080907] border border-[#292A23] space-y-1">
-                  <span className="text-[10px] text-[#A5A69D] uppercase flex items-center gap-1">
-                    <GitPullRequest className="w-3 h-3 text-[#AFD2FA]" /> PRs
+                <div className="p-3 rounded-lg bg-[#161324] border border-[#CAC4CE]/20 space-y-1">
+                  <span className="text-[10px] text-[#CAC4CE] uppercase flex items-center gap-1">
+                    <GitPullRequest className="w-3 h-3 text-[#8D86C9]" /> PRs
                   </span>
-                  <span className="text-lg font-bold text-[#F5F3ED]">
+                  <span className="text-lg font-bold text-[#F7ECE1]">
                     {repoData?.counts.pull_requests ?? 0}
                   </span>
                 </div>
 
-                <div className="p-3 rounded-lg bg-[#080907] border border-[#292A23] space-y-1">
-                  <span className="text-[10px] text-[#A5A69D] uppercase flex items-center gap-1">
-                    <GitCommit className="w-3 h-3 text-[#AFD2FA]" /> Commits
+                <div className="p-3 rounded-lg bg-[#161324] border border-[#CAC4CE]/20 space-y-1">
+                  <span className="text-[10px] text-[#CAC4CE] uppercase flex items-center gap-1">
+                    <GitCommit className="w-3 h-3 text-[#8D86C9]" /> Commits
                   </span>
-                  <span className="text-lg font-bold text-[#F5F3ED]">
+                  <span className="text-lg font-bold text-[#F7ECE1]">
                     {repoData?.counts.commits ?? 0}
                   </span>
                 </div>
@@ -437,57 +437,57 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
               {/* Ingest extra fields only when returned */}
               <div className="space-y-1 pt-1 text-xs font-mono">
                 {repoData?.prs_fetched !== undefined && repoData?.prs_fetched !== null && (
-                  <div className="flex items-center justify-between text-[#A5A69D]">
+                  <div className="flex items-center justify-between text-[#CAC4CE]">
                     <span>PRs Fetched:</span>
-                    <span className="text-[#F5F3ED] font-bold">{repoData.prs_fetched}</span>
+                    <span className="text-[#F7ECE1] font-bold">{repoData.prs_fetched}</span>
                   </div>
                 )}
                 {repoData?.sources_analyzed !== undefined && repoData?.sources_analyzed !== null && (
-                  <div className="flex items-center justify-between text-[#A5A69D]">
+                  <div className="flex items-center justify-between text-[#CAC4CE]">
                     <span>Sources Analyzed:</span>
-                    <span className="text-[#F5F3ED] font-bold">{repoData.sources_analyzed}</span>
+                    <span className="text-[#F7ECE1] font-bold">{repoData.sources_analyzed}</span>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Stage 2: Extract */}
-            <div className="rounded-xl p-5 bg-[#12130F] border border-[#292A23] space-y-4 relative overflow-hidden group shadow-sm">
-              <div className="flex items-center justify-between border-b border-[#292A23] pb-3">
+            <div className="rounded-xl p-5 bg-[#242038] border border-[#CAC4CE]/20 space-y-4 relative overflow-hidden group shadow-sm">
+              <div className="flex items-center justify-between border-b border-[#CAC4CE]/20 pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-lg bg-[#080907] text-[#3fb950] flex items-center justify-center font-mono font-bold text-xs border border-[#292A23]">
+                  <span className="w-6 h-6 rounded-lg bg-[#161324] text-[#3fb950] flex items-center justify-center font-mono font-bold text-xs border border-[#CAC4CE]/25">
                     2
                   </span>
-                  <h3 className="font-mono text-sm font-bold text-[#F5F3ED] tracking-wide">
+                  <h3 className="font-mono text-sm font-bold text-[#F7ECE1] tracking-wide">
                     Extract
                   </h3>
                 </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#080907] text-[#3fb950] border border-[#292A23]">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#161324] text-[#3fb950] border border-[#CAC4CE]/25">
                   Quotes & Rules
                 </span>
               </div>
 
-              <p className="text-xs text-[#A5A69D] font-sans leading-relaxed">
+              <p className="text-xs text-[#CAC4CE] font-sans leading-relaxed">
                 Applies character-level verbatim quote verification and extracts explicit decision records.
               </p>
 
               {/* Exact returned counts & extraction version (only when returned) */}
               <div className={`grid ${health?.version ? 'grid-cols-2' : 'grid-cols-1'} gap-2 text-xs font-mono`}>
-                <div className="p-3 rounded-lg bg-[#080907] border border-[#292A23] space-y-1">
-                  <span className="text-[10px] text-[#A5A69D] uppercase flex items-center gap-1">
+                <div className="p-3 rounded-lg bg-[#161324] border border-[#CAC4CE]/20 space-y-1">
+                  <span className="text-[10px] text-[#CAC4CE] uppercase flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3 text-[#3fb950]" /> Decisions
                   </span>
-                  <span className="text-lg font-bold text-[#F5F3ED]">
+                  <span className="text-lg font-bold text-[#F7ECE1]">
                     {repoData?.counts.decisions ?? 0}
                   </span>
                 </div>
 
                 {health?.version && (
-                  <div className="p-3 rounded-lg bg-[#080907] border border-[#292A23] space-y-1">
-                    <span className="text-[10px] text-[#A5A69D] uppercase flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3 text-[#B9915E]" /> Extraction Ver
+                  <div className="p-3 rounded-lg bg-[#161324] border border-[#CAC4CE]/20 space-y-1">
+                    <span className="text-[10px] text-[#CAC4CE] uppercase flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-[#9067C6]" /> Extraction Ver
                     </span>
-                    <span className="text-sm font-bold text-[#B9915E] truncate">
+                    <span className="text-sm font-bold text-[#C5B0E6] truncate">
                       v{health.version}
                     </span>
                   </div>
@@ -497,16 +497,16 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
               {/* Skipped Work & Verified Decisions (only when returned) */}
               <div className="space-y-1.5 pt-1 text-xs font-mono">
                 {repoData?.verified_decisions !== undefined && repoData?.verified_decisions !== null && (
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-[#2ea043]/10 border border-[#2ea043]/20 text-[#3fb950]">
-                    <span className="flex items-center gap-1.5 text-[#A5A69D]">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-[#3fb950]/10 border border-[#3fb950]/25 text-[#3fb950]">
+                    <span className="flex items-center gap-1.5 text-[#CAC4CE]">
                       <CheckCircle2 className="w-3 h-3 text-[#3fb950]" /> Verified Decisions:
                     </span>
                     <span className="text-[#3fb950] font-bold">{repoData.verified_decisions}</span>
                   </div>
                 )}
                 {repoData?.prs_noise_skipped !== undefined && repoData?.prs_noise_skipped !== null && (
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-[#d29922]/10 border border-[#d29922]/20 text-[#e3b341]">
-                    <span className="flex items-center gap-1.5 text-[#A5A69D]">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-[#e3b341]/10 border border-[#e3b341]/25 text-[#e3b341]">
+                    <span className="flex items-center gap-1.5 text-[#CAC4CE]">
                       <ShieldCheck className="w-3 h-3 text-[#e3b341]" /> Skipped Work (Noise PRs):
                     </span>
                     <span className="text-[#e3b341] font-bold">{repoData.prs_noise_skipped}</span>
@@ -516,41 +516,41 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
             </div>
 
             {/* Stage 3: Graph */}
-            <div className="rounded-xl p-5 bg-[#12130F] border border-[#292A23] space-y-4 relative overflow-hidden group shadow-sm">
-              <div className="flex items-center justify-between border-b border-[#292A23] pb-3">
+            <div className="rounded-xl p-5 bg-[#242038] border border-[#CAC4CE]/20 space-y-4 relative overflow-hidden group shadow-sm">
+              <div className="flex items-center justify-between border-b border-[#CAC4CE]/20 pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-lg bg-[#080907] text-[#B9915E] flex items-center justify-center font-mono font-bold text-xs border border-[#292A23]">
+                  <span className="w-6 h-6 rounded-lg bg-[#161324] text-[#9067C6] flex items-center justify-center font-mono font-bold text-xs border border-[#CAC4CE]/25">
                     3
                   </span>
-                  <h3 className="font-mono text-sm font-bold text-[#F5F3ED] tracking-wide">
+                  <h3 className="font-mono text-sm font-bold text-[#F7ECE1] tracking-wide">
                     Graph
                   </h3>
                 </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#080907] text-[#B9915E] border border-[#292A23]">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#161324] text-[#C5B0E6] border border-[#CAC4CE]/25">
                   Entities & Lineage
                 </span>
               </div>
 
-              <p className="text-xs text-[#A5A69D] font-sans leading-relaxed">
+              <p className="text-xs text-[#CAC4CE] font-sans leading-relaxed">
                 Connects code entities, temporal supersessions, and evidence receipts into a queryable graph.
               </p>
 
               {/* Exact returned counts */}
               <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                <div className="p-3 rounded-lg bg-[#080907] border border-[#292A23] space-y-1">
-                  <span className="text-[10px] text-[#A5A69D] uppercase flex items-center gap-1">
-                    <FileCode className="w-3 h-3 text-[#B9915E]" /> Entities
+                <div className="p-3 rounded-lg bg-[#161324] border border-[#CAC4CE]/20 space-y-1">
+                  <span className="text-[10px] text-[#CAC4CE] uppercase flex items-center gap-1">
+                    <FileCode className="w-3 h-3 text-[#9067C6]" /> Entities
                   </span>
-                  <span className="text-lg font-bold text-[#F5F3ED]">
+                  <span className="text-lg font-bold text-[#F7ECE1]">
                     {repoData?.counts.entities ?? 0}
                   </span>
                 </div>
 
-                <div className="p-3 rounded-lg bg-[#080907] border border-[#292A23] space-y-1">
-                  <span className="text-[10px] text-[#A5A69D] uppercase flex items-center gap-1">
-                    <Database className="w-3 h-3 text-[#B9915E]" /> Backing
+                <div className="p-3 rounded-lg bg-[#161324] border border-[#CAC4CE]/20 space-y-1">
+                  <span className="text-[10px] text-[#CAC4CE] uppercase flex items-center gap-1">
+                    <Database className="w-3 h-3 text-[#8D86C9]" /> Backing
                   </span>
-                  <span className="text-xs font-bold text-[#AFD2FA] uppercase truncate">
+                  <span className="text-xs font-bold text-[#C5B0E6] uppercase truncate">
                     {activeDataSource}
                   </span>
                 </div>
@@ -558,8 +558,8 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
 
               {/* Storage State (Local SQLite vs Remote Neo4j) */}
               <div className="pt-1 text-xs font-mono">
-                <div className="p-2.5 rounded-lg bg-[#080907] border border-[#292A23] flex items-center justify-between">
-                  <span className="text-[#A5A69D]">Graph Database:</span>
+                <div className="p-2.5 rounded-lg bg-[#161324] border border-[#CAC4CE]/20 flex items-center justify-between">
+                  <span className="text-[#CAC4CE]">Graph Database:</span>
                   <span
                     className={`font-semibold ${
                       isGraphRemoteConfigured ? 'text-[#3fb950]' : 'text-[#e3b341]'
@@ -574,11 +574,11 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
         </div>
 
         {/* 2. SQLITE-BACKED STATUS USABLE IF GRAPH IS OFFLINE */}
-        <div className="p-5 rounded-xl bg-[#12130F] border border-[#292A23] space-y-3 shadow-sm">
+        <div className="p-5 rounded-xl bg-[#242038] border border-[#CAC4CE]/20 space-y-3 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Database className="w-4 h-4 text-[#B9915E]" />
-              <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#F5F3ED]">
+              <Database className="w-4 h-4 text-[#9067C6]" />
+              <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-[#F7ECE1]">
                 Persistence & Storage Resilience (SQLite Local Fallback)
               </h3>
             </div>
@@ -587,25 +587,25 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
             </span>
           </div>
 
-          <p className="text-xs font-mono text-[#A5A69D] leading-relaxed">
+          <p className="text-xs font-mono text-[#CAC4CE] leading-relaxed">
             CodeWhy is architected with complete local SQLite resilience. If an external graph database
             (Neo4j) is unconfigured or offline, CodeWhy serves all decision queries, quote checks, and
             entity lineage seamlessly using the local SQLite store and in-memory indexes.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs font-mono">
-            <div className="p-3 rounded-lg bg-[#080907] border border-[#292A23]">
-              <span className="text-[#A5A69D] block text-[10px] uppercase font-mono">Active Data Source</span>
-              <span className="text-[#AFD2FA] font-bold text-sm uppercase font-mono">{activeDataSource}</span>
+            <div className="p-3 rounded-lg bg-[#161324] border border-[#CAC4CE]/20">
+              <span className="text-[#CAC4CE] block text-[10px] uppercase font-mono">Active Data Source</span>
+              <span className="text-[#C5B0E6] font-bold text-sm uppercase font-mono">{activeDataSource}</span>
             </div>
-            <div className="p-3 rounded-lg bg-[#080907] border border-[#292A23]">
-              <span className="text-[#A5A69D] block text-[10px] uppercase font-mono">Graph Query Engine</span>
-              <span className="text-[#F5F3ED] font-bold text-sm font-mono">
+            <div className="p-3 rounded-lg bg-[#161324] border border-[#CAC4CE]/20">
+              <span className="text-[#CAC4CE] block text-[10px] uppercase font-mono">Graph Query Engine</span>
+              <span className="text-[#F7ECE1] font-bold text-sm font-mono">
                 {isGraphRemoteConfigured ? 'Remote Neo4j' : 'Local SQLite Graph'}
               </span>
             </div>
-            <div className="p-3 rounded-lg bg-[#080907] border border-[#292A23]">
-              <span className="text-[#A5A69D] block text-[10px] uppercase font-mono">Query Availability</span>
+            <div className="p-3 rounded-lg bg-[#161324] border border-[#CAC4CE]/20">
+              <span className="text-[#CAC4CE] block text-[10px] uppercase font-mono">Query Availability</span>
               <span className={`font-bold text-sm font-mono ${queryAvailabilityClass}`}>
                 {queryAvailability}
               </span>
@@ -616,10 +616,10 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
         {/* 3. DEPENDENCY SERVICES STATUS (From GET /api/v1/health/dependencies) */}
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono uppercase tracking-wider text-[#A5A69D] font-bold">
+            <span className="text-xs font-mono uppercase tracking-wider text-[#CAC4CE] font-bold">
               Configured Services & Dependencies
             </span>
-            <div className="h-px bg-[#292A23] flex-1" />
+            <div className="h-px bg-[#CAC4CE]/20 flex-1" />
           </div>
 
           {dependencies?.services && dependencies.services.length > 0 ? (
@@ -629,25 +629,25 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
                 return (
                   <div
                     key={svc.name}
-                    className="p-4 rounded-xl bg-[#12130F] border border-[#292A23] space-y-2 shadow-sm"
+                    className="p-4 rounded-xl bg-[#242038] border border-[#CAC4CE]/20 space-y-2 shadow-sm"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-[#F5F3ED] uppercase text-xs flex items-center gap-1.5">
-                        <Cpu className="w-3.5 h-3.5 text-[#B9915E]" />
+                      <span className="font-bold text-[#F7ECE1] uppercase text-xs flex items-center gap-1.5">
+                        <Cpu className="w-3.5 h-3.5 text-[#9067C6]" />
                         {svc.name}
                       </span>
                       <span
                         className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
                           isConfigured
-                            ? 'bg-[#2ea043]/15 text-[#3fb950] border border-[#2ea043]/30'
-                            : 'bg-[#181914] text-[#A5A69D] border border-[#292A23]'
+                            ? 'bg-[#3fb950]/15 text-[#3fb950] border border-[#3fb950]/35'
+                            : 'bg-[#161324] text-[#CAC4CE] border border-[#CAC4CE]/25'
                         }`}
                       >
                         {svc.status}
                       </span>
                     </div>
 
-                    <p className="text-[11px] text-[#A5A69D] leading-snug break-words font-mono">
+                    <p className="text-[11px] text-[#CAC4CE] leading-snug break-words font-mono">
                       {svc.detail}
                     </p>
                   </div>
@@ -655,7 +655,7 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
               })}
             </div>
           ) : (
-            <div className="p-4 rounded-xl bg-[#12130F] border border-[#292A23] text-xs font-mono text-[#A5A69D]">
+            <div className="p-4 rounded-xl bg-[#242038] border border-[#CAC4CE]/20 text-xs font-mono text-[#CAC4CE]">
               Awaiting dependency telemetry from GET /api/v1/health/dependencies...
             </div>
           )}
@@ -664,53 +664,53 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
         {/* 4. FOUR SUPPORTED ANSWER OUTCOMES CONTRACT */}
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono uppercase tracking-wider text-[#A5A69D] font-bold">
+            <span className="text-xs font-mono uppercase tracking-wider text-[#CAC4CE] font-bold">
               Available Query Outcomes & Protocol Responses
             </span>
-            <div className="h-px bg-[#292A23] flex-1" />
+            <div className="h-px bg-[#CAC4CE]/20 flex-1" />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-mono">
             {/* Outcome 1: Full Answer */}
-            <div className="p-4 rounded-xl bg-[#12130F] border border-[#2ea043]/30 space-y-2 shadow-sm">
+            <div className="p-4 rounded-xl bg-[#242038] border border-[#3fb950]/35 space-y-2 shadow-sm">
               <div className="flex items-center gap-2 text-[#3fb950] font-bold">
                 <CheckCircle2 className="w-4 h-4 text-[#3fb950]" />
                 <span>Full Answer</span>
               </div>
-              <p className="text-[#A5A69D] leading-relaxed font-sans text-xs">
+              <p className="text-[#CAC4CE] leading-relaxed font-sans text-xs">
                 Verified decision path with quoted verbatim rationale surviving quote check. High confidence score.
               </p>
             </div>
 
             {/* Outcome 2: Partial Answer */}
-            <div className="p-4 rounded-xl bg-[#12130F] border border-[#d29922]/30 space-y-2 shadow-sm">
+            <div className="p-4 rounded-xl bg-[#242038] border border-[#e3b341]/35 space-y-2 shadow-sm">
               <div className="flex items-center gap-2 text-[#e3b341] font-bold">
                 <HelpCircle className="w-4 h-4 text-[#e3b341]" />
                 <span>Partial Answer</span>
               </div>
-              <p className="text-[#A5A69D] leading-relaxed font-sans text-xs">
-                Change recorded in history, rationale missing or unquoted (<code className="bg-[#080907] border border-[#292A23] px-1 py-0.5 rounded text-[#e3b341]">no_verified_quote</code>). Enumerates gaps.
+              <p className="text-[#CAC4CE] leading-relaxed font-sans text-xs">
+                Change recorded in history, rationale missing or unquoted (<code className="bg-[#161324] border border-[#CAC4CE]/25 px-1 py-0.5 rounded text-[#e3b341]">no_verified_quote</code>). Enumerates gaps.
               </p>
             </div>
 
             {/* Outcome 3: Refusal */}
-            <div className="p-4 rounded-xl bg-[#12130F] border border-[#292A23] space-y-2 shadow-sm">
-              <div className="flex items-center gap-2 text-[#F5F3ED] font-bold">
-                <XCircle className="w-4 h-4 text-[#8C806F]" />
+            <div className="p-4 rounded-xl bg-[#242038] border border-[#CAC4CE]/25 space-y-2 shadow-sm">
+              <div className="flex items-center gap-2 text-[#F7ECE1] font-bold">
+                <XCircle className="w-4 h-4 text-[#CAC4CE]" />
                 <span>Calibrated Refusal</span>
               </div>
-              <p className="text-[#A5A69D] leading-relaxed font-sans text-xs">
-                Truthful refusal (<code className="bg-[#080907] border border-[#292A23] px-1 py-0.5 rounded text-[#8C806F]">no_decision_path</code>, <code className="bg-[#080907] border border-[#292A23] px-1 py-0.5 rounded text-[#8C806F]">entity_not_found</code>, <code className="bg-[#080907] border border-[#292A23] px-1 py-0.5 rounded text-[#8C806F]">out_of_scope</code>).
+              <p className="text-[#CAC4CE] leading-relaxed font-sans text-xs">
+                Truthful refusal (<code className="bg-[#161324] border border-[#CAC4CE]/25 px-1 py-0.5 rounded text-[#CAC4CE]">no_decision_path</code>, <code className="bg-[#161324] border border-[#CAC4CE]/25 px-1 py-0.5 rounded text-[#CAC4CE]">entity_not_found</code>, <code className="bg-[#161324] border border-[#CAC4CE]/25 px-1 py-0.5 rounded text-[#CAC4CE]">out_of_scope</code>).
               </p>
             </div>
 
             {/* Outcome 4: Ambiguous Entity */}
-            <div className="p-4 rounded-xl bg-[#12130F] border border-[#B9915E]/30 space-y-2 shadow-sm">
-              <div className="flex items-center gap-2 text-[#B9915E] font-bold">
-                <Box className="w-4 h-4 text-[#B9915E]" />
+            <div className="p-4 rounded-xl bg-[#242038] border border-[#9067C6]/45 space-y-2 shadow-sm">
+              <div className="flex items-center gap-2 text-[#C5B0E6] font-bold">
+                <Box className="w-4 h-4 text-[#9067C6]" />
                 <span>Ambiguous Entity</span>
               </div>
-              <p className="text-[#A5A69D] leading-relaxed font-sans text-xs">
+              <p className="text-[#CAC4CE] leading-relaxed font-sans text-xs">
                 Matches multiple files or keys. Returns candidate chips for immediate disambiguation.
               </p>
             </div>
@@ -718,53 +718,53 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
         </div>
 
         {/* 5. REPOSITORY METADATA & TIMESTAMPS (Only when returned) */}
-        <div className="p-5 rounded-xl bg-[#12130F] border border-[#292A23] space-y-3 text-xs font-mono shadow-sm">
+        <div className="p-5 rounded-xl bg-[#242038] border border-[#CAC4CE]/20 space-y-3 text-xs font-mono shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#F5F3ED] uppercase tracking-wider">
+            <span className="text-xs font-bold text-[#F7ECE1] uppercase tracking-wider">
               Repository Specification Record
             </span>
             {repoData?.fixture && (
-              <span className="px-2 py-0.5 rounded bg-[#d29922]/15 text-[#e3b341] border border-[#d29922]/30 text-[10px]">
+              <span className="px-2 py-0.5 rounded bg-[#9067C6]/20 text-[#F7ECE1] border border-[#9067C6]/45 text-[10px]">
                 Synthetic Benchmark Fixture
               </span>
             )}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-[#A5A69D]">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-[#CAC4CE]">
             <div>
-              <span className="text-[10px] text-[#A5A69D] block uppercase">Repository ID</span>
-              <span className="text-[#F5F3ED] font-bold">{repoData?.id || repoId}</span>
+              <span className="text-[10px] text-[#CAC4CE] block uppercase">Repository ID</span>
+              <span className="text-[#F7ECE1] font-bold">{repoData?.id || repoId}</span>
             </div>
             <div>
-              <span className="text-[10px] text-[#A5A69D] block uppercase">Name</span>
-              <span className="text-[#F5F3ED] font-bold">{repoData?.name || repoId}</span>
+              <span className="text-[10px] text-[#CAC4CE] block uppercase">Name</span>
+              <span className="text-[#F7ECE1] font-bold">{repoData?.name || repoId}</span>
             </div>
             {repoData?.full_name && (
               <div>
-                <span className="text-[10px] text-[#A5A69D] block uppercase">Full Name</span>
-                <span className="text-[#F5F3ED] font-bold">{repoData.full_name}</span>
+                <span className="text-[10px] text-[#CAC4CE] block uppercase">Full Name</span>
+                <span className="text-[#F7ECE1] font-bold">{repoData.full_name}</span>
               </div>
             )}
             {repoData?.owner && (
               <div>
-                <span className="text-[10px] text-[#A5A69D] block uppercase">Owner</span>
-                <span className="text-[#F5F3ED] font-bold">{repoData.owner}</span>
+                <span className="text-[10px] text-[#CAC4CE] block uppercase">Owner</span>
+                <span className="text-[#F7ECE1] font-bold">{repoData.owner}</span>
               </div>
             )}
             {repoData?.scope && (
               <div>
-                <span className="text-[10px] text-[#A5A69D] block uppercase">Scope</span>
-                <span className="text-[#F5F3ED] font-bold">{repoData.scope}</span>
+                <span className="text-[10px] text-[#CAC4CE] block uppercase">Scope</span>
+                <span className="text-[#F7ECE1] font-bold">{repoData.scope}</span>
               </div>
             )}
             {repoData?.url && (
               <div>
-                <span className="text-[10px] text-[#A5A69D] block uppercase">Source URL</span>
+                <span className="text-[10px] text-[#CAC4CE] block uppercase">Source URL</span>
                 <a
                   href={repoData.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#757F6C] hover:text-[#AFD2FA] font-bold truncate block underline transition-colors"
+                  className="text-[#C5B0E6] hover:text-[#F7ECE1] font-bold truncate block underline transition-colors"
                 >
                   {repoData.url}
                 </a>
@@ -772,8 +772,8 @@ export const RepositoryStatusView: React.FC<RepositoryStatusViewProps> = ({
             )}
             {repoData?.last_rebuilt_at && (
               <div>
-                <span className="text-[10px] text-[#A5A69D] block uppercase">Last Rebuilt Timestamp</span>
-                <span className="text-[#B9915E] font-bold">
+                <span className="text-[10px] text-[#CAC4CE] block uppercase">Last Rebuilt Timestamp</span>
+                <span className="text-[#C5B0E6] font-bold">
                   {new Date(repoData.last_rebuilt_at).toLocaleString()}
                 </span>
               </div>

@@ -3,6 +3,7 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
 } from 'react';
 import {
   ReactFlow,
@@ -16,6 +17,7 @@ import {
   type Node,
   type Edge,
   type NodeProps,
+  type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type {
@@ -57,12 +59,15 @@ import {
   Database,
   GitBranch,
   Loader2,
+  Focus,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
-const NODE_WIDTH = 280;
-const NODE_HEIGHT = 136;
-const NODE_SPACING = 380;
-const RADIAL_SPACING = 420;
+const NODE_WIDTH = 288;
+const NODE_HEIGHT = 144;
+const NODE_SPACING = 400;
+const RADIAL_SPACING = 440;
 
 function radialNodePositions(
   nodes: RawGraphNode[],
@@ -151,22 +156,22 @@ const CodeWhyGraphNode: React.FC<NodeProps<Node<CustomNodeData>>> = ({ data, sel
               ? 'Rejected'
               : 'Unresolved';
         const icon = state === 'ACTIVE'
-          ? <CheckCircle2 className="w-3.5 h-3.5 text-[#B9915E] shrink-0" />
+          ? <CheckCircle2 className="w-3.5 h-3.5 text-[#C5B0E6] shrink-0" />
           : state === 'SUPERSEDED'
-            ? <Clock className="w-3.5 h-3.5 text-[#8C806F] shrink-0" />
+            ? <Clock className="w-3.5 h-3.5 text-[#CAC4CE] shrink-0" />
             : state === 'REJECTED'
-              ? <XCircle className="w-3.5 h-3.5 text-[#E06C75] shrink-0" />
-              : <HelpCircle className="w-3.5 h-3.5 text-[#B9915E] shrink-0" />;
+              ? <XCircle className="w-3.5 h-3.5 text-[#f85149] shrink-0" />
+              : <HelpCircle className="w-3.5 h-3.5 text-[#e3b341] shrink-0" />;
         return {
           borderColor: isSelected
-            ? 'border-[#B9915E] ring-2 ring-[#B9915E]/40'
-            : 'border-[#B9915E]/50 hover:border-[#B9915E]',
-          bg: 'bg-[#12130F]',
-          badgeBg: 'bg-[#B9915E]/15 text-[#B9915E] border-[#B9915E]/30',
+            ? 'border-[#9067C6] ring-2 ring-[#9067C6]/50'
+            : 'border-[#9067C6]/55 hover:border-[#9067C6]',
+          bg: 'bg-[#242038]',
+          badgeBg: 'bg-[#9067C6]/20 text-[#F7ECE1] border-[#9067C6]/45',
           badgeText,
           icon,
-          glowColor: 'hover:shadow-[0_0_16px_rgba(185,145,94,0.2)]',
-          handleColor: '!bg-[#B9915E] !border-[#12130F]',
+          glowColor: 'hover:shadow-[0_0_20px_rgba(144,103,198,0.28)]',
+          handleColor: '!bg-[#9067C6] !border-[#242038]',
         };
       }
       case 'CodeEntity': {
@@ -174,112 +179,112 @@ const CodeWhyGraphNode: React.FC<NodeProps<Node<CustomNodeData>>> = ({ data, sel
         if (entType === 'Module') {
           return {
             borderColor: isSelected
-              ? 'border-[#757F6C] ring-2 ring-[#757F6C]/40'
-              : 'border-[#757F6C]/50 hover:border-[#757F6C]',
-            bg: 'bg-[#12130F]',
-            badgeBg: 'bg-[#757F6C]/15 text-[#AFD2FA] border-[#757F6C]/30',
+              ? 'border-[#8D86C9] ring-2 ring-[#8D86C9]/50'
+              : 'border-[#8D86C9]/55 hover:border-[#8D86C9]',
+            bg: 'bg-[#242038]',
+            badgeBg: 'bg-[#8D86C9]/20 text-[#F7ECE1] border-[#8D86C9]/45',
             badgeText: 'Module',
-            icon: <Folder className="w-3.5 h-3.5 text-[#757F6C] shrink-0" />,
-            glowColor: 'hover:shadow-[0_0_16px_rgba(117,127,108,0.2)]',
-            handleColor: '!bg-[#757F6C] !border-[#12130F]',
+            icon: <Folder className="w-3.5 h-3.5 text-[#8D86C9] shrink-0" />,
+            glowColor: 'hover:shadow-[0_0_20px_rgba(141,134,201,0.25)]',
+            handleColor: '!bg-[#8D86C9] !border-[#242038]',
           };
         }
         if (entType === 'ConfigKey') {
           return {
             borderColor: isSelected
-              ? 'border-[#8C806F] ring-2 ring-[#8C806F]/40'
-              : 'border-[#8C806F]/50 hover:border-[#8C806F]',
-            bg: 'bg-[#12130F]',
-            badgeBg: 'bg-[#8C806F]/15 text-[#F5F3ED] border-[#8C806F]/30',
+              ? 'border-[#CAC4CE] ring-2 ring-[#CAC4CE]/45'
+              : 'border-[#CAC4CE]/45 hover:border-[#CAC4CE]',
+            bg: 'bg-[#242038]',
+            badgeBg: 'bg-[#CAC4CE]/15 text-[#F7ECE1] border-[#CAC4CE]/35',
             badgeText: 'ConfigKey',
-            icon: <Key className="w-3.5 h-3.5 text-[#8C806F] shrink-0" />,
-            glowColor: 'hover:shadow-[0_0_16px_rgba(140,128,111,0.2)]',
-            handleColor: '!bg-[#8C806F] !border-[#12130F]',
+            icon: <Key className="w-3.5 h-3.5 text-[#CAC4CE] shrink-0" />,
+            glowColor: 'hover:shadow-[0_0_18px_rgba(202,196,206,0.2)]',
+            handleColor: '!bg-[#CAC4CE] !border-[#242038]',
           };
         }
         return {
           borderColor: isSelected
-            ? 'border-[#757F6C] ring-2 ring-[#757F6C]/40'
-            : 'border-[#757F6C]/50 hover:border-[#757F6C]',
-          bg: 'bg-[#12130F]',
-          badgeBg: 'bg-[#757F6C]/15 text-[#F5F3ED] border-[#757F6C]/30',
+            ? 'border-[#8D86C9] ring-2 ring-[#8D86C9]/50'
+            : 'border-[#8D86C9]/55 hover:border-[#8D86C9]',
+          bg: 'bg-[#242038]',
+          badgeBg: 'bg-[#8D86C9]/20 text-[#F7ECE1] border-[#8D86C9]/45',
           badgeText: 'File',
-          icon: <FileCode className="w-3.5 h-3.5 text-[#757F6C] shrink-0" />,
-          glowColor: 'hover:shadow-[0_0_16px_rgba(117,127,108,0.2)]',
-          handleColor: '!bg-[#757F6C] !border-[#12130F]',
+          icon: <FileCode className="w-3.5 h-3.5 text-[#8D86C9] shrink-0" />,
+          glowColor: 'hover:shadow-[0_0_20px_rgba(141,134,201,0.25)]',
+          handleColor: '!bg-[#8D86C9] !border-[#242038]',
         };
       }
       case 'Commit':
         return {
           borderColor: isSelected
-            ? 'border-[#E06C75] ring-2 ring-[#E06C75]/40'
-            : 'border-[#E06C75]/40 hover:border-[#E06C75]',
-          bg: 'bg-[#12130F]',
-          badgeBg: 'bg-[#E06C75]/15 text-[#E06C75] border-[#E06C75]/30',
+            ? 'border-[#E06C75] ring-2 ring-[#E06C75]/50'
+            : 'border-[#E06C75]/45 hover:border-[#E06C75]',
+          bg: 'bg-[#242038]',
+          badgeBg: 'bg-[#E06C75]/15 text-[#F7ECE1] border-[#E06C75]/35',
           badgeText: 'Commit',
           icon: <GitCommit className="w-3.5 h-3.5 text-[#E06C75] shrink-0" />,
-          glowColor: 'hover:shadow-[0_0_16px_rgba(224,108,117,0.2)]',
-          handleColor: '!bg-[#E06C75] !border-[#12130F]',
+          glowColor: 'hover:shadow-[0_0_18px_rgba(224,108,117,0.22)]',
+          handleColor: '!bg-[#E06C75] !border-[#242038]',
         };
       case 'Repository':
         return {
           borderColor: isSelected
-            ? 'border-[#B9915E] ring-2 ring-[#B9915E]/40'
-            : 'border-[#B9915E]/50 hover:border-[#B9915E]',
-          bg: 'bg-[#12130F]',
-          badgeBg: 'bg-[#B9915E]/15 text-[#B9915E] border-[#B9915E]/30',
+            ? 'border-[#F7ECE1] ring-2 ring-[#9067C6]/55'
+            : 'border-[#F7ECE1]/45 hover:border-[#F7ECE1]',
+          bg: 'bg-[#242038]',
+          badgeBg: 'bg-[#F7ECE1]/15 text-[#F7ECE1] border-[#F7ECE1]/35',
           badgeText: 'Repository',
-          icon: <GitBranch className="w-3.5 h-3.5 text-[#B9915E] shrink-0" />,
-          glowColor: 'hover:shadow-[0_0_16px_rgba(185,145,94,0.2)]',
-          handleColor: '!bg-[#B9915E] !border-[#12130F]',
+          icon: <GitBranch className="w-3.5 h-3.5 text-[#F7ECE1] shrink-0" />,
+          glowColor: 'hover:shadow-[0_0_18px_rgba(247,236,225,0.2)]',
+          handleColor: '!bg-[#F7ECE1] !border-[#242038]',
         };
       case 'PullRequest':
         return {
           borderColor: isSelected
-            ? 'border-[#AFD2FA] ring-2 ring-[#AFD2FA]/40'
-            : 'border-[#AFD2FA]/40 hover:border-[#AFD2FA]',
-          bg: 'bg-[#12130F]',
-          badgeBg: 'bg-[#AFD2FA]/15 text-[#AFD2FA] border-[#AFD2FA]/30',
+            ? 'border-[#AFD2FA] ring-2 ring-[#AFD2FA]/50'
+            : 'border-[#AFD2FA]/45 hover:border-[#AFD2FA]',
+          bg: 'bg-[#242038]',
+          badgeBg: 'bg-[#AFD2FA]/15 text-[#F7ECE1] border-[#AFD2FA]/35',
           badgeText: node.props?.merged === false ? 'PR (Open)' : 'PR',
           icon: <GitPullRequest className="w-3.5 h-3.5 text-[#AFD2FA] shrink-0" />,
-          glowColor: 'hover:shadow-[0_0_16px_rgba(175,210,250,0.2)]',
-          handleColor: '!bg-[#AFD2FA] !border-[#12130F]',
+          glowColor: 'hover:shadow-[0_0_18px_rgba(175,210,250,0.22)]',
+          handleColor: '!bg-[#AFD2FA] !border-[#242038]',
         };
       case 'Evidence':
         return {
           borderColor: isSelected
-            ? 'border-[#757F6C] ring-2 ring-[#757F6C]/40'
-            : 'border-[#292A23] hover:border-[#757F6C]/60',
-          bg: 'bg-[#12130F]',
-          badgeBg: 'bg-[#292A23] text-[#A5A69D] border-[#292A23]',
+            ? 'border-[#CAC4CE] ring-2 ring-[#CAC4CE]/45'
+            : 'border-[#CAC4CE]/30 hover:border-[#CAC4CE]/65',
+          bg: 'bg-[#242038]',
+          badgeBg: 'bg-[#161324] text-[#CAC4CE] border-[#CAC4CE]/25',
           badgeText: 'Evidence',
-          icon: <FileText className="w-3.5 h-3.5 text-[#A5A69D] shrink-0" />,
-          glowColor: 'hover:shadow-[0_0_16px_rgba(117,127,108,0.15)]',
-          handleColor: '!bg-[#757F6C] !border-[#12130F]',
+          icon: <FileText className="w-3.5 h-3.5 text-[#CAC4CE] shrink-0" />,
+          glowColor: 'hover:shadow-[0_0_16px_rgba(202,196,206,0.18)]',
+          handleColor: '!bg-[#CAC4CE] !border-[#242038]',
         };
       case 'Person':
         return {
           borderColor: isSelected
-            ? 'border-[#AFD2FA] ring-2 ring-[#AFD2FA]/40'
-            : 'border-[#292A23] hover:border-[#AFD2FA]/60',
-          bg: 'bg-[#12130F]',
-          badgeBg: 'bg-[#AFD2FA]/15 text-[#AFD2FA] border-[#AFD2FA]/30',
+            ? 'border-[#8D86C9] ring-2 ring-[#8D86C9]/50'
+            : 'border-[#CAC4CE]/30 hover:border-[#8D86C9]/65',
+          bg: 'bg-[#242038]',
+          badgeBg: 'bg-[#8D86C9]/20 text-[#F7ECE1] border-[#8D86C9]/40',
           badgeText: 'Person',
-          icon: <User className="w-3.5 h-3.5 text-[#AFD2FA] shrink-0" />,
-          glowColor: 'hover:shadow-[0_0_16px_rgba(175,210,250,0.2)]',
-          handleColor: '!bg-[#AFD2FA] !border-[#12130F]',
+          icon: <User className="w-3.5 h-3.5 text-[#8D86C9] shrink-0" />,
+          glowColor: 'hover:shadow-[0_0_16px_rgba(141,134,201,0.22)]',
+          handleColor: '!bg-[#8D86C9] !border-[#242038]',
         };
       default:
         return {
           borderColor: isSelected
-            ? 'border-[#757F6C] ring-2 ring-[#757F6C]/40'
-            : 'border-[#292A23] hover:border-[#757F6C]',
-          bg: 'bg-[#12130F]',
-          badgeBg: 'bg-[#292A23] text-[#A5A69D] border-[#292A23]',
+            ? 'border-[#9067C6] ring-2 ring-[#9067C6]/50'
+            : 'border-[#CAC4CE]/30 hover:border-[#9067C6]',
+          bg: 'bg-[#242038]',
+          badgeBg: 'bg-[#161324] text-[#CAC4CE] border-[#CAC4CE]/25',
           badgeText: node.type,
-          icon: <Workflow className="w-3.5 h-3.5 text-[#A5A69D] shrink-0" />,
-          glowColor: 'hover:shadow-[0_0_16px_rgba(117,127,108,0.15)]',
-          handleColor: '!bg-[#757F6C] !border-[#12130F]',
+          icon: <Workflow className="w-3.5 h-3.5 text-[#CAC4CE] shrink-0" />,
+          glowColor: 'hover:shadow-[0_0_16px_rgba(144,103,198,0.2)]',
+          handleColor: '!bg-[#9067C6] !border-[#242038]',
         };
     }
   };
@@ -289,7 +294,7 @@ const CodeWhyGraphNode: React.FC<NodeProps<Node<CustomNodeData>>> = ({ data, sel
   return (
     <div
       onClick={() => data.onSelect(node)}
-      className={`w-[280px] min-h-[136px] px-4 py-3 rounded-xl border ${style.borderColor} ${style.bg} ${style.glowColor} shadow-xl transition-all duration-150 cursor-pointer select-none group text-left ${data.isFocus ? 'ring-2 ring-[#B9915E] shadow-[0_0_24px_rgba(185,145,94,0.35)]' : ''}`}
+      className={`w-[288px] min-h-[144px] px-4 py-3 rounded-xl border ${style.borderColor} ${style.bg} ${style.glowColor} shadow-xl transition-all duration-150 cursor-pointer select-none group text-left ${data.isFocus ? 'ring-2 ring-[#F7ECE1] shadow-[0_0_24px_rgba(144,103,198,0.45)]' : ''}`}
     >
       <Handle type="target" position={Position.Left} className={`!w-2.5 !h-2.5 !border-2 ${style.handleColor}`} />
       
@@ -300,28 +305,28 @@ const CodeWhyGraphNode: React.FC<NodeProps<Node<CustomNodeData>>> = ({ data, sel
         </span>
 
         {data.isFocus ? (
-          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#B9915E] bg-[#B9915E]/15 border border-[#B9915E]/40 rounded px-1.5 py-0.5 shadow-[0_0_10px_rgba(185,145,94,0.2)]">
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#FFFFFF] bg-[#9067C6] border border-[#9067C6] rounded px-1.5 py-0.5 shadow-[0_0_10px_rgba(144,103,198,0.35)]">
             Focus
           </span>
         ) : (
-          <span className="text-[10px] font-mono text-[#A5A69D]/80 truncate max-w-[100px]" title={node.id}>
+          <span className="text-[10px] font-mono text-[#CAC4CE] truncate max-w-[108px]" title={node.id}>
             {node.id.replace(/^(dec_|file:|key:|module:|person:|pr:|ev:)/, '')}
           </span>
         )}
       </div>
 
-      <div className="text-sm font-semibold font-mono text-[#F5F3ED] leading-snug break-words line-clamp-2 group-hover:text-[#B9915E] transition-colors" title={node.label}>
+      <div className="text-sm font-semibold font-mono text-[#F7ECE1] leading-snug break-words line-clamp-3 group-hover:text-white transition-colors" title={node.label}>
         {node.label}
       </div>
 
       {node.props?.path && (
-        <div className="text-[11px] font-mono text-[#A5A69D] break-all line-clamp-2 mt-1" title={node.props.path}>
+        <div className="text-[11px] font-mono text-[#CAC4CE] break-all line-clamp-2 mt-1" title={node.props.path}>
           {node.props.path}
         </div>
       )}
 
       {node.props?.rule && (
-        <div className="mt-1.5 text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#1A1813] text-[#B9915E] border border-[#B9915E]/30 truncate inline-block">
+        <div className="mt-1.5 text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#161324] text-[#C5B0E6] border border-[#9067C6]/40 truncate inline-block">
           Rule: {node.props.rule}
         </div>
       )}
@@ -344,7 +349,6 @@ interface GraphExplorerViewProps {
 export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
   selectedRepo,
   questionContext,
-  onAskQuestion,
 }) => {
   const [graphData, setGraphData] = useState<GraphResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -367,6 +371,11 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
   // Selected node for detail drawer/panel
   const [selectedNode, setSelectedNode] = useState<RawGraphNode | null>(null);
   const [activeDecisionDrawerId, setActiveDecisionDrawerId] = useState<string | null>(null);
+
+  // Collapsible legend / filters for maximum graph viewport
+  const [isLegendOpen, setIsLegendOpen] = useState(true);
+  const rfInstanceRef = useRef<ReactFlowInstance<Node<CustomNodeData>, Edge> | null>(null);
+  const searchSeqRef = useRef(0);
 
   // Filters (Evidence and Person hidden by default as specified!)
   const [filters, setFilters] = useState({
@@ -447,24 +456,33 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
 
   // Debounced search for entities via GET /api/v1/repositories/{id}/entities?q=...
   useEffect(() => {
-    if (!searchQuery.trim() || searchQuery.length < 1) {
+    const seq = searchSeqRef.current + 1;
+    searchSeqRef.current = seq;
+
+    if (!searchQuery.trim() || searchQuery.length < 1 || !repoId) {
       setSearchResults([]);
       setIsSearching(false);
       return;
     }
 
+    let cancelled = false;
     const timer = setTimeout(async () => {
       setIsSearching(true);
       const res = await fetchEntitySearch(repoId, searchQuery.trim());
-      if (res && res.entities) {
-        setSearchResults(res.entities);
-      } else {
-        setSearchResults([]);
+      if (!cancelled && seq === searchSeqRef.current) {
+        if (res && res.entities) {
+          setSearchResults(res.entities);
+        } else {
+          setSearchResults([]);
+        }
+        setIsSearching(false);
       }
-      setIsSearching(false);
     }, 250);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [searchQuery, repoId]);
 
   // Filter nodes based on node-type checkboxes and Time-Travel year scrubber (2018 -> 2026)
@@ -530,22 +548,22 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
     });
 
     const rfEdges: Edge[] = sortedEdges.map((edge, idx) => {
-      let strokeColor = '#8C806F';
+      let strokeColor = '#CAC4CE';
       let isDashed = false;
 
       if (edge.type === 'SUPERSEDES') {
-        strokeColor = '#B9915E'; // dashed bronze
+        strokeColor = '#9067C6'; // dashed primary purple
         isDashed = true;
       } else if (edge.type === 'GOVERNS') {
-        strokeColor = '#757F6C'; // muted olive/green
+        strokeColor = '#8D86C9'; // secondary lavender
       } else if (edge.type === 'DECIDED_IN') {
-        strokeColor = '#E06C75'; // restrained warm coral/red
+        strokeColor = '#E06C75'; // warm coral/red
       } else if (edge.type === 'SUPPORTED_BY') {
-        strokeColor = '#757F6C';
+        strokeColor = '#3fb950';
       } else if (edge.type === 'AUTHORED' || edge.type === 'REVIEWED') {
         strokeColor = '#AFD2FA'; // powder blue
       } else if (edge.type === 'REFERENCES') {
-        strokeColor = '#8C806F'; // muted gray/taupe
+        strokeColor = '#CAC4CE'; // soft lavender-grey
       }
 
       const edgeLabel = edge.rule ? `${edge.type} (${edge.rule})` : edge.type;
@@ -558,22 +576,22 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
         animated: edge.type === 'SUPERSEDES',
         label: edgeLabel,
         labelStyle: {
-          fill: '#F5F3ED',
+          fill: '#F7ECE1',
           fontSize: 10,
           fontFamily: 'var(--font-mono)',
           fontWeight: 600,
         },
         labelBgStyle: {
-          fill: '#12130F',
+          fill: '#242038',
           fillOpacity: 0.95,
         },
         labelBgPadding: [6, 3],
         labelBgBorderRadius: 4,
         style: {
           stroke: strokeColor,
-          strokeWidth: isDashed ? 2 : 1.75,
+          strokeWidth: isDashed ? 2.2 : 1.85,
           strokeDasharray: isDashed ? '5,5' : undefined,
-          opacity: 0.85,
+          opacity: 0.9,
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
@@ -609,45 +627,66 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
     return { inbound, outbound };
   }, [selectedNode, graphData]);
 
+  // Precompute inbound/outbound counts for the accessible list view
+  const nodeDegrees = useMemo(() => {
+    const counts = new Map<string, { inCount: number; outCount: number }>();
+    if (!graphData?.edges) return counts;
+    for (const edge of graphData.edges) {
+      const src = counts.get(edge.source) ?? { inCount: 0, outCount: 0 };
+      src.outCount += 1;
+      counts.set(edge.source, src);
+      const tgt = counts.get(edge.target) ?? { inCount: 0, outCount: 0 };
+      tgt.inCount += 1;
+      counts.set(edge.target, tgt);
+    }
+    return counts;
+  }, [graphData]);
+
+  const handleFitView = useCallback(() => {
+    rfInstanceRef.current?.fitView({ padding: 0.1, maxZoom: 1.25, duration: 250 });
+  }, []);
+
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] min-h-[600px] bg-[#080907] w-full text-[#F5F3ED] overflow-hidden select-none">
+    <div
+      className="flex flex-col h-[calc(100vh-var(--cw-header-h,62px))] min-h-[640px] bg-[#191628] w-full text-[#F7ECE1] overflow-hidden select-none"
+    >
       
-      {/* Top Header & Context Bar */}
-      <div className="border-b border-[#292A23] bg-[#0B0C09]/95 backdrop-blur-md px-4 sm:px-6 py-3.5 shrink-0 z-20">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* Compact Top Header & Controls Bar */}
+      <div className="border-b border-[#CAC4CE]/20 bg-[#242038]/95 backdrop-blur-md px-3 sm:px-5 py-2.5 shrink-0 z-20">
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
           
-          {/* Left: Breadcrumbs & Title */}
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-[#12130F] text-[#B9915E] border border-[#292A23] shadow-sm">
+          {/* Left: Title & Count */}
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-lg bg-[#161324] text-[#9067C6] border border-[#9067C6]/40 shadow-sm">
               <GitFork className="w-4 h-4" />
             </div>
 
             <div>
               {focusEntityId && (
-                <div className="flex items-center gap-2 text-xs font-mono text-[#B9915E] font-semibold mb-0.5">
-                  <span className="text-[#A5A69D] text-[10px] uppercase tracking-wider">focus:</span>
-                  <code className="text-[#F5F3ED] bg-[#12130F] px-1.5 py-0.5 rounded border border-[#292A23]">{focusEntityId}</code>
+                <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#C5B0E6] font-semibold">
+                  <span className="text-[#CAC4CE] text-[10px] uppercase tracking-wider">focus:</span>
+                  <code className="text-[#F7ECE1] bg-[#161324] px-1.5 py-0.2 rounded border border-[#CAC4CE]/25 max-w-[240px] truncate">{focusEntityId}</code>
                 </div>
               )}
-              <h1 className="text-lg font-bold font-sans text-[#F5F3ED] tracking-tight flex items-center gap-2.5 pt-0.5">
+              <h1 className="text-base font-bold font-sans text-[#F7ECE1] tracking-tight flex items-center gap-2">
                 <span>Connected Knowledge Graph</span>
                 {isLoading ? (
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#757F6C]/15 text-[#757F6C] border border-[#757F6C]/30 animate-pulse">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#9067C6]/20 text-[#C5B0E6] border border-[#9067C6]/40 animate-pulse">
                     Loading graph...
                   </span>
                 ) : graphData ? (
-                  <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-[#12130F] border border-[#292A23] text-[#A5A69D]">
-                    {visibleNodesList.length} of {graphData.nodes.length} nodes visible
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#161324] border border-[#CAC4CE]/25 text-[#CAC4CE]">
+                    {visibleNodesList.length} of {graphData.nodes.length} nodes
                   </span>
                 ) : null}
               </h1>
             </div>
           </div>
 
-          {/* Center: Search Entities autocomplete (GET /api/v1/repositories/{id}/entities) */}
-          <div className="relative w-full sm:w-72 lg:w-96">
+          {/* Center: Search Entities autocomplete */}
+          <div className="relative w-full sm:w-64 lg:w-80">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 text-[#B9915E] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Search className="w-3.5 h-3.5 text-[#9067C6] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
@@ -657,7 +696,7 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
                 }}
                 onFocus={() => setIsSearchOpen(true)}
                 placeholder="Search entities (e.g. retry, config)..."
-                className="w-full pl-8 pr-8 py-1.5 rounded-xl bg-[#12130F] border border-[#292A23] text-xs font-mono text-[#F5F3ED] placeholder:text-[#A5A69D]/60 focus:outline-none focus:border-[#B9915E] transition-all"
+                className="w-full pl-8 pr-8 py-1.5 rounded-lg bg-[#161324] border border-[#CAC4CE]/25 text-xs font-mono text-[#F7ECE1] placeholder:text-[#CAC4CE]/65 focus:outline-none focus:border-[#9067C6] focus:ring-1 focus:ring-[#9067C6]/40 transition-all"
               />
               {searchQuery && (
                 <button
@@ -666,7 +705,8 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
                     setSearchResults([]);
                     setIsSearchOpen(false);
                   }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A5A69D] hover:text-[#F5F3ED]"
+                  aria-label="Clear entity search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#CAC4CE] hover:text-[#F7ECE1] cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -675,10 +715,10 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
 
             {/* Dropdown search results */}
             {isSearchOpen && (searchResults.length > 0 || isSearching) && (
-              <div className="absolute top-full left-0 right-0 mt-1.5 bg-[#12130F] border border-[#292A23] rounded-xl shadow-2xl overflow-hidden z-50 text-xs font-mono max-h-64 overflow-y-auto">
-                <div className="px-3 py-1.5 border-b border-[#292A23] text-[10px] text-[#A5A69D] uppercase tracking-wider flex items-center justify-between">
+              <div className="absolute top-full left-0 right-0 mt-1.5 bg-[#242038] border border-[#CAC4CE]/25 rounded-xl shadow-2xl overflow-hidden z-50 text-xs font-mono max-h-64 overflow-y-auto">
+                <div className="px-3 py-1.5 border-b border-[#CAC4CE]/20 text-[10px] text-[#CAC4CE] uppercase tracking-wider flex items-center justify-between bg-[#161324]">
                   <span>Candidate Entities</span>
-                  {isSearching && <span className="text-[#B9915E]">Searching...</span>}
+                  {isSearching && <span className="text-[#C5B0E6]">Searching...</span>}
                 </div>
 
                 {searchResults.map((ent) => (
@@ -689,19 +729,19 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
                       setIsSearchOpen(false);
                       setSearchQuery('');
                     }}
-                    className="w-full text-left px-3 py-2 hover:bg-[#1A1813] flex items-center justify-between border-b border-[#292A23]/60 last:border-0 transition-colors cursor-pointer"
+                    className="w-full text-left px-3 py-2 hover:bg-[#322D4D] flex items-center justify-between border-b border-[#CAC4CE]/15 last:border-0 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2 truncate">
-                      {ent.type === 'Module' && <Folder className="w-3.5 h-3.5 text-[#AFD2FA] shrink-0" />}
-                      {ent.type === 'ConfigKey' && <Key className="w-3.5 h-3.5 text-[#8C806F] shrink-0" />}
-                      {ent.type === 'File' && <FileCode className="w-3.5 h-3.5 text-[#757F6C] shrink-0" />}
+                      {ent.type === 'Module' && <Folder className="w-3.5 h-3.5 text-[#8D86C9] shrink-0" />}
+                      {ent.type === 'ConfigKey' && <Key className="w-3.5 h-3.5 text-[#CAC4CE] shrink-0" />}
+                      {ent.type === 'File' && <FileCode className="w-3.5 h-3.5 text-[#8D86C9] shrink-0" />}
                       <div className="truncate">
-                        <span className="font-semibold text-[#F5F3ED]">{ent.label}</span>
-                        {ent.path && <span className="text-[#A5A69D] text-[10px] block truncate">{ent.path}</span>}
+                        <span className="font-semibold text-[#F7ECE1]">{ent.label}</span>
+                        {ent.path && <span className="text-[#CAC4CE] text-[10px] block truncate">{ent.path}</span>}
                       </div>
                     </div>
 
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-[#B9915E]/15 text-[#B9915E] border border-[#B9915E]/30 shrink-0">
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-[#9067C6]/20 text-[#F7ECE1] border border-[#9067C6]/45 shrink-0">
                       Focus Subgraph
                     </span>
                   </button>
@@ -711,16 +751,16 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
           </div>
 
           {/* Right: Controls & Navigation */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             
             {/* View Mode Switcher */}
-            <div className="flex items-center bg-[#12130F] p-1 rounded-xl border border-[#292A23] text-xs font-mono">
+            <div className="flex items-center bg-[#161324] p-0.5 rounded-lg border border-[#CAC4CE]/25 text-xs font-mono">
               <button
                 onClick={() => setViewMode('graph')}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                   viewMode === 'graph'
-                    ? 'bg-[#B9915E]/15 text-[#B9915E] font-semibold border border-[#B9915E]/40'
-                    : 'text-[#A5A69D] hover:text-[#F5F3ED]'
+                    ? 'bg-[#9067C6] text-white font-semibold shadow-sm'
+                    : 'text-[#CAC4CE] hover:text-[#F7ECE1]'
                 }`}
                 title="Interactive connected node graph"
               >
@@ -730,10 +770,10 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
 
               <button
                 onClick={() => setViewMode('list')}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                   viewMode === 'list'
-                    ? 'bg-[#B9915E]/15 text-[#B9915E] font-semibold border border-[#B9915E]/40'
-                    : 'text-[#A5A69D] hover:text-[#F5F3ED]'
+                    ? 'bg-[#9067C6] text-white font-semibold shadow-sm'
+                    : 'text-[#CAC4CE] hover:text-[#F7ECE1]'
                 }`}
                 title="Accessible Screen-Reader Ready List View"
               >
@@ -742,23 +782,25 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
               </button>
             </div>
 
-            {/* Ask about this repository, when no question is loaded */}
-            {!activeQuestion && (
-              <button
-                onClick={onAskQuestion}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#12130F] hover:bg-[#1A1813] text-[#A5A69D] hover:text-[#F5F3ED] border border-[#292A23] text-xs font-mono transition-colors cursor-pointer"
-                title="Open the workspace to ask a question"
-              >
-                <Search className="w-3 h-3" />
-                <span>Ask a question</span>
-              </button>
+            {viewMode === 'graph' && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleFitView}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#161324] hover:bg-[#322D4D] text-[#CAC4CE] hover:text-[#F7ECE1] border border-[#CAC4CE]/25 text-xs font-mono transition-colors cursor-pointer"
+                  title="Fit graph to screen"
+                >
+                  <Focus className="w-3.5 h-3.5 text-[#8D86C9]" />
+                  <span className="hidden xl:inline">Fit</span>
+                </button>
+              </>
             )}
 
             {/* Clear Entity Focus Button */}
             {focusEntityId && focusEntityId !== questionEntityId && (
               <button
                 onClick={() => setFocusEntityId(questionEntityId)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#12130F] hover:bg-[#1A1813] text-[#B9915E] border border-[#B9915E]/35 text-xs font-mono transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#9067C6]/20 hover:bg-[#9067C6]/35 text-[#F7ECE1] border border-[#9067C6]/45 text-xs font-mono transition-colors cursor-pointer"
                 title={questionEntityId ? 'Return to the entity from the latest question' : 'Return to the full repository graph'}
               >
                 <RotateCcw className="w-3 h-3" />
@@ -768,58 +810,58 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
           </div>
         </div>
 
-        {/* Node Type Filter Chips Bar */}
-        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-[#292A23] mt-3 text-xs font-mono">
-          <span className="text-[10px] text-[#A5A69D] uppercase tracking-wider flex items-center gap-1 mr-1">
-            <Filter className="w-3 h-3 text-[#B9915E]" /> Filters:
+        {/* Compact Node Type Filter Chips Bar */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-[#CAC4CE]/15 mt-2 text-xs font-mono">
+          <span className="text-[10px] text-[#CAC4CE] uppercase tracking-wider flex items-center gap-1 mr-1">
+            <Filter className="w-3 h-3 text-[#9067C6]" /> Filters:
           </span>
 
           {/* Repository */}
           <button
             onClick={() => toggleFilter('Repository')}
-            className={`px-2.5 py-0.5 rounded-lg border flex items-center gap-1.5 transition-colors cursor-pointer text-xs ${
+            className={`px-2 py-0.5 rounded-md border flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] ${
               filters.Repository
-                ? 'bg-[#B9915E]/15 text-[#B9915E] border-[#B9915E]/40 font-semibold'
-                : 'bg-[#12130F] text-[#A5A69D]/60 border-[#292A23] opacity-60'
+                ? 'bg-[#9067C6]/20 text-[#F7ECE1] border-[#9067C6]/50 font-semibold'
+                : 'bg-[#161324] text-[#CAC4CE]/65 border-[#CAC4CE]/20 opacity-70'
             }`}
           >
-            <GitBranch className="w-3 h-3 text-[#B9915E]" />
+            <GitBranch className="w-3 h-3 text-[#F7ECE1]" />
             <span>Repository</span>
           </button>
 
           {/* CodeEntity */}
           <button
             onClick={() => toggleFilter('CodeEntity')}
-            className={`px-2.5 py-0.5 rounded-lg border flex items-center gap-1.5 transition-colors cursor-pointer text-xs ${
+            className={`px-2 py-0.5 rounded-md border flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] ${
               filters.CodeEntity
-                ? 'bg-[#757F6C]/20 text-[#757F6C] border-[#757F6C]/40 font-semibold'
-                : 'bg-[#12130F] text-[#A5A69D]/60 border-[#292A23] opacity-60'
+                ? 'bg-[#8D86C9]/20 text-[#F7ECE1] border-[#8D86C9]/50 font-semibold'
+                : 'bg-[#161324] text-[#CAC4CE]/65 border-[#CAC4CE]/20 opacity-70'
             }`}
           >
-            <FileCode className="w-3 h-3 text-[#757F6C]" />
+            <FileCode className="w-3 h-3 text-[#8D86C9]" />
             <span>Entities (File/Module/Key)</span>
           </button>
 
           {/* Decision */}
           <button
             onClick={() => toggleFilter('Decision')}
-            className={`px-2.5 py-0.5 rounded-lg border flex items-center gap-1.5 transition-colors cursor-pointer text-xs ${
+            className={`px-2 py-0.5 rounded-md border flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] ${
               filters.Decision
-                ? 'bg-[#B9915E]/15 text-[#B9915E] border-[#B9915E]/40 font-semibold'
-                : 'bg-[#12130F] text-[#A5A69D]/60 border-[#292A23] opacity-60'
+                ? 'bg-[#9067C6]/20 text-[#F7ECE1] border-[#9067C6]/50 font-semibold'
+                : 'bg-[#161324] text-[#CAC4CE]/65 border-[#CAC4CE]/20 opacity-70'
             }`}
           >
-            <CheckCircle2 className="w-3 h-3 text-[#B9915E]" />
+            <CheckCircle2 className="w-3 h-3 text-[#C5B0E6]" />
             <span>Decisions</span>
           </button>
 
           {/* PullRequest */}
           <button
             onClick={() => toggleFilter('PullRequest')}
-            className={`px-2.5 py-0.5 rounded-lg border flex items-center gap-1.5 transition-colors cursor-pointer text-xs ${
+            className={`px-2 py-0.5 rounded-md border flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] ${
               filters.PullRequest
-                ? 'bg-[#AFD2FA]/15 text-[#AFD2FA] border-[#AFD2FA]/40 font-semibold'
-                : 'bg-[#12130F] text-[#A5A69D]/60 border-[#292A23] opacity-60'
+                ? 'bg-[#AFD2FA]/15 text-[#F7ECE1] border-[#AFD2FA]/45 font-semibold'
+                : 'bg-[#161324] text-[#CAC4CE]/65 border-[#CAC4CE]/20 opacity-70'
             }`}
           >
             <GitPullRequest className="w-3 h-3 text-[#AFD2FA]" />
@@ -829,48 +871,48 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
           {/* Evidence (Hidden by default) */}
           <button
             onClick={() => toggleFilter('Evidence')}
-            className={`px-2.5 py-0.5 rounded-lg border flex items-center gap-1.5 transition-colors cursor-pointer text-xs ${
+            className={`px-2 py-0.5 rounded-md border flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] ${
               filters.Evidence
-                ? 'bg-[#8C806F]/20 text-[#F5F3ED] border-[#8C806F]/40 font-semibold'
-                : 'bg-[#12130F] text-[#A5A69D] border-[#292A23]'
+                ? 'bg-[#CAC4CE]/20 text-[#F7ECE1] border-[#CAC4CE]/45 font-semibold'
+                : 'bg-[#161324] text-[#CAC4CE] border-[#CAC4CE]/20'
             }`}
           >
-            {filters.Evidence ? <Eye className="w-3 h-3 text-[#F5F3ED]" /> : <EyeOff className="w-3 h-3 text-[#A5A69D]" />}
+            {filters.Evidence ? <Eye className="w-3 h-3 text-[#F7ECE1]" /> : <EyeOff className="w-3 h-3 text-[#CAC4CE]" />}
             <span>Evidence {filters.Evidence ? '(Shown)' : '(Hidden)'}</span>
           </button>
 
           {/* Person (Hidden by default) */}
           <button
             onClick={() => toggleFilter('Person')}
-            className={`px-2.5 py-0.5 rounded-lg border flex items-center gap-1.5 transition-colors cursor-pointer text-xs ${
+            className={`px-2 py-0.5 rounded-md border flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] ${
               filters.Person
-                ? 'bg-[#8C806F]/20 text-[#F5F3ED] border-[#8C806F]/40 font-semibold'
-                : 'bg-[#12130F] text-[#A5A69D] border-[#292A23]'
+                ? 'bg-[#8D86C9]/20 text-[#F7ECE1] border-[#8D86C9]/45 font-semibold'
+                : 'bg-[#161324] text-[#CAC4CE] border-[#CAC4CE]/20'
             }`}
           >
-            {filters.Person ? <Eye className="w-3 h-3 text-[#F5F3ED]" /> : <EyeOff className="w-3 h-3 text-[#A5A69D]" />}
+            {filters.Person ? <Eye className="w-3 h-3 text-[#F7ECE1]" /> : <EyeOff className="w-3 h-3 text-[#CAC4CE]" />}
             <span>People {filters.Person ? '(Shown)' : '(Hidden)'}</span>
           </button>
 
 {import.meta.env.DEV && (
-          <div className="ml-auto flex items-center gap-2 text-[10px] text-[#A5A69D]">
-            <span className="text-[#A5A69D] uppercase">Test States:</span>
+          <div className="ml-auto flex items-center gap-2 text-[10px] text-[#CAC4CE]">
+            <span className="text-[#CAC4CE] uppercase">Test States:</span>
             <button
               onClick={() => setSimulateOffline((o) => !o)}
-              className={`px-2 py-0.5 rounded border text-[10px] font-mono transition-colors ${
+              className={`px-2 py-0.5 rounded border text-[10px] font-mono transition-colors cursor-pointer ${
                 simulateOffline
-                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 font-bold'
-                  : 'bg-[#12130F] text-[#A5A69D] border-[#292A23] hover:text-[#F5F3ED]'
+                  ? 'bg-[#f85149]/20 text-[#f85149] border-[#f85149]/45 font-bold'
+                  : 'bg-[#161324] text-[#CAC4CE] border-[#CAC4CE]/20 hover:text-[#F7ECE1]'
               }`}
             >
               {simulateOffline ? 'Reset Online' : 'Simulate 503'}
             </button>
             <button
               onClick={() => setSimulateTruncated((t) => !t)}
-              className={`px-2 py-0.5 rounded border text-[10px] font-mono transition-colors ${
+              className={`px-2 py-0.5 rounded border text-[10px] font-mono transition-colors cursor-pointer ${
                 simulateTruncated
-                  ? 'bg-[#B9915E]/20 text-[#B9915E] border-[#B9915E]/40 font-bold'
-                  : 'bg-[#12130F] text-[#A5A69D] border-[#292A23] hover:text-[#F5F3ED]'
+                  ? 'bg-[#9067C6]/25 text-[#F7ECE1] border-[#9067C6]/50 font-bold'
+                  : 'bg-[#161324] text-[#CAC4CE] border-[#CAC4CE]/20 hover:text-[#F7ECE1]'
               }`}
             >
               {simulateTruncated ? 'Reset Ceiling' : 'Simulate Truncated'}
@@ -882,68 +924,34 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
 
       {/* Truncated Subgraph Notice Banner */}
       {graphData?.truncated && (
-        <div className="bg-[#1A1813] border-b border-[#B9915E]/30 px-4 py-2 flex items-center justify-between text-xs font-mono text-[#B9915E] z-10 shrink-0">
+        <div className="bg-[#242038] border-b border-[#e3b341]/35 px-4 py-1.5 flex items-center justify-between text-xs font-mono text-[#e3b341] z-10 shrink-0">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-[#B9915E] shrink-0" />
+            <AlertTriangle className="w-3.5 h-3.5 text-[#e3b341] shrink-0" />
             <span>
               <strong>Truncated Response Notice:</strong> Graph query reached the hard node budget (maximum 80 nodes returned). Some entities or temporal supersessions may not be displayed.
             </span>
           </div>
-          <span className="text-[11px] text-[#A5A69D] hidden sm:inline">
+          <span className="text-[11px] text-[#CAC4CE] hidden sm:inline">
             Focus on an entity using the search bar to inspect focused subgraphs.
           </span>
         </div>
       )}
 
       {activeQuestion && (
-        <div className="shrink-0 border-b border-[#292A23] bg-[#0B0C09]/90 px-4 py-2.5">
-          <p className="text-[10px] font-mono uppercase tracking-wider text-[#B9915E] font-semibold">Graph for latest question</p>
-          <p className="mt-0.5 truncate text-xs font-mono text-[#F5F3ED]">{activeQuestion.question}</p>
+        <div className="shrink-0 border-b border-[#CAC4CE]/15 bg-[#242038]/85 px-4 py-1.5 flex items-center gap-2">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-[#C5B0E6] font-semibold shrink-0">
+            Graph for latest question:
+          </span>
+          <p className="truncate text-xs font-mono text-[#F7ECE1]">{activeQuestion.question}</p>
         </div>
       )}
 
       {!isGraphOffline && !errorMessage && viewMode === 'graph' && graphData && (
-        <div className="shrink-0 border-b border-[#292A23] bg-[#0B0C09]/90 px-4 py-2">
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] font-mono text-[#A5A69D]">
-            <span className="uppercase font-bold tracking-wider text-[#F5F3ED]">Legend</span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#B9915E]" />
-              Decision
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#757F6C]" />
-              Source File
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#E06C75]" />
-              Commit
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#AFD2FA]" />
-              Author
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#AFD2FA]" />
-              Pull Request
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 border-t-2 border-dashed border-[#B9915E]" />
-              SUPERSEDES
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 border-t-2 border-[#757F6C]" />
-              GOVERNS
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 border-t-2 border-[#E06C75]" />
-              DECIDED_IN
-            </span>
-          </div>
-
+        <div className="shrink-0 border-b border-[#CAC4CE]/20 bg-[#242038]/90 px-4 py-2">
           {/* F5: Time-Travel Graph Scrubber (2018 -> 2026) */}
-          <div className="flex items-center gap-3 pt-2 border-t border-[#292A23]/60 text-xs font-mono">
-            <span className="text-[#B9915E] font-semibold">⏳ Time-Travel Scrubber:</span>
-            <span className="text-[#A5A69D]">2018</span>
+          <div className="flex items-center gap-3 text-xs font-mono">
+            <span className="text-[#C5B0E6] font-semibold">⏳ Time-Travel Scrubber:</span>
+            <span className="text-[#CAC4CE]">2018</span>
             <input
               type="range"
               min={2018}
@@ -952,16 +960,16 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
               value={timeTravelYear}
               onChange={(e) => setTimeTravelYear(Number(e.target.value))}
               aria-label="Time-Travel Year Scrubber"
-              className="w-44 accent-[#B9915E] cursor-pointer"
+              className="w-44 accent-[#9067C6] cursor-pointer"
             />
-            <span className="px-2 py-0.5 rounded bg-[#12130F] border border-[#B9915E]/40 text-[#F5F3ED] font-bold">
+            <span className="px-2 py-0.5 rounded bg-[#161324] border border-[#9067C6]/40 text-[#F7ECE1] font-bold">
               ≤ {timeTravelYear}
             </span>
             {timeTravelYear < 2026 && (
               <button
                 type="button"
                 onClick={() => setTimeTravelYear(2026)}
-                className="text-[11px] text-[#A5A69D] hover:text-[#F5F3ED] underline cursor-pointer"
+                className="text-[11px] text-[#CAC4CE] hover:text-[#F7ECE1] underline cursor-pointer"
               >
                 Reset to 2026
               </button>
@@ -970,30 +978,30 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
         </div>
       )}
 
-      {/* Main Content Area: Visual Graph or Accessible List or 503 Offline State */}
+      {/* Main Content Area: Full-bleed Visual Graph or Accessible List or 503 Offline State */}
       <div className="flex-1 min-h-0 relative flex overflow-hidden">
         
         {isLoading ? (
           <div className="flex-1 flex flex-col items-center justify-center p-6 text-center z-10 space-y-3">
-            <Loader2 className="w-8 h-8 animate-spin text-[#757F6C]" />
-            <p className="text-xs font-mono text-[#A5A69D]">
+            <Loader2 className="w-8 h-8 animate-spin text-[#9067C6]" />
+            <p className="text-xs font-mono text-[#CAC4CE]">
               Loading {focusEntityId ? 'focused subgraph' : 'repository graph'}...
             </p>
           </div>
         ) : isGraphOffline ? (
           <div className="flex-1 flex flex-col items-center justify-center p-6 text-center z-10 space-y-4">
-            <div className="p-4 rounded-2xl bg-[#12130F] text-[#E06C75] border border-[#E06C75]/30 shadow-lg">
+            <div className="p-4 rounded-2xl bg-[#242038] text-[#f85149] border border-[#f85149]/35 shadow-lg">
               <Database className="w-10 h-10" />
             </div>
 
             <div className="max-w-md space-y-2">
-              <div className="inline-block px-2.5 py-0.5 rounded-full bg-[#E06C75]/15 text-[#E06C75] border border-[#E06C75]/30 text-xs font-mono font-bold">
+              <div className="inline-block px-2.5 py-0.5 rounded-full bg-[#f85149]/15 text-[#f85149] border border-[#f85149]/35 text-xs font-mono font-bold">
                 HTTP 503 • Graph Service Offline
               </div>
-              <h2 className="text-xl font-bold font-sans text-[#F5F3ED]">
+              <h2 className="text-xl font-bold font-sans text-[#F7ECE1]">
                 Graph Database Engine Unavailable
               </h2>
-              <p className="text-xs font-mono text-[#A5A69D] leading-relaxed">
+              <p className="text-xs font-mono text-[#CAC4CE] leading-relaxed">
                 The graph query service (Neo4j) is currently offline, unconfigured, or unreachable. 
                 CodeWhy's local SQLite store remains 100% operational for questions and decision timelines.
               </p>
@@ -1005,7 +1013,7 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
                   setSimulateOffline(false);
                   setReloadToken((token) => token + 1);
                 }}
-                className="px-4 py-2 rounded-xl bg-[#12130F] hover:bg-[#1A1813] text-[#757F6C] border border-[#757F6C]/40 font-semibold transition-colors flex items-center gap-2 cursor-pointer shadow-sm"
+                className="px-4 py-2 rounded-xl bg-[#9067C6] hover:bg-[#7B52B3] text-white border border-[#9067C6] font-semibold transition-colors flex items-center gap-2 cursor-pointer shadow-sm"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Retry Connection</span>
@@ -1015,28 +1023,28 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
         ) : errorMessage ? (
           /* Error State */
           <div className="flex-1 flex flex-col items-center justify-center p-6 text-center z-10 space-y-3">
-            <AlertTriangle className="w-8 h-8 text-[#B9915E]" />
-            <h3 className="text-sm font-bold text-[#F5F3ED] font-mono">{errorMessage}</h3>
+            <AlertTriangle className="w-8 h-8 text-[#e3b341]" />
+            <h3 className="text-sm font-bold text-[#F7ECE1] font-mono">{errorMessage}</h3>
             <button
               onClick={() => {
                 setFocusEntityId(null);
                 setReloadToken((token) => token + 1);
               }}
-              className="px-3 py-1.5 rounded-xl bg-[#12130F] text-[#A5A69D] border border-[#292A23] text-xs font-mono hover:text-[#F5F3ED]"
+              className="px-3 py-1.5 rounded-xl bg-[#9067C6] hover:bg-[#7B52B3] text-white text-xs font-mono cursor-pointer transition-colors"
             >
               Return to Full Graph
             </button>
           </div>
         ) : !graphData ? (
           <div className="flex-1 flex flex-col items-center justify-center p-6 text-center z-10 space-y-3">
-            <GitFork className="w-8 h-8 text-[#8C806F]" />
-            <h3 className="text-sm font-bold text-[#F5F3ED] font-mono">No graph data returned</h3>
-            <p className="text-xs font-mono text-[#A5A69D] max-w-md">
+            <GitFork className="w-8 h-8 text-[#8D86C9]" />
+            <h3 className="text-sm font-bold text-[#F7ECE1] font-mono">No graph data returned</h3>
+            <p className="text-xs font-mono text-[#CAC4CE] max-w-md">
               This repository returned no nodes. Search for an entity, or reload the graph.
             </p>
             <button
               onClick={() => setReloadToken((token) => token + 1)}
-              className="px-3 py-1.5 rounded-xl bg-[#12130F] text-[#A5A69D] border border-[#292A23] text-xs font-mono hover:text-[#F5F3ED]"
+              className="px-3 py-1.5 rounded-xl bg-[#9067C6] hover:bg-[#7B52B3] text-white text-xs font-mono cursor-pointer transition-colors"
             >
               Reload Graph
             </button>
@@ -1044,25 +1052,25 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
         ) : viewMode === 'list' ? (
           /* 2. Accessible Screen-Reader Friendly List View */
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 w-full max-w-7xl mx-auto space-y-6">
-            <div className="flex items-center justify-between border-b border-[#292A23] pb-3">
+            <div className="flex items-center justify-between border-b border-[#CAC4CE]/20 pb-3">
               <div>
-                <h2 className="text-sm font-mono font-bold uppercase text-[#F5F3ED] tracking-wider">
+                <h2 className="text-sm font-mono font-bold uppercase text-[#F7ECE1] tracking-wider">
                   Accessible Node & Relationship View
                 </h2>
-                <p className="text-xs text-[#A5A69D] font-mono">
+                <p className="text-xs text-[#CAC4CE] font-mono">
                   Tabular screen-reader accessible inventory of {visibleNodesList.length} visible graph nodes and {visibleEdgesList.length} relationships
                 </p>
               </div>
 
-              <span className="text-xs font-mono px-2 py-0.5 rounded bg-[#B9915E]/15 text-[#B9915E] border border-[#B9915E]/30">
+              <span className="text-xs font-mono px-2 py-0.5 rounded bg-[#9067C6]/20 text-[#F7ECE1] border border-[#9067C6]/40">
                 ARIA Accessible
               </span>
             </div>
 
-            <div className="rounded-xl border border-[#292A23] bg-[#12130F] overflow-hidden text-xs font-mono">
+            <div className="rounded-xl border border-[#CAC4CE]/20 bg-[#242038] overflow-hidden text-xs font-mono">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-[#292A23] bg-[#0B0C09] text-[#A5A69D] text-[11px] uppercase tracking-wider">
+                  <tr className="border-b border-[#CAC4CE]/20 bg-[#161324] text-[#CAC4CE] text-[11px] uppercase tracking-wider">
                     <th className="py-3 px-4">Node Label & ID</th>
                     <th className="py-3 px-4">Type</th>
                     <th className="py-3 px-4">State / Property</th>
@@ -1070,18 +1078,17 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#292A23] text-[#A5A69D]">
+                <tbody className="divide-y divide-[#CAC4CE]/15 text-[#CAC4CE]">
                   {visibleNodesList.map((node) => {
-                    const inCount = graphData?.edges.filter((e) => e.target === node.id).length || 0;
-                    const outCount = graphData?.edges.filter((e) => e.source === node.id).length || 0;
+                    const deg = nodeDegrees.get(node.id) ?? { inCount: 0, outCount: 0 };
                     return (
-                      <tr key={node.id} className="hover:bg-[#1A1813]/60 transition-colors">
+                      <tr key={node.id} className="hover:bg-[#322D4D]/60 transition-colors">
                         <td className="py-3 px-4">
-                          <div className="font-bold text-[#F5F3ED]">{node.label}</div>
-                          <div className="text-[10px] text-[#A5A69D]/70">{node.id}</div>
+                          <div className="font-bold text-[#F7ECE1]">{node.label}</div>
+                          <div className="text-[10px] text-[#CAC4CE]/80">{node.id}</div>
                         </td>
                         <td className="py-3 px-4">
-                          <span className="px-2 py-0.5 rounded bg-[#1A1813] text-[#F5F3ED] border border-[#292A23] text-[10px]">
+                          <span className="px-2 py-0.5 rounded bg-[#161324] text-[#F7ECE1] border border-[#CAC4CE]/25 text-[10px]">
                             {node.type}
                             {node.props?.entity_type ? ` (${node.props.entity_type})` : ''}
                           </span>
@@ -1091,36 +1098,36 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
                             <span
                               className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                 node.props.state === 'ACTIVE'
-                                  ? 'bg-[#B9915E]/15 text-[#B9915E] border border-[#B9915E]/40'
+                                  ? 'bg-[#9067C6]/20 text-[#F7ECE1] border border-[#9067C6]/45'
                                   : node.props.state === 'SUPERSEDED'
-                                  ? 'bg-[#12130F] text-[#8C806F] border border-[#292A23]'
-                                  : 'bg-[#E06C75]/15 text-[#E06C75] border border-[#E06C75]/40'
+                                  ? 'bg-[#161324] text-[#CAC4CE] border border-[#CAC4CE]/25'
+                                  : 'bg-[#f85149]/15 text-[#f85149] border border-[#f85149]/40'
                               }`}
                             >
                               {node.props.state}
                             </span>
                           )}
                           {node.props?.path && (
-                            <span className="text-[10px] text-[#A5A69D] block truncate max-w-xs">{node.props.path}</span>
+                            <span className="text-[10px] text-[#CAC4CE] block truncate max-w-xs">{node.props.path}</span>
                           )}
                           {node.props?.number && (
                             <span className="text-[10px] text-[#AFD2FA]">PR #{node.props.number}</span>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-[11px] text-[#A5A69D]">
-                          {inCount} in • {outCount} out
+                        <td className="py-3 px-4 text-[11px] text-[#CAC4CE]">
+                          {deg.inCount} in • {deg.outCount} out
                         </td>
                         <td className="py-3 px-4 text-right space-x-2">
                           <button
                             onClick={() => setSelectedNode(node)}
-                            className="px-2.5 py-1 rounded bg-[#12130F] hover:bg-[#1A1813] text-[#757F6C] border border-[#292A23] hover:border-[#757F6C]/40 text-[10px]"
+                            className="px-2.5 py-1 rounded bg-[#161324] hover:bg-[#322D4D] text-[#F7ECE1] border border-[#CAC4CE]/25 hover:border-[#8D86C9] text-[10px] cursor-pointer"
                           >
                             Inspect
                           </button>
                           {node.type === 'Decision' && (
                             <button
                               onClick={() => setActiveDecisionDrawerId(node.id)}
-                              className="px-2.5 py-1 rounded bg-[#B9915E]/15 hover:bg-[#B9915E]/25 text-[#B9915E] border border-[#B9915E]/30 text-[10px]"
+                              className="px-2.5 py-1 rounded bg-[#9067C6] hover:bg-[#7B52B3] text-white border border-[#9067C6] text-[10px] cursor-pointer"
                             >
                               Drawer
                             </button>
@@ -1134,40 +1141,97 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
             </div>
           </div>
         ) : (
-          /* 3. Interactive React Flow Canvas */
-          <div className="flex-1 w-full h-full relative">
+          /* 3. Interactive React Flow Canvas (Maximized Viewport) */
+          <div className="flex-1 w-full h-full min-h-[520px] relative">
             <ReactFlow
               nodes={nodes}
               edges={edges}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
+              onInit={(instance) => {
+                rfInstanceRef.current = instance;
+              }}
               nodeTypes={nodeTypes}
+              nodesDraggable
+              panOnDrag
+              zoomOnScroll
               fitView
-              fitViewOptions={{ padding: 0.08, maxZoom: 1.15 }}
-              minZoom={0.25}
+              fitViewOptions={{ padding: 0.1, maxZoom: 1.2 }}
+              minZoom={0.2}
               maxZoom={2.5}
               defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-              className="bg-[#080907]"
+              className="bg-[#191628]"
               proOptions={{ hideAttribution: true }}
             >
-              <Background color="#292A23" gap={24} size={1} />
-              <Controls className="codewhy-flow-controls" />
+              <Background color="#3A3456" gap={24} size={1.25} />
+              <Controls className="codewhy-flow-controls" showInteractive={false} showFitView={false} />
             </ReactFlow>
+
+            {/* Floating Collapsible Legend (keeps canvas height maximized) */}
+            <div className="absolute left-14 bottom-4 z-20 max-w-[calc(100%-5rem)]">
+              <div className="rounded-xl border border-[#CAC4CE]/25 bg-[#242038]/92 backdrop-blur-md shadow-xl px-3 py-2 text-[10px] font-mono text-[#CAC4CE]">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="uppercase font-bold tracking-wider text-[#F7ECE1]">Legend</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsLegendOpen((prev) => !prev)}
+                    className="text-[#C5B0E6] hover:text-[#F7ECE1] flex items-center gap-0.5 cursor-pointer"
+                    aria-expanded={isLegendOpen}
+                  >
+                    <span>{isLegendOpen ? 'Hide' : 'Show'}</span>
+                    {isLegendOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+                  </button>
+                </div>
+                {isLegendOpen && (
+                  <div className="mt-2 pt-2 border-t border-[#CAC4CE]/15 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                    <span className="flex items-center gap-1.5 text-[#F7ECE1]">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#9067C6]" />
+                      Decision
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[#F7ECE1]">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#8D86C9]" />
+                      Source File
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[#F7ECE1]">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#E06C75]" />
+                      Commit
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[#F7ECE1]">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#AFD2FA]" />
+                      Pull Request
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[#F7ECE1]">
+                      <span className="w-4 border-t-2 border-dashed border-[#9067C6]" />
+                      SUPERSEDES
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[#F7ECE1]">
+                      <span className="w-4 border-t-2 border-[#8D86C9]" />
+                      GOVERNS
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[#F7ECE1]">
+                      <span className="w-4 border-t-2 border-[#E06C75]" />
+                      DECIDED_IN
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* 4. Node Detail Inspector Slide-Over Panel */}
+        {/* 4. Collapsible Node Detail Inspector Slide-Over Panel */}
         {selectedNode && (
-          <aside className="absolute right-4 top-4 bottom-4 w-80 sm:w-96 max-w-[calc(100%-2rem)] border border-[#292A23] rounded-2xl bg-[#0B0C09]/95 backdrop-blur-xl p-5 overflow-y-auto space-y-5 z-30 flex flex-col justify-between shadow-2xl">
+          <aside className="absolute right-4 top-4 bottom-4 w-80 sm:w-96 max-w-[calc(100%-2rem)] border border-[#CAC4CE]/25 rounded-2xl bg-[#242038]/95 backdrop-blur-xl p-5 overflow-y-auto space-y-5 z-30 flex flex-col justify-between shadow-2xl">
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-[#292A23] pb-3">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-[#A5A69D] flex items-center gap-1.5 font-bold">
-                  <Workflow className="w-3.5 h-3.5 text-[#B9915E]" />
+              <div className="flex items-center justify-between border-b border-[#CAC4CE]/20 pb-3">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#CAC4CE] flex items-center gap-1.5 font-bold">
+                  <Workflow className="w-3.5 h-3.5 text-[#9067C6]" />
                   Node Inspection
                 </span>
                 <button
                   onClick={() => setSelectedNode(null)}
-                  className="p-1 rounded-lg hover:bg-[#12130F] text-[#A5A69D] hover:text-[#F5F3ED] transition-colors"
+                  aria-label="Collapse node inspector"
+                  className="p-1 rounded-lg hover:bg-[#322D4D] text-[#CAC4CE] hover:text-[#F7ECE1] transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1176,17 +1240,17 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
               {/* Title & Badge */}
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#12130F] text-[#F5F3ED] border border-[#292A23]">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#161324] text-[#F7ECE1] border border-[#CAC4CE]/25">
                     {selectedNode.type}
                   </span>
                   {selectedNode.props?.state && (
                     <span
                       className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
                         selectedNode.props.state === 'ACTIVE'
-                          ? 'bg-[#B9915E]/15 text-[#B9915E] border border-[#B9915E]/40'
+                          ? 'bg-[#9067C6]/20 text-[#F7ECE1] border border-[#9067C6]/45'
                           : selectedNode.props.state === 'SUPERSEDED'
-                          ? 'bg-[#12130F] text-[#8C806F] border border-[#292A23]'
-                          : 'bg-[#E06C75]/15 text-[#E06C75] border border-[#E06C75]/40'
+                          ? 'bg-[#161324] text-[#CAC4CE] border border-[#CAC4CE]/25'
+                          : 'bg-[#f85149]/15 text-[#f85149] border border-[#f85149]/40'
                       }`}
                     >
                       {selectedNode.props.state}
@@ -1194,59 +1258,59 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
                   )}
                 </div>
 
-                <h3 className="text-sm font-bold font-mono text-[#F5F3ED] leading-snug">
+                <h3 className="text-sm font-bold font-mono text-[#F7ECE1] leading-snug">
                   {selectedNode.label}
                 </h3>
-                <div className="text-[11px] font-mono text-[#A5A69D] break-all">
-                  ID: <code className="text-[#B9915E]">{selectedNode.id}</code>
+                <div className="text-[11px] font-mono text-[#CAC4CE] break-all">
+                  ID: <code className="text-[#C5B0E6]">{selectedNode.id}</code>
                 </div>
               </div>
 
               {/* Properties table */}
               <div className="space-y-2">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-[#A5A69D] block font-bold">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#CAC4CE] block font-bold">
                   Returned Properties
                 </span>
-                <div className="p-3 rounded-xl bg-[#12130F] border border-[#292A23] space-y-1.5 text-xs font-mono">
+                <div className="p-3 rounded-xl bg-[#161324] border border-[#CAC4CE]/20 space-y-1.5 text-xs font-mono">
                   {Object.entries(selectedNode.props || {}).length > 0 ? (
                     Object.entries(selectedNode.props).map(([k, v]) => (
-                      <div key={k} className="flex items-start justify-between gap-2 border-b border-[#292A23]/60 pb-1 last:border-0 last:pb-0">
-                        <span className="text-[#A5A69D] text-[11px]">{k}:</span>
-                        <span className="text-[#F5F3ED] text-right truncate max-w-[180px]" title={String(v)}>
+                      <div key={k} className="flex items-start justify-between gap-2 border-b border-[#CAC4CE]/15 pb-1 last:border-0 last:pb-0">
+                        <span className="text-[#CAC4CE] text-[11px]">{k}:</span>
+                        <span className="text-[#F7ECE1] text-right truncate max-w-[180px]" title={String(v)}>
                           {String(v)}
                         </span>
                       </div>
                     ))
                   ) : (
-                    <span className="text-[#A5A69D]/60 text-[11px]">No extra properties recorded</span>
+                    <span className="text-[#CAC4CE]/70 text-[11px]">No extra properties recorded</span>
                   )}
                 </div>
               </div>
 
               {/* Connected Relationships */}
               <div className="space-y-2">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-[#A5A69D] block font-bold">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#CAC4CE] block font-bold">
                   Relationships ({connectedDetails.inbound.length + connectedDetails.outbound.length})
                 </span>
 
                 <div className="space-y-2 max-h-48 overflow-y-auto text-xs font-mono">
                   {connectedDetails.inbound.map((edge, i) => (
-                    <div key={`in-${i}`} className="p-2 rounded-lg bg-[#12130F] border border-[#292A23] flex items-center justify-between text-[11px]">
-                      <span className="text-[#A5A69D] truncate max-w-[120px]">{edge.source}</span>
-                      <span className="text-[#757F6C] font-bold px-1.5 py-0.5 rounded bg-[#757F6C]/15 border border-[#757F6C]/30 text-[9px]">
+                    <div key={`in-${i}`} className="p-2 rounded-lg bg-[#161324] border border-[#CAC4CE]/20 flex items-center justify-between text-[11px]">
+                      <span className="text-[#CAC4CE] truncate max-w-[120px]">{edge.source}</span>
+                      <span className="text-[#C5B0E6] font-bold px-1.5 py-0.5 rounded bg-[#8D86C9]/20 border border-[#8D86C9]/35 text-[9px]">
                         ──({edge.type})──►
                       </span>
-                      <span className="text-[#F5F3ED] font-semibold">this</span>
+                      <span className="text-[#F7ECE1] font-semibold">this</span>
                     </div>
                   ))}
 
                   {connectedDetails.outbound.map((edge, i) => (
-                    <div key={`out-${i}`} className="p-2 rounded-lg bg-[#12130F] border border-[#292A23] flex items-center justify-between text-[11px]">
-                      <span className="text-[#F5F3ED] font-semibold">this</span>
-                      <span className="text-[#B9915E] font-bold px-1.5 py-0.5 rounded bg-[#B9915E]/15 border border-[#B9915E]/30 text-[9px]">
+                    <div key={`out-${i}`} className="p-2 rounded-lg bg-[#161324] border border-[#CAC4CE]/20 flex items-center justify-between text-[11px]">
+                      <span className="text-[#F7ECE1] font-semibold">this</span>
+                      <span className="text-[#C5B0E6] font-bold px-1.5 py-0.5 rounded bg-[#9067C6]/20 border border-[#9067C6]/35 text-[9px]">
                         ──({edge.type})──►
                       </span>
-                      <span className="text-[#A5A69D] truncate max-w-[120px]">{edge.target}</span>
+                      <span className="text-[#CAC4CE] truncate max-w-[120px]">{edge.target}</span>
                     </div>
                   ))}
                 </div>
@@ -1254,13 +1318,13 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
             </div>
 
             {/* Action Buttons */}
-            <div className="space-y-2 pt-4 border-t border-[#292A23] text-xs font-mono">
+            <div className="space-y-2 pt-4 border-t border-[#CAC4CE]/20 text-xs font-mono">
               {selectedNode.type === 'Decision' && (
                 <button
                   onClick={() => setActiveDecisionDrawerId(selectedNode.id)}
-                  className="w-full py-2 px-3 rounded-xl bg-[#B9915E]/15 hover:bg-[#B9915E]/25 text-[#B9915E] border border-[#B9915E]/35 font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  className="w-full py-2 px-3 rounded-xl bg-[#9067C6] hover:bg-[#7B52B3] text-white border border-[#9067C6] font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
-                  <Layers className="w-3.5 h-3.5 text-[#B9915E]" />
+                  <Layers className="w-3.5 h-3.5 text-white" />
                   <span>Open Full Decision Drawer</span>
                 </button>
               )}
@@ -1270,9 +1334,9 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
                   onClick={() => {
                     setFocusEntityId(selectedNode.id);
                   }}
-                  className="w-full py-2 px-3 rounded-xl bg-[#757F6C]/20 hover:bg-[#757F6C]/30 text-[#F5F3ED] border border-[#757F6C]/40 font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  className="w-full py-2 px-3 rounded-xl bg-[#8D86C9]/25 hover:bg-[#8D86C9]/40 text-[#F7ECE1] border border-[#8D86C9]/50 font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
-                  <Workflow className="w-3.5 h-3.5 text-[#757F6C]" />
+                  <Workflow className="w-3.5 h-3.5 text-[#8D86C9]" />
                   <span>Focus Subgraph on this Entity</span>
                 </button>
               )}

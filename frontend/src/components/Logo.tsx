@@ -33,10 +33,10 @@ export const Logo: React.FC<LogoProps> = ({
             width: icon,
             height: icon,
             fontSize: Math.max(10, Math.round(text * 0.65)),
-            backgroundImage: 'linear-gradient(180deg, #14150F 0%, #0A0B08 100%)',
-            border: '1px solid color-mix(in srgb, #B9915E 52%, #292A23)',
-            color: '#F0E9DC',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4), 0 0 12px rgba(185, 145, 94, 0.15)',
+            backgroundImage: 'linear-gradient(180deg, #2E284A 0%, #1C182D 100%)',
+            border: '1px solid rgba(144, 103, 198, 0.65)',
+            color: '#F7ECE1',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.35), 0 0 12px rgba(144, 103, 198, 0.22)',
           }}
         >
           Cw.
@@ -48,22 +48,22 @@ export const Logo: React.FC<LogoProps> = ({
             <div
               className="flex items-baseline tracking-tight font-extrabold"
               style={{
-                fontFamily: "'Manrope', sans-serif",
+                fontFamily: "'Inter', sans-serif",
                 fontSize: text,
                 letterSpacing: '-0.04em',
                 lineHeight: 1.1,
               }}
             >
-              <span style={{ color: '#F5F3ED' }}>Code</span>
-              <span style={{ color: '#B9915E' }}>Why</span>
+              <span style={{ color: '#F7ECE1' }}>Code</span>
+              <span style={{ color: '#9067C6' }}>Why</span>
             </div>
             {showTagline && (
               <span
                 style={{
-                  fontFamily: "'Manrope', sans-serif",
+                  fontFamily: "'Inter', sans-serif",
                   fontSize: sub,
                   fontWeight: 600,
-                  color: '#A5A69D',
+                  color: '#CAC4CE',
                   marginTop: '3px',
                   letterSpacing: '0.04em',
                   lineHeight: 1,

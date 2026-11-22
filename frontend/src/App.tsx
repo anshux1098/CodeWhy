@@ -172,6 +172,23 @@ export function App() {
     // Listen for browser popstate (back/forward buttons)
     const handlePopState = () => {
       const r = parseUrlRoute();
+      if (r.repoId) {
+        setRepositories((currentRepos) => {
+          const matched = currentRepos.find((repo) => repo.id === r.repoId);
+          if (matched) {
+            setSelectedRepo(matched);
+          } else {
+            setSelectedRepo({
+              id: r.repoId!,
+              name: r.repoId!,
+              url: `https://github.com/${r.repoId}`,
+              counts: { decisions: 0, entities: 0, pull_requests: 0, commits: 0 },
+              fixture: false,
+            });
+          }
+          return currentRepos;
+        });
+      }
       if (r.tab === 'decisions' && r.repoId) {
         setCurrentTab('decisions');
       } else if (r.tab === 'status' && r.repoId) {
@@ -275,16 +292,16 @@ export function App() {
       {healthDataSource && healthDataSource !== 'graph' && (
         <div
           data-testid="data-source-banner"
-          className="w-full bg-amber-500/20 text-amber-950 border-b border-amber-500/40 px-4 py-2 text-center text-xs font-mono font-bold tracking-wide z-30"
+          className="w-full bg-[#e3b341]/15 text-[#F7ECE1] border-b border-[#e3b341]/40 px-4 py-2 text-center text-xs font-mono font-semibold tracking-wide z-30"
           role="alert"
         >
           Not running on the real graph, results may differ
         </div>
       )}
-      {(selectedRepo?.fixture || repositories.some((r) => r.fixture)) && (
+      {selectedRepo?.fixture && (
         <div
           data-testid="fixture-banner"
-          className="w-full bg-rose-500/20 text-rose-950 border-b border-rose-500/40 px-4 py-2 text-center text-xs font-mono font-bold tracking-wide z-30"
+          className="w-full bg-[#9067C6]/20 text-[#F7ECE1] border-b border-[#9067C6]/45 px-4 py-2 text-center text-xs font-mono font-semibold tracking-wide z-30"
           role="alert"
         >
           SAMPLE DATA, NOT REAL HISTORY

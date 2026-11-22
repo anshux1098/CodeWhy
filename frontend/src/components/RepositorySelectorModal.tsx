@@ -349,6 +349,8 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
           onSelectRepo(resolvedRepo);
           setIngestJobId(null);
           setIngestStatus(null);
+          setIngestRepo('');
+          setIngestFiles('');
           onClose();
         } else if (status.status === 'failed') {
           clearPolling();
@@ -452,23 +454,27 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
         aria-labelledby="repository-selector-title"
         aria-describedby="repository-selector-description"
         tabIndex={-1}
-        className="relative w-full max-w-2xl bg-[#fffdf8] border border-[#d7d2c6] rounded-lg shadow-xl overflow-hidden z-10 flex flex-col max-h-[85vh]"
+        className="relative w-full max-w-2xl bg-[#191628] border border-[#CAC4CE]/25 rounded-2xl shadow-2xl overflow-hidden z-10 flex flex-col max-h-[85vh] text-[#F7ECE1]"
       >
         
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#d7d2c6] bg-[#fffdf8]">
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded bg-[#efede5] text-[#617c50] border border-[#d7d2c6]">
-              <GitBranch className="w-4 h-4" />
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#CAC4CE]/20 bg-[#242038]">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-[#2E284A] text-[#C5B0E6] border border-[#9067C6]/45">
+              <GitBranch className="w-4 h-4 text-[#C5B0E6]" />
             </div>
             <div>
-              <h3 id="repository-selector-title" className="text-sm font-semibold text-[#292b25]">Select Target Repository</h3>
-              <p id="repository-selector-description" className="text-xs text-[#77776e]">Choose a repository to inspect architectural provenance</p>
+              <h3 id="repository-selector-title" className="text-base font-semibold text-[#F7ECE1] leading-snug">
+                Select Target Repository
+              </h3>
+              <p id="repository-selector-description" className="text-xs text-[#CAC4CE] mt-0.5">
+                Choose a repository to inspect architectural provenance
+              </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-[#77776e] hover:text-[#292b25] rounded hover:bg-[#efede5] transition-colors cursor-pointer"
+            className="p-2 text-[#F7ECE1] bg-[#2E284A] hover:bg-[#3A335C] border border-[#CAC4CE]/25 rounded-lg transition-colors cursor-pointer"
             aria-label="Close repository selector"
             title="Close (Esc)"
           >
@@ -477,50 +483,50 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-[#d7d2c6] px-5 bg-[#fffdf8]">
+        <div className="flex border-b border-[#CAC4CE]/20 px-6 bg-[#242038] gap-1">
           <button
             onClick={() => setActiveTab('existing')}
-            className={`py-2.5 px-3 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
+            className={`py-3 px-4 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer rounded-t-lg ${
               activeTab === 'existing'
-                ? 'border-[#718d5e] text-[#292b25]'
-                : 'border-transparent text-[#77776e] hover:text-[#292b25]'
+                ? 'border-[#9067C6] text-[#F7ECE1] bg-[#2E284A]'
+                : 'border-transparent text-[#CAC4CE] hover:text-[#F7ECE1] hover:bg-[#2E284A]/55'
             }`}
           >
-            <Database className="w-3.5 h-3.5" />
-            Available Repositories ({repositories.length})
+            <Database className={`w-3.5 h-3.5 ${activeTab === 'existing' ? 'text-[#C5B0E6]' : 'text-[#8D86C9]'}`} />
+            <span>Available Repositories ({repositories.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('custom')}
-            className={`py-2.5 px-3 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
+            className={`py-3 px-4 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer rounded-t-lg ${
               activeTab === 'custom'
-                ? 'border-[#718d5e] text-[#292b25]'
-                : 'border-transparent text-[#77776e] hover:text-[#292b25]'
+                ? 'border-[#9067C6] text-[#F7ECE1] bg-[#2E284A]'
+                : 'border-transparent text-[#CAC4CE] hover:text-[#F7ECE1] hover:bg-[#2E284A]/55'
             }`}
           >
-            <Plus className="w-3.5 h-3.5" />
-            Add Target
+            <Plus className={`w-3.5 h-3.5 ${activeTab === 'custom' ? 'text-[#C5B0E6]' : 'text-[#8D86C9]'}`} />
+            <span>Add Target</span>
           </button>
         </div>
 
         {/* Content Body */}
         {activeTab === 'existing' ? (
-          <div className="p-5 flex flex-col gap-3 overflow-y-auto">
+          <div className="p-6 flex flex-col gap-4 overflow-y-auto bg-[#191628]">
             {/* Search Input */}
             <div className="relative">
-              <Search className="w-3.5 h-3.5 text-[#77776e] absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-[#CAC4CE] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Filter by name, owner, or scope..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 bg-[#f5f3ed] border border-[#d7d2c6] rounded text-xs font-mono text-[#292b25] placeholder-[#929086] focus:outline-none focus:border-[#718d5e]"
+                className="w-full pl-10 pr-4 py-2.5 bg-[#161324] border border-[#CAC4CE]/25 rounded-xl text-xs font-mono text-[#F7ECE1] placeholder:text-[#CAC4CE]/70 focus:outline-none focus:border-[#9067C6] focus:ring-2 focus:ring-[#9067C6]/35 transition-colors"
               />
             </div>
 
             {/* Repositories List */}
-            <div className="space-y-2.5 mt-1">
+            <div className="space-y-3">
               {filteredRepos.length === 0 ? (
-                <div className="text-center py-8 text-[#77776e] text-xs font-mono">
+                <div className="text-center py-8 text-[#CAC4CE] text-xs font-mono bg-[#242038] rounded-xl border border-[#CAC4CE]/20">
                   No repositories match "{searchQuery}"
                 </div>
               ) : (
@@ -544,55 +550,61 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
                           onClose();
                         }
                       }}
-                      className={`group p-3.5 rounded border transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#718d5e] ${
+                      className={`group p-4 rounded-xl border transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9067C6] ${
                         isSelected
-                          ? 'bg-[#f5f3ed] border-[#718d5e]'
-                          : 'bg-[#f5f3ed] border-[#d7d2c6] hover:border-[#bdb8ab]'
+                          ? 'bg-[#322952] border-[#9067C6] ring-1 ring-[#9067C6]/50 shadow-sm'
+                          : 'bg-[#242038] border-[#CAC4CE]/20 hover:border-[#9067C6]/70 hover:bg-[#2C2647]'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1 flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-sm font-semibold text-[#292b25] group-hover:text-[#617c50] transition-colors truncate">
+                        <div className="space-y-1.5 flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {isSelected && (
+                              <span
+                                className="w-2 h-2 rounded-full bg-[#C5B0E6] shrink-0"
+                                aria-hidden="true"
+                              />
+                            )}
+                            <span className="font-mono text-sm font-semibold text-[#F7ECE1] group-hover:text-white transition-colors truncate">
                               {repo.name}
                             </span>
                             {isSelected && (
-                              <span className="flex items-center gap-1 text-[10px] font-mono text-[#3fb950] bg-[#2ea043]/15 border border-[#2ea043]/30 px-1.5 py-0.2 rounded">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-mono font-semibold text-white bg-[#9067C6] px-2 py-0.5 rounded-md">
                                 <Check className="w-3 h-3" /> Selected
                               </span>
                             )}
                             {repo.fixture && (
-                              <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 rounded">
+                              <span className="text-[10px] font-mono font-semibold text-[#F7ECE1] bg-[#161324] border border-[#CAC4CE]/25 px-1.5 py-0.5 rounded">
                                 fixture
                               </span>
                             )}
                           </div>
 
                           {repo.scope && (
-                            <p className="text-xs text-[#77776e] line-clamp-1">
+                            <p className="text-xs text-[#CAC4CE] line-clamp-1">
                               {repo.scope}
                             </p>
                           )}
 
                           {/* Metric Pill Grid */}
-                          <div className="flex flex-wrap items-center gap-2.5 pt-1.5 text-xs font-mono text-[#77776e]">
-                            <div className="flex items-center gap-1 text-[#51534b]">
-                              <ShieldCheck className="w-3 h-3 text-[#2ea043]" />
+                          <div className="flex flex-wrap items-center gap-2.5 pt-1 text-xs font-mono text-[#CAC4CE]">
+                            <div className="flex items-center gap-1 text-[#F7ECE1]">
+                              <ShieldCheck className="w-3.5 h-3.5 text-[#3fb950]" />
                               <span>{repo.counts.decisions} decisions</span>
                             </div>
-                            <span className="text-[#d7d2c6]">•</span>
-                            <div className="flex items-center gap-1 text-[#51534b]">
-                              <FileCode className="w-3 h-3 text-[#617c50]" />
+                            <span className="text-[#CAC4CE]/40">•</span>
+                            <div className="flex items-center gap-1 text-[#F7ECE1]">
+                              <FileCode className="w-3.5 h-3.5 text-[#C5B0E6]" />
                               <span>{repo.counts.entities} entities</span>
                             </div>
-                            <span className="text-[#d7d2c6]">•</span>
-                            <div className="flex items-center gap-1 text-[#51534b]">
-                              <GitPullRequest className="w-3 h-3 text-[#a371f7]" />
+                            <span className="text-[#CAC4CE]/40">•</span>
+                            <div className="flex items-center gap-1 text-[#F7ECE1]">
+                              <GitPullRequest className="w-3.5 h-3.5 text-[#8D86C9]" />
                               <span>{repo.counts.pull_requests} PRs</span>
                             </div>
-                            <span className="text-[#d7d2c6]">•</span>
-                            <div className="flex items-center gap-1 text-[#51534b]">
-                              <GitCommit className="w-3 h-3 text-[#77776e]" />
+                            <span className="text-[#CAC4CE]/40">•</span>
+                            <div className="flex items-center gap-1 text-[#F7ECE1]">
+                              <GitCommit className="w-3.5 h-3.5 text-[#CAC4CE]" />
                               <span>{repo.counts.commits} commits</span>
                             </div>
                           </div>
@@ -605,7 +617,11 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
                             onKeyDown={(e) => e.stopPropagation()}
-                            className="p-1.5 text-[#77776e] hover:text-[#292b25] hover:bg-[#efede5] rounded transition-colors flex-shrink-0"
+                            className={`p-2 rounded-lg transition-colors flex-shrink-0 border ${
+                              isSelected
+                                ? 'text-[#F7ECE1] bg-[#242038] border-[#9067C6]/50 hover:border-[#9067C6]'
+                                : 'text-[#CAC4CE] border-transparent hover:text-[#F7ECE1] hover:bg-[#322952]'
+                            }`}
                             title="Open repository in GitHub"
                             aria-label={`Open ${repo.name} on GitHub`}
                           >
@@ -620,10 +636,10 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
             </div>
           </div>
         ) : (
-          <div className="p-5 space-y-4">
-            <div className="space-y-3">
+          <div className="p-6 space-y-4 overflow-y-auto bg-[#191628]">
+            <div className="space-y-3.5">
               <div>
-                <label htmlFor="ingest-repo-input" className="block text-xs font-semibold text-[#292b25] mb-1.5">
+                <label htmlFor="ingest-repo-input" className="block text-xs font-semibold text-[#F7ECE1] mb-1.5">
                   GitHub Repository URL or owner/repo
                 </label>
                 <input
@@ -636,47 +652,47 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
                     setIngestError(null);
                   }}
                   disabled={isSubmitting || !!ingestJobId}
-                  className="w-full px-3 py-2 bg-[#f5f3ed] border border-[#d7d2c6] rounded text-xs font-mono text-[#292b25] placeholder-[#929086] focus:outline-none focus:border-[#718d5e]"
+                  className="w-full px-3.5 py-2.5 bg-[#161324] border border-[#CAC4CE]/25 rounded-xl text-xs font-mono text-[#F7ECE1] placeholder:text-[#CAC4CE]/70 focus:outline-none focus:border-[#9067C6] focus:ring-2 focus:ring-[#9067C6]/35"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#292b25] mb-1.5">
+                <label className="block text-xs font-semibold text-[#F7ECE1] mb-1.5">
                   Scan Mode
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2.5">
                   <button
                     type="button"
                     disabled={isSubmitting || !!ingestJobId}
                     onClick={() => setIngestMode('quick')}
-                    className={`p-2.5 rounded border text-left transition-colors cursor-pointer ${
+                    className={`p-3 rounded-xl border text-left transition-colors cursor-pointer ${
                       ingestMode === 'quick'
-                        ? 'bg-[#efede5] border-[#718d5e] text-[#292b25]'
-                        : 'bg-[#f5f3ed] border-[#d7d2c6] text-[#77776e]'
+                        ? 'bg-[#322952] border-[#9067C6] text-[#F7ECE1] ring-1 ring-[#9067C6]/50'
+                        : 'bg-[#242038] border-[#CAC4CE]/20 text-[#CAC4CE] hover:border-[#9067C6]/65 hover:text-[#F7ECE1]'
                     }`}
                   >
-                    <div className="text-xs font-semibold">Quick Start (~30–45s)</div>
-                    <div className="text-[11px] opacity-80">Top 8 hotspot files · 25 high-signal PRs</div>
+                    <div className="text-xs font-semibold text-[#F7ECE1]">Quick Start (~30–45s)</div>
+                    <div className="text-[11px] text-[#CAC4CE] mt-0.5">Top 8 hotspot files · 25 high-signal PRs</div>
                   </button>
                   <button
                     type="button"
                     disabled={isSubmitting || !!ingestJobId}
                     onClick={() => setIngestMode('deep')}
-                    className={`p-2.5 rounded border text-left transition-colors cursor-pointer ${
+                    className={`p-3 rounded-xl border text-left transition-colors cursor-pointer ${
                       ingestMode === 'deep'
-                        ? 'bg-[#efede5] border-[#718d5e] text-[#292b25]'
-                        : 'bg-[#f5f3ed] border-[#d7d2c6] text-[#77776e]'
+                        ? 'bg-[#322952] border-[#9067C6] text-[#F7ECE1] ring-1 ring-[#9067C6]/50'
+                        : 'bg-[#242038] border-[#CAC4CE]/20 text-[#CAC4CE] hover:border-[#9067C6]/65 hover:text-[#F7ECE1]'
                     }`}
                   >
-                    <div className="text-xs font-semibold">Deep Scan</div>
-                    <div className="text-[11px] opacity-80">Top 20 files · up to 200 PRs</div>
+                    <div className="text-xs font-semibold text-[#F7ECE1]">Deep Scan</div>
+                    <div className="text-[11px] text-[#CAC4CE] mt-0.5">Top 20 files · up to 200 PRs</div>
                   </button>
                 </div>
               </div>
 
               <div>
-                <label htmlFor="ingest-files-input" className="block text-xs font-semibold text-[#292b25] mb-1">
-                  Target Files <span className="font-normal text-[#77776e]">(optional — leave blank for zero-config auto-discovery)</span>
+                <label htmlFor="ingest-files-input" className="block text-xs font-semibold text-[#F7ECE1] mb-1.5">
+                  Target Files <span className="font-normal text-[#CAC4CE]">(optional — leave blank for zero-config auto-discovery)</span>
                 </label>
                 <input
                   id="ingest-files-input"
@@ -685,7 +701,7 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
                   value={ingestFiles}
                   onChange={(e) => setIngestFiles(e.target.value)}
                   disabled={isSubmitting || !!ingestJobId}
-                  className="w-full px-3 py-2 bg-[#f5f3ed] border border-[#d7d2c6] rounded text-xs font-mono text-[#292b25] placeholder-[#929086] focus:outline-none focus:border-[#718d5e]"
+                  className="w-full px-3.5 py-2.5 bg-[#161324] border border-[#CAC4CE]/25 rounded-xl text-xs font-mono text-[#F7ECE1] placeholder:text-[#CAC4CE]/70 focus:outline-none focus:border-[#9067C6] focus:ring-2 focus:ring-[#9067C6]/35"
                 />
               </div>
 
@@ -716,29 +732,29 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
                   }
                 }}
                 disabled={isSubmitting || !!ingestJobId || !ingestRepo.trim()}
-                className="px-4 py-2 bg-[#718d5e] text-white text-xs font-semibold rounded hover:bg-[#617c50] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2.5 bg-[#9067C6] text-white text-xs font-semibold rounded-xl hover:bg-[#7B52B3] transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-sm"
               >
                 {isSubmitting ? 'Starting…' : ingestMode === 'quick' ? 'Quick Analyze Repository' : 'Deep Analyze Repository'}
               </button>
 
               {ingestError && (
-                <p className="text-red-600 text-xs font-mono">{ingestError}</p>
+                <p className="text-[#f85149] text-xs font-mono font-medium">{ingestError}</p>
               )}
 
               {ingestStatus && ingestStatus.status !== 'failed' && (
-                <div className="space-y-2 pt-1">
-                  <div className="flex justify-between items-center text-xs font-mono text-[#77776e]">
+                <div className="space-y-2 pt-1 bg-[#242038] p-3.5 rounded-xl border border-[#CAC4CE]/25">
+                  <div className="flex justify-between items-center text-xs font-mono text-[#F7ECE1]">
                     <span>{ingestStatus.phase ?? ingestStatus.status}</span>
                     <span>{ingestStatus.progress_pct}%</span>
                   </div>
-                  <div className="w-full bg-[#efede5] rounded-full h-2">
+                  <div className="w-full bg-[#161324] rounded-full h-2">
                     <div
-                      className="bg-[#718d5e] h-2 rounded-full transition-all"
+                      className="bg-[#9067C6] h-2 rounded-full transition-all"
                       style={{ width: `${ingestStatus.progress_pct}%` }}
                     />
                   </div>
                   {ingestStatus.status === 'done' && (
-                    <p className="text-xs font-mono text-[#718d5e]">Done! Loading repository…</p>
+                    <p className="text-xs font-mono font-medium text-[#3fb950]">Done! Loading repository…</p>
                   )}
                 </div>
               )}

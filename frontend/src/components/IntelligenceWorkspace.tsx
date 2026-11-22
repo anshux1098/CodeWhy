@@ -226,14 +226,14 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
 
   const renderAnswerWithCitations = (answerText: string) => {
     if (!activeCitations || activeCitations.length === 0) {
-      return <p className="prose-answer text-[#F5F3ED] text-sm leading-relaxed">{answerText}</p>;
+      return <p className="prose-answer text-[#F7ECE1] text-sm leading-relaxed">{answerText}</p>;
     }
 
     return (
-      <div className="text-[#F5F3ED] leading-relaxed space-y-3">
+      <div className="text-[#F7ECE1] leading-relaxed space-y-3">
         <p className="prose-answer text-sm leading-relaxed">{answerText}</p>
         <div className="pt-2 flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-mono text-[#A5A69D] uppercase tracking-wider mr-1">
+          <span className="text-[11px] font-mono text-[#CAC4CE] uppercase tracking-wider mr-1">
             Citations:
           </span>
           {activeCitations.map((c, index) => {
@@ -244,14 +244,14 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
                 onClick={() => handleSelectCitation(isSelected ? null : c.id)}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-mono font-medium transition-colors cursor-pointer border ${
                   isSelected
-                    ? 'bg-[#757F6C] text-[#080907] border-[#8A9680]'
-                    : 'bg-[#080907] text-[#B9915E] border-[#292A23] hover:border-[#B9915E]/50 hover:bg-[#181914]'
+                    ? 'bg-[#9067C6] text-white border-[#9067C6]'
+                    : 'bg-[#161324] text-[#C5B0E6] border-[#CAC4CE]/25 hover:border-[#9067C6] hover:bg-[#322D4D]'
                 }`}
                 title={`View receipt: ${c.quote.slice(0, 50)}...`}
               >
                 <Quote className="w-3 h-3" />
                 <span>[{index + 1}: {c.id}]</span>
-                {c.author && <span className="text-[10px] opacity-75">@{c.author}</span>}
+                {c.author && <span className="text-[10px] opacity-80">@{c.author}</span>}
               </button>
             );
           })}
@@ -263,24 +263,24 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
   const showEvidencePanel = Boolean(response) || activeCitations.length > 0 || activeEvidenceGaps.length > 0;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] w-full bg-[#080907]">
+    <div className="flex flex-col h-[calc(100vh-4rem)] w-full bg-[#191628]">
       {/* Top context bar */}
-      <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-2.5 border-b border-[#292A23] bg-[#0B0C09]">
+      <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-2.5 border-b border-[#CAC4CE]/20 bg-[#242038]">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-mono text-[#A5A69D]">
+          <span className="text-xs font-mono text-[#CAC4CE]">
             Investigation Target:
           </span>
-          <span className="font-mono text-xs font-semibold text-[#F5F3ED] bg-[#12130F] px-2.5 py-1 rounded-md border border-[#292A23] flex items-center gap-1.5">
-            <GitBranch className="w-3.5 h-3.5 text-[#757F6C]" />
+          <span className="font-mono text-xs font-semibold text-[#F7ECE1] bg-[#161324] px-2.5 py-1 rounded-md border border-[#CAC4CE]/25 flex items-center gap-1.5">
+            <GitBranch className="w-3.5 h-3.5 text-[#8D86C9]" />
             {selectedRepo?.name || repoId || 'No repository selected'}
           </span>
           {isDemoRepo && (
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#B9915E]/15 text-[#B9915E] border border-[#B9915E]/30">
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#9067C6]/20 text-[#F7ECE1] border border-[#9067C6]/45">
               fixture
             </span>
           )}
           {selectedRepo?.last_rebuilt_at && (
-            <span className="text-[11px] font-mono text-[#A5A69D] bg-[#12130F] px-2.5 py-1 rounded-md border border-[#292A23]">
+            <span className="text-[11px] font-mono text-[#CAC4CE] bg-[#161324] px-2.5 py-1 rounded-md border border-[#CAC4CE]/20">
               Last graph rebuild: {new Date(selectedRepo.last_rebuilt_at).toLocaleDateString()}
             </span>
           )}
@@ -294,15 +294,15 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
       >
         <main className="flex-1 min-w-0 p-4 sm:p-6 space-y-4">
           {isLoading && (
-            <div className="workbench-card rounded-xl bg-[#12130F] border border-[#292A23] p-8 text-center space-y-3">
-              <div className="w-10 h-10 rounded-full bg-[#080907] border border-[#292A23] flex items-center justify-center mx-auto text-[#757F6C]">
+            <div className="workbench-card rounded-xl bg-[#242038] border border-[#CAC4CE]/20 p-8 text-center space-y-3">
+              <div className="w-10 h-10 rounded-full bg-[#161324] border border-[#9067C6]/45 flex items-center justify-center mx-auto text-[#9067C6]">
                 <Loader2 className="w-5 h-5 animate-spin" />
               </div>
               <div>
-                <h3 className="text-xs font-mono font-semibold text-[#F5F3ED]">
+                <h3 className="text-xs font-mono font-semibold text-[#F7ECE1]">
                   Querying Decision Graph & Verifying Quotes...
                 </h3>
-                <p className="text-[11px] font-mono text-[#A5A69D] mt-1">
+                <p className="text-[11px] font-mono text-[#CAC4CE] mt-1">
                   Resolving entities, validating verbatim substring citations, and scoring provenance.
                 </p>
               </div>
@@ -310,16 +310,16 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
           )}
 
           {error && (
-            <div data-testid="backend-error-state" className="workbench-card rounded-xl bg-[#12130F] border border-[#da3633]/40 p-5 text-[#f85149] space-y-3">
+            <div data-testid="backend-error-state" className="workbench-card rounded-xl bg-[#242038] border border-[#f85149]/45 p-5 text-[#f85149] space-y-3">
               <div className="flex items-center gap-2 font-medium text-xs">
                 <AlertTriangle className="w-4 h-4 text-[#f85149]" />
                 <span>Backend Error</span>
               </div>
-              <p className="text-xs font-mono text-[#A5A69D]">{error}</p>
+              <p className="text-xs font-mono text-[#CAC4CE]">{error}</p>
               <button
                 type="button"
                 onClick={() => handleAsk()}
-                className="px-3.5 py-1.5 rounded-md bg-[#080907] hover:bg-[#181914] text-[#F5F3ED] border border-[#292A23] text-xs font-mono transition-colors cursor-pointer"
+                className="px-3.5 py-1.5 rounded-md bg-[#9067C6] hover:bg-[#7B52B3] text-white text-xs font-mono transition-colors cursor-pointer"
               >
                 Retry
               </button>
@@ -327,15 +327,15 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
           )}
 
           {!isLoading && !error && !response && !duelResult && (
-            <div className="workbench-card rounded-xl bg-[#12130F] border border-[#292A23] p-9 text-center space-y-4">
-              <div className="w-10 h-10 rounded-lg bg-[#080907] text-[#B9915E] border border-[#292A23] flex items-center justify-center mx-auto">
+            <div className="workbench-card rounded-xl bg-[#242038] border border-[#CAC4CE]/20 p-9 text-center space-y-4">
+              <div className="w-10 h-10 rounded-lg bg-[#161324] text-[#9067C6] border border-[#9067C6]/40 flex items-center justify-center mx-auto">
                 <Terminal className="w-5 h-5" />
               </div>
               <div className="max-w-md mx-auto space-y-1.5">
-                <h3 className="text-sm font-semibold text-[#F5F3ED]">
+                <h3 className="text-sm font-semibold text-[#F7ECE1]">
                   Decision Investigation Console
                 </h3>
-                <p className="text-xs text-[#A5A69D] leading-relaxed">
+                <p className="text-xs text-[#CAC4CE] leading-relaxed">
                   Enter a question below to reconstruct historical engineering intent from Git commits, PRs, and review discussions.
                 </p>
               </div>
@@ -446,22 +446,22 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
 
               {/* Full Verified Answer */}
               {response.outcome === 'full' && (
-                <div className="workbench-card rounded-xl bg-[#12130F] border border-[#2ea043]/40 p-6 space-y-5">
-                  <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[#292A23] pb-3">
+                <div className="workbench-card rounded-xl bg-[#242038] border border-[#3fb950]/45 p-6 space-y-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[#CAC4CE]/20 pb-3">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-mono font-semibold bg-[#2ea043]/15 text-[#3fb950] border border-[#2ea043]/40">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-mono font-semibold bg-[#3fb950]/15 text-[#3fb950] border border-[#3fb950]/40">
                         <CheckCircle2 className="w-3.5 h-3.5 text-[#3fb950]" />
                         Full Verified Answer
                       </span>
                       {response.confidence && (
-                        <span className="px-2.5 py-0.5 rounded-md text-xs font-mono font-medium bg-[#080907] text-[#757F6C] border border-[#292A23]">
+                        <span className="px-2.5 py-0.5 rounded-md text-xs font-mono font-medium bg-[#161324] text-[#C5B0E6] border border-[#CAC4CE]/25">
                           {Math.round(response.confidence.score * 100)}% {response.confidence.label} Confidence
                         </span>
                       )}
                     </div>
                     <button
                       onClick={handleCopyAnswer}
-                      className="px-2.5 py-1 rounded-md bg-[#080907] hover:bg-[#181914] border border-[#292A23] text-[#A5A69D] hover:text-[#F5F3ED] transition-colors flex items-center gap-1.5 text-xs font-mono cursor-pointer"
+                      className="px-2.5 py-1 rounded-md bg-[#161324] hover:bg-[#322D4D] border border-[#CAC4CE]/25 text-[#CAC4CE] hover:text-[#F7ECE1] transition-colors flex items-center gap-1.5 text-xs font-mono cursor-pointer"
                       title={copiedAnswer === 'failed' ? 'Copy failed — clipboard access was blocked' : 'Copy answer text'}
                       aria-label={copiedAnswer === 'failed' ? 'Copy failed' : 'Copy answer text'}
                     >
@@ -479,13 +479,13 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
                   </div>
 
                   {response.entity && (
-                    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-[#080907] border border-[#292A23] text-xs font-mono">
-                      <span className="text-[#757F6C] font-medium">{response.entity.type}:</span>
-                      <span className="text-[#F5F3ED] font-semibold">{response.entity.label}</span>
+                    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-[#161324] border border-[#CAC4CE]/25 text-xs font-mono">
+                      <span className="text-[#8D86C9] font-medium">{response.entity.type}:</span>
+                      <span className="text-[#F7ECE1] font-semibold">{response.entity.label}</span>
                       {response.entity.path && (
-                        <span className="text-[#A5A69D]">({response.entity.path})</span>
+                        <span className="text-[#CAC4CE]">({response.entity.path})</span>
                       )}
-                      <span className="text-[#A5A69D]/70">
+                      <span className="text-[#CAC4CE]/85">
                         • {response.entity.decision_count} governing decisions
                       </span>
                     </div>
@@ -493,36 +493,36 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
 
                   {response.answer && renderAnswerWithCitations(response.answer)}
 
-                  <div className="flex items-center gap-2 pt-2 border-t border-[#292A23] text-xs font-mono">
-                    <span className="text-[#A5A69D]">Real Outcome:</span>
-                    <span className="font-bold uppercase text-[#2ea043]">{response.outcome}</span>
+                  <div className="flex items-center gap-2 pt-2 border-t border-[#CAC4CE]/20 text-xs font-mono">
+                    <span className="text-[#CAC4CE]">Real Outcome:</span>
+                    <span className="font-bold uppercase text-[#3fb950]">{response.outcome}</span>
                   </div>
                 </div>
               )}
 
               {/* Partial Answer */}
               {response.outcome === 'partial' && (
-                <div className="workbench-card rounded-xl bg-[#12130F] border border-[#d29922]/40 p-6 space-y-5">
-                  <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[#292A23] pb-3">
+                <div className="workbench-card rounded-xl bg-[#242038] border border-[#e3b341]/45 p-6 space-y-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[#CAC4CE]/20 pb-3">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-mono font-semibold bg-[#d29922]/15 text-[#e3b341] border border-[#d29922]/40">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-mono font-semibold bg-[#e3b341]/15 text-[#e3b341] border border-[#e3b341]/40">
                         <HelpCircle className="w-3.5 h-3.5 text-[#e3b341]" />
                         Partial Answer
                       </span>
                       {response.reason_code && (
-                        <span className="px-2.5 py-0.5 rounded-md text-xs font-mono bg-[#080907] text-[#e3b341] border border-[#292A23]">
+                        <span className="px-2.5 py-0.5 rounded-md text-xs font-mono bg-[#161324] text-[#e3b341] border border-[#CAC4CE]/25">
                           Reason: {response.reason_code}
                         </span>
                       )}
                       {response.confidence && (
-                        <span className="px-2.5 py-0.5 rounded-md text-xs font-mono text-[#A5A69D] bg-[#080907] border border-[#292A23]">
+                        <span className="px-2.5 py-0.5 rounded-md text-xs font-mono text-[#CAC4CE] bg-[#161324] border border-[#CAC4CE]/25">
                           {Math.round(response.confidence.score * 100)}% {response.confidence.label}
                         </span>
                       )}
                     </div>
                     <button
                       onClick={handleCopyAnswer}
-                      className="px-2.5 py-1 rounded-md bg-[#080907] hover:bg-[#181914] border border-[#292A23] text-[#A5A69D] hover:text-[#F5F3ED] transition-colors flex items-center gap-1.5 text-xs font-mono cursor-pointer"
+                      className="px-2.5 py-1 rounded-md bg-[#161324] hover:bg-[#322D4D] border border-[#CAC4CE]/25 text-[#CAC4CE] hover:text-[#F7ECE1] transition-colors flex items-center gap-1.5 text-xs font-mono cursor-pointer"
                       title={copiedAnswer === 'failed' ? 'Copy failed — clipboard access was blocked' : 'Copy answer text'}
                       aria-label={copiedAnswer === 'failed' ? 'Copy failed' : 'Copy answer text'}
                     >
@@ -541,20 +541,20 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
 
                   {response.answer && renderAnswerWithCitations(response.answer)}
 
-                  <div className="flex items-center gap-2 pt-2 border-t border-[#292A23] text-xs font-mono">
-                    <span className="text-[#A5A69D]">Real Outcome:</span>
+                  <div className="flex items-center gap-2 pt-2 border-t border-[#CAC4CE]/20 text-xs font-mono">
+                    <span className="text-[#CAC4CE]">Real Outcome:</span>
                     <span className="font-bold uppercase text-[#e3b341]">{response.outcome}</span>
                     {response.reason_code && (
-                      <span className="text-[#A5A69D]">({response.reason_code})</span>
+                      <span className="text-[#CAC4CE]">({response.reason_code})</span>
                     )}
                   </div>
 
-                  <div className="p-3 rounded-lg bg-[#080907] border border-[#d29922]/30 space-y-1">
+                  <div className="p-3 rounded-lg bg-[#161324] border border-[#e3b341]/35 space-y-1">
                     <span className="text-xs font-mono font-medium text-[#e3b341] flex items-center gap-1.5 uppercase">
                       <AlertTriangle className="w-3.5 h-3.5 text-[#e3b341]" />
                       Missing Verbatim Rationale
                     </span>
-                    <p className="text-xs font-mono text-[#A5A69D] leading-relaxed">
+                    <p className="text-xs font-mono text-[#CAC4CE] leading-relaxed">
                       Code modifications were discovered, but no character-verified quote survived verification. See evidence gaps in the right margin.
                     </p>
                   </div>
@@ -563,15 +563,15 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
 
               {/* Refusal (Honest Negative) */}
               {response.outcome === 'refusal' && response.reason_code !== 'ambiguous_entity' && (
-                <div className="workbench-card rounded-xl bg-[#12130F] border border-[#8C806F]/40 p-6 space-y-5">
-                  <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[#292A23] pb-3">
+                <div className="workbench-card rounded-xl bg-[#242038] border border-[#CAC4CE]/30 p-6 space-y-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[#CAC4CE]/20 pb-3">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-mono font-semibold bg-[#8C806F]/20 text-[#D4CBBF] border border-[#8C806F]/40">
-                        <XCircle className="w-3.5 h-3.5 text-[#D4CBBF]" />
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-mono font-semibold bg-[#CAC4CE]/15 text-[#F7ECE1] border border-[#CAC4CE]/35">
+                        <XCircle className="w-3.5 h-3.5 text-[#CAC4CE]" />
                         Principled Refusal
                       </span>
                       {response.reason_code && (
-                        <span className="px-2.5 py-0.5 rounded-md text-xs font-mono bg-[#080907] text-[#D4CBBF] border border-[#292A23]">
+                        <span className="px-2.5 py-0.5 rounded-md text-xs font-mono bg-[#161324] text-[#CAC4CE] border border-[#CAC4CE]/25">
                           Code: {response.reason_code}
                         </span>
                       )}
@@ -579,23 +579,23 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
                   </div>
 
                   {response.answer && (
-                    <p className="text-[#F5F3ED] text-sm leading-relaxed font-sans">
+                    <p className="text-[#F7ECE1] text-sm leading-relaxed font-sans">
                       {response.answer}
                     </p>
                   )}
 
-                  <div className="flex items-center gap-2 pt-2 border-t border-[#292A23] text-xs font-mono">
-                    <span className="text-[#A5A69D]">Real Outcome:</span>
-                    <span className="font-bold uppercase text-[#D4CBBF]">{response.outcome}</span>
+                  <div className="flex items-center gap-2 pt-2 border-t border-[#CAC4CE]/20 text-xs font-mono">
+                    <span className="text-[#CAC4CE]">Real Outcome:</span>
+                    <span className="font-bold uppercase text-[#F7ECE1]">{response.outcome}</span>
                     {response.reason_code && (
-                      <span className="px-2 py-0.5 rounded-md bg-[#080907] text-[#D4CBBF] border border-[#292A23]">
+                      <span className="px-2 py-0.5 rounded-md bg-[#161324] text-[#CAC4CE] border border-[#CAC4CE]/25">
                         {response.reason_code}
                       </span>
                     )}
                   </div>
 
-                  <div className="p-3.5 rounded-lg bg-[#080907] border border-[#292A23] text-xs font-mono text-[#A5A69D] space-y-1">
-                    <span className="text-[#B9915E] font-medium block">
+                  <div className="p-3.5 rounded-lg bg-[#161324] border border-[#CAC4CE]/20 text-xs font-mono text-[#CAC4CE] space-y-1">
+                    <span className="text-[#C5B0E6] font-medium block">
                       Refusal Guarantee:
                     </span>
                     <span className="leading-relaxed">
@@ -607,16 +607,16 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
 
               {/* Ambiguous Entity Disambiguation */}
               {response.outcome === 'refusal' && response.reason_code === 'ambiguous_entity' && (
-                <div className="rounded-xl bg-[#12130F] border border-[#757F6C]/40 p-5 space-y-4">
-                  <div className="flex items-center gap-2 border-b border-[#292A23] pb-3">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-mono font-medium bg-[#757F6C]/15 text-[#757F6C] border border-[#757F6C]/40">
-                      <AlertTriangle className="w-3.5 h-3.5 text-[#757F6C]" />
+                <div className="rounded-xl bg-[#242038] border border-[#9067C6]/45 p-5 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-[#CAC4CE]/20 pb-3">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-mono font-medium bg-[#9067C6]/20 text-[#F7ECE1] border border-[#9067C6]/45">
+                      <AlertTriangle className="w-3.5 h-3.5 text-[#C5B0E6]" />
                       Entity Ambiguity — Select Candidate
                     </span>
                   </div>
 
                   <div className="space-y-2.5">
-                    <p className="text-[#A5A69D] text-xs font-mono">
+                    <p className="text-[#CAC4CE] text-xs font-mono">
                       Multiple matching code entities were found in the knowledge graph:
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
@@ -627,16 +627,16 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
                             setEntityId(cand.id);
                             handleAsk(`Why is ${cand.label} configured this way?`, cand.id);
                           }}
-                          className="p-3 rounded-lg bg-[#080907] border border-[#292A23] hover:border-[#B9915E]/50 text-left transition-colors group cursor-pointer"
+                          className="p-3 rounded-lg bg-[#161324] border border-[#CAC4CE]/25 hover:border-[#9067C6] text-left transition-colors group cursor-pointer"
                         >
-                          <div className="flex items-center justify-between text-xs font-mono text-[#757F6C] mb-1">
+                          <div className="flex items-center justify-between text-xs font-mono text-[#8D86C9] mb-1">
                             <span>{cand.type}</span>
                             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                           </div>
-                          <div className="font-mono text-sm font-semibold text-[#F5F3ED]">
+                          <div className="font-mono text-sm font-semibold text-[#F7ECE1]">
                             {cand.label}
                           </div>
-                          <div className="text-[11px] font-mono text-[#A5A69D] mt-0.5">
+                          <div className="text-[11px] font-mono text-[#CAC4CE] mt-0.5">
                             {cand.id}
                           </div>
                         </button>
@@ -648,20 +648,20 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
 
               {/* Confidence Signals Inspector */}
               {response.confidence && (
-                <div className="rounded-xl border border-[#292A23] bg-[#12130F] p-3.5 space-y-2.5">
+                <div className="rounded-xl border border-[#CAC4CE]/20 bg-[#242038] p-3.5 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-[#757F6C]" />
-                      <span className="text-xs font-mono font-semibold uppercase tracking-wider text-[#F5F3ED]">
+                      <ShieldCheck className="w-4 h-4 text-[#8D86C9]" />
+                      <span className="text-xs font-mono font-semibold uppercase tracking-wider text-[#F7ECE1]">
                         Confidence Signals:
                       </span>
-                      <span className="font-mono text-xs font-medium px-2 py-0.5 rounded-md bg-[#080907] text-[#757F6C] border border-[#292A23]">
+                      <span className="font-mono text-xs font-medium px-2 py-0.5 rounded-md bg-[#161324] text-[#C5B0E6] border border-[#CAC4CE]/25">
                         {Math.round(response.confidence.score * 100)}% ({response.confidence.label})
                       </span>
                     </div>
                     <button
                       onClick={() => setShowConfidenceSignals((s) => !s)}
-                      className="flex items-center gap-1 text-xs font-mono text-[#A5A69D] hover:text-[#F5F3ED] transition-colors cursor-pointer"
+                      className="flex items-center gap-1 text-xs font-mono text-[#CAC4CE] hover:text-[#F7ECE1] transition-colors cursor-pointer"
                     >
                       <span>{showConfidenceSignals ? 'Hide signals' : 'Inspect signals'}</span>
                       {showConfidenceSignals ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -669,19 +669,19 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
                   </div>
 
                   {showConfidenceSignals && response.confidence.signals && (
-                    <div className="pt-2.5 border-t border-[#292A23] grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs font-mono">
+                    <div className="pt-2.5 border-t border-[#CAC4CE]/20 grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs font-mono">
                       {Object.entries(response.confidence.signals).map(([key, val]) => (
-                        <div key={key} className="p-2.5 rounded-lg bg-[#080907] border border-[#292A23] space-y-1.5">
-                          <span className="text-[10px] text-[#A5A69D] uppercase block truncate">
+                        <div key={key} className="p-2.5 rounded-lg bg-[#161324] border border-[#CAC4CE]/20 space-y-1.5">
+                          <span className="text-[10px] text-[#CAC4CE] uppercase block truncate">
                             {key.replace(/_/g, ' ')}
                           </span>
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-[#F5F3ED]">
+                            <span className="text-xs font-semibold text-[#F7ECE1]">
                               {typeof val === 'number' ? (val <= 1.0 ? `${Math.round(val * 100)}%` : val) : String(val)}
                             </span>
-                            <div className="w-12 h-1 rounded bg-[#12130F] overflow-hidden border border-[#292A23]">
+                            <div className="w-12 h-1 rounded bg-[#242038] overflow-hidden border border-[#CAC4CE]/20">
                               <div
-                                className="h-full bg-[#757F6C] rounded"
+                                className="h-full bg-[#9067C6] rounded"
                                 style={{ width: `${Math.min(Number(val) * 100, 100)}%` }}
                               />
                             </div>
@@ -698,7 +698,7 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
 
         {/* Evidence receipts margin */}
         {showEvidencePanel && (
-          <aside className="w-full lg:w-96 shrink-0 border-t lg:border-t-0 lg:border-l border-[#292A23] lg:max-h-full lg:overflow-y-auto">
+          <aside className="w-full lg:w-96 shrink-0 border-t lg:border-t-0 lg:border-l border-[#CAC4CE]/20 lg:max-h-full lg:overflow-y-auto">
             <ContextualEvidenceMargin
               citations={activeCitations}
               evidenceGaps={activeEvidenceGaps}
@@ -712,11 +712,11 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
       </div>
 
       {/* Ask Input Bar & Option B: Expandable Suggestions */}
-      <div className="shrink-0 border-t border-[#292A23] bg-[#0B0C09] px-4 sm:px-6 py-3.5 z-20">
+      <div className="shrink-0 border-t border-[#CAC4CE]/20 bg-[#242038] px-4 sm:px-6 py-3.5 z-20">
         <div className="max-w-4xl mx-auto space-y-2.5">
           {/* Query Composer */}
           <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A5A69D] pointer-events-none" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#CAC4CE] pointer-events-none" />
             <input
               type="text"
               value={question}
@@ -727,12 +727,12 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
                 }
               }}
               placeholder="Ask why code is like this (e.g. Why was MAX_RETRIES changed?)"
-              className="w-full pl-10 pr-32 py-2.5 bg-[#080907] border border-[#292A23] rounded-lg text-[#F5F3ED] placeholder:text-[#A5A69D]/60 font-sans text-xs sm:text-sm focus:outline-none focus:border-[#B9915E]/70 focus:ring-1 focus:ring-[#B9915E]/40 transition-colors"
+              className="w-full pl-10 pr-32 py-2.5 bg-[#161324] border border-[#CAC4CE]/25 rounded-lg text-[#F7ECE1] placeholder:text-[#CAC4CE]/65 font-sans text-xs sm:text-sm focus:outline-none focus:border-[#9067C6] focus:ring-1 focus:ring-[#9067C6]/45 transition-colors"
             />
             <button
               onClick={() => handleAsk()}
               disabled={isLoading || question.trim().length < 3}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3.5 py-1.5 rounded-md bg-[#757F6C] hover:bg-[#8A9680] text-[#080907] font-semibold font-sans text-xs flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-sm"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3.5 py-1.5 rounded-md bg-[#9067C6] hover:bg-[#7B52B3] text-white font-semibold font-sans text-xs flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-sm"
             >
               {isLoading ? (
                 <>
@@ -759,17 +759,17 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
 
           {/* Option B: Expandable Suggested Questions */}
           {groundedQuestions.length > 0 && (
-            <div className="rounded-lg bg-[#12130F] border border-[#292A23] overflow-hidden transition-all duration-200">
+            <div className="rounded-lg bg-[#161324] border border-[#CAC4CE]/20 overflow-hidden transition-all duration-200">
               {/* Compact Collapsed Row */}
               <div className="px-3.5 py-2 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-5 h-5 rounded-md bg-[#080907] border border-[#292A23] flex items-center justify-center shrink-0 text-[#B9915E]">
+                  <div className="w-5 h-5 rounded-md bg-[#242038] border border-[#9067C6]/40 flex items-center justify-center shrink-0 text-[#9067C6]">
                     <Sparkles className="w-3 h-3" />
                   </div>
-                  <span className="text-xs font-semibold text-[#F5F3ED] truncate">
+                  <span className="text-xs font-semibold text-[#F7ECE1] truncate">
                     Try an example question
                   </span>
-                  <span className="text-xs text-[#A5A69D] hidden sm:inline truncate">
+                  <span className="text-xs text-[#CAC4CE] hidden sm:inline truncate">
                     Explore example questions to get started.
                   </span>
                 </div>
@@ -780,7 +780,7 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
                   aria-expanded={isSuggestionsExpanded}
                   aria-controls="suggested-questions-panel"
                   onClick={() => setIsSuggestionsExpanded((prev) => !prev)}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-[#B9915E] hover:text-[#C9A776] transition-colors shrink-0 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-[#C5B0E6] hover:text-[#F7ECE1] transition-colors shrink-0 cursor-pointer"
                 >
                   <span>Browse suggestions</span>
                   <ChevronDown
@@ -797,7 +797,7 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
                   id="suggested-questions-panel"
                   role="region"
                   aria-labelledby="browse-suggestions-btn"
-                  className="border-t border-[#292A23] p-3 bg-[#080907]/60 flex flex-wrap gap-2 transition-all duration-200 motion-reduce:transition-none"
+                  className="border-t border-[#CAC4CE]/20 p-3 bg-[#191628] flex flex-wrap gap-2 transition-all duration-200 motion-reduce:transition-none"
                 >
                   {groundedQuestions.map((sq, idx) => (
                     <button
@@ -808,15 +808,15 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
                         if (sq.entityId) setEntityId(sq.entityId);
                       }}
                       disabled={isLoading}
-                      className="group text-left px-3 py-2 rounded-md bg-[#080907] hover:bg-[#181914] border border-[#292A23] hover:border-[#B9915E]/40 transition-colors flex flex-col gap-1 cursor-pointer max-w-full"
+                      className="group text-left px-3 py-2 rounded-md bg-[#242038] hover:bg-[#322D4D] border border-[#CAC4CE]/20 hover:border-[#9067C6] transition-colors flex flex-col gap-1 cursor-pointer max-w-full"
                     >
-                      <span className="text-xs font-medium text-[#F5F3ED] group-hover:text-white leading-snug">
+                      <span className="text-xs font-medium text-[#F7ECE1] group-hover:text-white leading-snug">
                         {sq.question}
                       </span>
-                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-[#A5A69D]">
-                        <span className="text-[#757F6C]">{sq.label}</span>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-[#CAC4CE]">
+                        <span className="text-[#8D86C9]">{sq.label}</span>
                         {sq.tag && (
-                          <span className="px-1.5 py-0.2 rounded bg-[#12130F] text-[#B9915E] border border-[#292A23]">
+                          <span className="px-1.5 py-0.2 rounded bg-[#161324] text-[#C5B0E6] border border-[#9067C6]/35">
                             {sq.tag}
                           </span>
                         )}

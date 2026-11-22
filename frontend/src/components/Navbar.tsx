@@ -56,7 +56,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="cw-branch text-[11px]">· {branch}</span>
             )}
             {selectedRepo?.fixture && (
-              <span className="text-[9px] font-mono px-1 py-0.5 rounded border border-[var(--cw-border)] text-[var(--cw-text-2)]">
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-[#9067C6]/45 bg-[#9067C6]/15 text-[#F7ECE1]">
                 fixture
               </span>
             )}

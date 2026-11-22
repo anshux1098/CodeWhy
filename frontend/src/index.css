@@ -1,90 +1,90 @@
 @import "tailwindcss";
 @import "./landing.css";
 
-/* CodeWhy dark workbench palette. */
+/* CodeWhy Purple Haze palette. */
 
 :root {
-  font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 
-  --font-sans:    'Manrope', system-ui, sans-serif;
-  --font-display: 'Manrope', system-ui, sans-serif;
+  --font-sans:    'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono:    'JetBrains Mono', ui-monospace, monospace;
 
-  --canvas:         #000000;
-  --surface:        #050505;
-  --surface-lowest: #000000;
-  --surface-raised: #0b0b0b;
-  --surface-card:   #080808;
-  --surface-hover:  #141414;
-  --surface-bright: #1c1112;
-  --border:         #242424;
-  --border-strong:  #4a2729;
+  --canvas:         #191628;
+  --surface:        #242038;
+  --surface-lowest: #161324;
+  --surface-raised: #2C2744;
+  --surface-card:   #242038;
+  --surface-hover:  #322D4D;
+  --surface-bright: #3B355B;
+  --border:         rgba(202, 196, 206, 0.22);
+  --border-strong:  rgba(144, 103, 198, 0.55);
 
-  --text:           #f4f4f5;
-  --text-muted:     #b0b0ba;
-  --text-subtle:    #85858f;
+  --text:           #F7ECE1;
+  --text-muted:     #CAC4CE;
+  --text-subtle:    #A69FB3;
 
-  --primary:        #ef3434;
-  --primary-container: #dc2626;
-  --secondary:      #202024;
-  --secondary-container: #2a1719;
-  --entity-cyan:    #f87171;
-  --evidence-emerald: #22c55e;
-  --rationale-amber: #f59e0b;
-  --refusal-rose:   #f04444;
+  --primary:        #9067C6;
+  --primary-container: #7B52B3;
+  --secondary:      #8D86C9;
+  --secondary-container: #322D4D;
+  --entity-cyan:    #8D86C9;
+  --evidence-emerald: #3fb950;
+  --rationale-amber: #e3b341;
+  --refusal-rose:   #f85149;
   --warning:       var(--rationale-amber);
 
-  --brand-cyan:     var(--entity-cyan);
+  --brand-cyan:     var(--secondary);
   --brand-teal:     var(--evidence-emerald);
-  --brand-gradient: linear-gradient(135deg, #f04444 0%, #b91c1c 100%);
+  --brand-gradient: linear-gradient(135deg, #9067C6 0%, #8D86C9 100%);
 
-  --tab-overview:    #ef4444;
-  --tab-investigate: #fb4b4b;
-  --tab-decisions:   var(--primary);
-  --tab-file:        #f97373;
-  --tab-graph:       #dc2626;
-  --tab-status:      #ef4444;
+  --tab-overview:    #9067C6;
+  --tab-investigate: #9067C6;
+  --tab-decisions:   #8D86C9;
+  --tab-file:        #9067C6;
+  --tab-graph:       #8D86C9;
+  --tab-status:      #9067C6;
 
   --emerald:        var(--evidence-emerald);
-  --emerald-light:  #16a34a;
-  --emerald-soft:   rgba(34, 197, 94, 0.12);
-  --emerald-border: rgba(34, 197, 94, 0.35);
+  --emerald-light:  #2ea043;
+  --emerald-soft:   rgba(63, 185, 80, 0.14);
+  --emerald-border: rgba(63, 185, 80, 0.35);
   --emerald-text:   var(--evidence-emerald);
 
   --violet:         var(--primary-container);
   --violet-light:   var(--primary);
-  --violet-soft:    rgba(239, 52, 52, 0.12);
-  --violet-border:  rgba(239, 52, 52, 0.32);
-  --violet-text:    var(--primary);
+  --violet-soft:    rgba(144, 103, 198, 0.16);
+  --violet-border:  rgba(144, 103, 198, 0.42);
+  --violet-text:    #C5B0E6;
 
   --amber:          var(--rationale-amber);
-  --amber-light:    #a95f00;
-  --amber-soft:     rgba(245, 158, 11, 0.12);
-  --amber-border:   rgba(245, 158, 11, 0.35);
+  --amber-light:    #d29922;
+  --amber-soft:     rgba(227, 179, 65, 0.14);
+  --amber-border:   rgba(227, 179, 65, 0.35);
   --amber-text:     var(--rationale-amber);
 
-  --cyan:           var(--entity-cyan);
-  --cyan-light:     #67e8f9;
-  --cyan-soft:      rgba(248, 113, 113, 0.12);
-  --cyan-border:    rgba(248, 113, 113, 0.32);
-  --cyan-text:      var(--entity-cyan);
+  --cyan:           var(--secondary);
+  --cyan-light:     #A8A2DB;
+  --cyan-soft:      rgba(141, 134, 201, 0.16);
+  --cyan-border:    rgba(141, 134, 201, 0.38);
+  --cyan-text:      #B8B2E6;
 
   --rose:           var(--refusal-rose);
-  --rose-light:     #be123c;
-  --rose-soft:      rgba(240, 68, 68, 0.12);
-  --rose-border:    rgba(240, 68, 68, 0.35);
+  --rose-light:     #da3633;
+  --rose-soft:      rgba(248, 81, 73, 0.14);
+  --rose-border:    rgba(248, 81, 73, 0.35);
   --rose-text:      var(--refusal-rose);
 
   --accent:         var(--primary);
-  --accent-soft:    rgba(239, 52, 52, 0.12);
+  --accent-soft:    rgba(144, 103, 198, 0.16);
   --accent-contrast:#ffffff;
-  --accent-glow:    rgba(239, 52, 52, 0.28);
+  --accent-glow:    rgba(144, 103, 198, 0.32);
 
-  --sidebar:        #030303;
-  --sidebar-text:   #c4c4cc;
+  --sidebar:        #242038;
+  --sidebar-text:   #F7ECE1;
 
   color-scheme: dark;
 }
@@ -108,7 +108,7 @@
   button, input { font: inherit; }
 
   ::selection {
-    background: rgba(239, 52, 52, 0.28);
+    background: rgba(144, 103, 198, 0.35);
     color: var(--text);
   }
 
