@@ -485,9 +485,7 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
     };
   }, [searchQuery, repoId]);
 
-  // Filter nodes based on node-type checkboxes and Time-Travel year scrubber (2018 -> 2026)
-  const [timeTravelYear, setTimeTravelYear] = useState<number>(2026);
-
+  // Filter nodes based on node-type checkboxes
   const visibleNodesList = useMemo(() => {
     if (!graphData?.nodes) return [];
     return graphData.nodes.filter((node) => {
@@ -495,18 +493,9 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
       if (filters[typeKey] !== undefined && !filters[typeKey]) {
         return false;
       }
-      if (timeTravelYear < 2026) {
-        const rawDate = (node as unknown as { date?: string; created_at?: string }).date
-          || (node as unknown as { date?: string; created_at?: string }).created_at
-          || '';
-        const match = /^(\d{4})/.exec(String(rawDate));
-        if (match && Number(match[1]) > timeTravelYear) {
-          return false;
-        }
-      }
       return true;
     });
-  }, [graphData, filters, timeTravelYear]);
+  }, [graphData, filters]);
 
   const visibleNodeIds = useMemo(() => {
     return new Set(visibleNodesList.map((n) => n.id));
@@ -922,59 +911,12 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
         </div>
       </div>
 
-      {/* Truncated Subgraph Notice Banner */}
-      {graphData?.truncated && (
-        <div className="bg-[#242038] border-b border-[#e3b341]/35 px-4 py-1.5 flex items-center justify-between text-xs font-mono text-[#e3b341] z-10 shrink-0">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-3.5 h-3.5 text-[#e3b341] shrink-0" />
-            <span>
-              <strong>Truncated Response Notice:</strong> Graph query reached the hard node budget (maximum 80 nodes returned). Some entities or temporal supersessions may not be displayed.
-            </span>
-          </div>
-          <span className="text-[11px] text-[#CAC4CE] hidden sm:inline">
-            Focus on an entity using the search bar to inspect focused subgraphs.
-          </span>
-        </div>
-      )}
-
       {activeQuestion && (
         <div className="shrink-0 border-b border-[#CAC4CE]/15 bg-[#242038]/85 px-4 py-1.5 flex items-center gap-2">
           <span className="text-[10px] font-mono uppercase tracking-wider text-[#C5B0E6] font-semibold shrink-0">
             Graph for latest question:
           </span>
           <p className="truncate text-xs font-mono text-[#F7ECE1]">{activeQuestion.question}</p>
-        </div>
-      )}
-
-      {!isGraphOffline && !errorMessage && viewMode === 'graph' && graphData && (
-        <div className="shrink-0 border-b border-[#CAC4CE]/20 bg-[#242038]/90 px-4 py-2">
-          {/* F5: Time-Travel Graph Scrubber (2018 -> 2026) */}
-          <div className="flex items-center gap-3 text-xs font-mono">
-            <span className="text-[#C5B0E6] font-semibold">⏳ Time-Travel Scrubber:</span>
-            <span className="text-[#CAC4CE]">2018</span>
-            <input
-              type="range"
-              min={2018}
-              max={2026}
-              step={1}
-              value={timeTravelYear}
-              onChange={(e) => setTimeTravelYear(Number(e.target.value))}
-              aria-label="Time-Travel Year Scrubber"
-              className="w-44 accent-[#9067C6] cursor-pointer"
-            />
-            <span className="px-2 py-0.5 rounded bg-[#161324] border border-[#9067C6]/40 text-[#F7ECE1] font-bold">
-              ≤ {timeTravelYear}
-            </span>
-            {timeTravelYear < 2026 && (
-              <button
-                type="button"
-                onClick={() => setTimeTravelYear(2026)}
-                className="text-[11px] text-[#CAC4CE] hover:text-[#F7ECE1] underline cursor-pointer"
-              >
-                Reset to 2026
-              </button>
-            )}
-          </div>
         </div>
       )}
 
