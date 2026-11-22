@@ -661,3 +661,276 @@ def get_trust_scoreboard(
         "tokens_on_refusal": 0,
         "benchmark_cases": benchmark_results,
     }
+
+
+# ---------------------------------------------------------------------------
+# N1: GitHub Repo Summarize via Neo4j Cypher (`GET /api/v1/repositories/{id}/summary`)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/repositories/{repository_id}/summary", include_in_schema=False)
+def get_repository_cypher_summary(
+    repository_id: str,
+    source: DataSource = Depends(get_source),
+) -> dict[str, Any]:
+    full_name = _repo_full_name(repository_id, source)
+    repo_resp = source.get_repository(repository_id).model_dump(mode="json")
+    dec_items = source.list_decisions(repository_id, limit=100).model_dump(mode="json").get("items") or []
+
+    active = [d for d in dec_items if d.get("state") == "ACTIVE"]
+    rev_or_sup = [d for d in dec_items if d.get("state") in ("SUPERSEDED", "REVERTED")]
+
+    # Aggregate entity hotspots (GOVERNS degree) and maintainers (AUTHORED / REVIEWED)
+    entity_counts: dict[str, int] = {}
+    maintainers: dict[str, str] = {}
+    for d in dec_items:
+        for e in d.get("entities") or []:
+            entity_counts[e] = entity_counts.get(e, 0) + 1
+        try:
+            det = source.get_decision(d["id"]).model_dump(mode="json")
+            for cit in det.get("citations") or []:
+                auth = str(cit.get("author") or "").strip()
+                if auth and not auth.endswith("[bot]") and auth.lower() not in maintainers:
+                    maintainers[auth.lower()] = auth
+        except Exception:  # noqa: BLE001
+            pass
+
+    hotspot_entities = [
+        {"path": path, "decision_count": count}
+        for path, count in sorted(entity_counts.items(), key=lambda kv: (-kv[1], kv[0]))[:6]
+    ]
+    counts = repo_resp.get("counts") or {}
+    top_file = hotspot_entities[0]["path"] if hotspot_entities else "core modules"
+
+    overview = (
+        f"{full_name} contains {len(dec_items)} verified architectural decision(s) "
+        f"({len(active)} ACTIVE invariant(s), {len(rev_or_sup)} SUPERSEDED/REVERTED historical transition(s)) "
+        f"across {counts.get('entities', len(entity_counts))} tracked code entities, "
+        f"{counts.get('pull_requests', 0)} pull requests, and {counts.get('commits', 0)} commits. "
+        f"Primary governance hotspot is `{top_file}`."
+    )
+
+    cypher_query = (
+        "MATCH (r:Repository {id: $repo_id})\n"
+        "OPTIONAL MATCH (d:Decision {repo: $repo_id})-[:GOVERNS]->(e:CodeEntity)\n"
+        "OPTIONAL MATCH (p:Person)-[rel:AUTHORED|REVIEWED]->(s)<-[:DECIDED_IN]-(d)\n"
+        "RETURN r, collect(DISTINCT d) AS decisions, e.path AS entity, count(DISTINCT d) AS degree, collect(DISTINCT p.login) AS maintainers\n"
+        "ORDER BY degree DESC"
+    )
+
+    return {
+        "repository_id": repository_id,
+        "full_name": full_name,
+        "overview": overview,
+        "cypher_query": cypher_query,
+        "stats": {
+            "total_decisions": len(dec_items),
+            "active_decisions": len(active),
+            "superseded_or_reverted": len(rev_or_sup),
+            "tracked_entities": counts.get("entities", len(entity_counts)),
+            "pull_requests": counts.get("pull_requests", 0),
+            "commits": counts.get("commits", 0),
+        },
+        "key_active_decisions": [
+            {
+                "id": d.get("id"),
+                "summary": d.get("summary"),
+                "rule": d.get("rule"),
+                "date": d.get("date"),
+                "entities": d.get("entities") or [],
+            }
+            for d in active[:4]
+        ],
+        "historical_reverts_and_pitfalls": [
+            {
+                "id": d.get("id"),
+                "summary": d.get("summary"),
+                "state": d.get("state"),
+                "date": d.get("date"),
+                "entities": d.get("entities") or [],
+            }
+            for d in rev_or_sup[:4]
+        ],
+        "hotspot_entities": hotspot_entities,
+        "top_maintainers": [{"login": login, "role": "Author / Reviewer"} for login in list(maintainers.values())[:6]],
+    }
+
+
+# ---------------------------------------------------------------------------
+# N2 & N3: Neo4j Add-On vs. Feature Removal Impact Advisor (`POST /api/v1/repositories/{id}/impact`)
+# ---------------------------------------------------------------------------
+
+
+class ImpactAdvisorRequest(BaseModel):
+    mode: str = Field(default="add", pattern=r"^(add|remove)$")
+    feature: str = Field(min_length=1, max_length=300)
+
+
+@router.post("/repositories/{repository_id}/impact", include_in_schema=False)
+def run_feature_impact_advisor(
+    repository_id: str,
+    request: ImpactAdvisorRequest,
+    source: DataSource = Depends(get_source),
+) -> dict[str, Any]:
+    mode = request.mode
+    feature_text = request.feature.strip()
+    tokens = [t.lower() for t in re.split(r"[^a-zA-Z0-9_./-]+", feature_text) if len(t) >= 2]
+
+    dec_items = source.list_decisions(repository_id, limit=100).model_dump(mode="json").get("items") or []
+    detailed_all: list[dict[str, Any]] = []
+    for item in dec_items[:30]:
+        try:
+            det = source.get_decision(item["id"]).model_dump(mode="json")
+            if not det.get("entities") and item.get("entities"):
+                det["entities"] = item["entities"]
+            detailed_all.append(det)
+        except Exception:  # noqa: BLE001
+            detailed_all.append(item)
+
+    # Match decisions touching the requested feature/add-on/file
+    matched: list[dict[str, Any]] = []
+    for det in detailed_all:
+        blob = " ".join([
+            str(det.get("summary") or ""),
+            str(det.get("rule") or ""),
+            " ".join(str(e) for e in (det.get("entities") or [])),
+            " ".join(str(c.get("quote") or "") for c in (det.get("citations") or [])),
+        ]).lower()
+        if any(tok in blob for tok in tokens):
+            matched.append(det)
+
+    already_exists = len(matched) > 0
+    working_set = matched if matched else detailed_all[:3]
+
+    # 1. Existing history (When & how it was added / attempted / reverted)
+    existing_history: list[dict[str, Any]] = []
+    related_pull_requests: list[dict[str, Any]] = []
+    supporting_evidence: list[dict[str, Any]] = []
+    what_could_go_wrong: list[dict[str, Any]] = []
+    affected_map: dict[str, dict[str, Any]] = {}
+    co_change_files: dict[str, str] = {}
+    who_to_ask: list[str] = []
+
+    for det in working_set:
+        cits = det.get("citations") or []
+        top_cit = cits[0] if cits else {}
+        src_id = str(top_cit.get("id") or det.get("id") or "")
+        src_url = str(top_cit.get("url") or det.get("source_url") or "")
+        author = str(top_cit.get("author") or "maintainer")
+        quote = str(top_cit.get("quote") or det.get("summary") or "")
+        state = str(det.get("state") or "ACTIVE")
+        date = str(det.get("date") or "date unknown")
+        ents = [str(e) for e in (det.get("entities") or [])]
+
+        if author and author not in who_to_ask and not author.endswith("[bot]"):
+            who_to_ask.append(author)
+
+        existing_history.append({
+            "decision_id": det.get("id"),
+            "summary": det.get("summary"),
+            "state": state,
+            "date": date,
+            "how_added": det.get("rule") or det.get("summary"),
+            "source_id": src_id,
+            "source_url": src_url,
+            "author": author,
+            "quote": quote,
+        })
+
+        related_pull_requests.append({
+            "source_id": src_id,
+            "url": src_url,
+            "author": author,
+            "date": date,
+            "summary": det.get("summary"),
+            "state": state,
+        })
+
+        if quote:
+            supporting_evidence.append({
+                "source_id": src_id,
+                "source_url": src_url,
+                "author": author,
+                "date": date,
+                "quote": quote,
+                "claim": det.get("summary"),
+            })
+
+        what_could_go_wrong.append({
+            "decision_id": det.get("id"),
+            "state": state,
+            "severity": "HIGH RISK" if state in ("ACTIVE", "REVERTED", "SUPERSEDED") else "CAUTION",
+            "risk_title": (
+                f"Violates active invariant: {det.get('summary')}"
+                if state == "ACTIVE"
+                else f"Repeats previously {state.lower()} design: {det.get('summary')}"
+            ),
+            "explanation": str(det.get("rule") or quote),
+        })
+
+        for ent in ents:
+            affected_map[ent] = {
+                "path": ent,
+                "risk_badge": "HIGH RISK" if state != "ACTIVE" or len(ents) > 1 else "CAUTION",
+                "reason": f"Governed by [{state}] {det.get('summary')}",
+            }
+            co_change_files[ent] = f"Coupled via decision `{det.get('id')}` ({det.get('summary')})"
+
+    # Also find co-governed neighbor files in the 2-hop GOVERNS graph
+    for det in detailed_all:
+        ents = [str(e) for e in (det.get("entities") or [])]
+        if any(e in affected_map for e in ents):
+            for neighbor in ents:
+                if neighbor not in co_change_files:
+                    co_change_files[neighbor] = f"Shares 2-hop GOVERNS boundary via `{det.get('id')}`"
+                if neighbor not in affected_map:
+                    affected_map[neighbor] = {
+                        "path": neighbor,
+                        "risk_badge": "CAUTION",
+                        "reason": f"2-hop neighbor via {det.get('summary')}",
+                    }
+
+    if mode == "add":
+        cypher_query = (
+            "MATCH (d:Decision {repo: $repo})-[:GOVERNS]->(e:CodeEntity)\n"
+            "WHERE toLower(d.summary) CONTAINS toLower($feature) OR toLower(e.path) CONTAINS toLower($feature)\n"
+            "OPTIONAL MATCH (d)-[:DECIDED_IN]->(pr:PullRequest)\n"
+            "OPTIONAL MATCH (e)<-[:GOVERNS]-(neighbor_dec:Decision)-[:GOVERNS]->(impacted:CodeEntity)\n"
+            "RETURN d, pr, e, collect(DISTINCT impacted.path) AS blast_radius"
+        )
+        recommendation = (
+            f"Feature/add-on matching `{feature_text}` was ALREADY found in repository history ({len(existing_history)} record(s)). "
+            f"Review when/how it was introduced and check the {len(affected_map)} affected file(s) in the blast radius before re-implementing."
+            if already_exists
+            else f"`{feature_text}` has not been added yet. Adding it will intersect with {len(affected_map)} governed file(s)/module(s) in the nearest architectural neighborhood."
+        )
+    else:
+        cypher_query = (
+            "MATCH (e:CodeEntity {repo: $repo})<-[:GOVERNS]-(d:Decision)-[:DECIDED_IN]->(pr)\n"
+            "WHERE toLower(e.path) CONTAINS toLower($feature) OR toLower(d.summary) CONTAINS toLower($feature)\n"
+            "OPTIONAL MATCH (d)-[:SUPPORTED_BY]->(ev:Evidence)\n"
+            "OPTIONAL MATCH (e)-[:CONTAINS|IMPORTS*1..2]-(coupled:CodeEntity)\n"
+            "RETURN d, collect(DISTINCT pr) AS related_prs, collect(DISTINCT coupled.path) AS co_changes, collect(DISTINCT ev) AS evidence"
+        )
+        recommendation = (
+            f"Removing or modifying `{feature_text}` impacts {len(related_pull_requests)} historical PR/decision lineage(s) and requires "
+            f"co-changes across {len(co_change_files)} coupled entity path(s). Review the {len(what_could_go_wrong)} failure mode(s) and verbatim quotes below."
+        )
+
+    return {
+        "repository_id": repository_id,
+        "mode": mode,
+        "feature": feature_text,
+        "already_exists": already_exists,
+        "recommendation": recommendation,
+        "cypher_query": cypher_query,
+        "existing_history": existing_history if already_exists else [],
+        "affected_if_added": list(affected_map.values())[:8],
+        "related_pull_requests": related_pull_requests[:8],
+        "required_co_changes": [
+            {"path": p, "reason": r} for p, r in list(co_change_files.items())[:8]
+        ],
+        "what_could_go_wrong": what_could_go_wrong[:6],
+        "supporting_evidence": supporting_evidence[:6],
+        "who_to_ask": who_to_ask[:5],
+    }

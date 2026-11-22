@@ -213,7 +213,11 @@ export function App() {
   };
 
   const handleAddNewRepo = (newRepo: Repository) => {
-    setRepositories((prev) => [newRepo, ...prev]);
+    setRepositories((prev) => [newRepo, ...prev.filter((r) => r.id !== newRepo.id)]);
+    handleSelectRepo(newRepo);
+    if (currentTab === 'home') {
+      navigateToTab('workspace', newRepo);
+    }
   };
 
   const [workspaceQuestion, setWorkspaceQuestion] = useState<string | undefined>();

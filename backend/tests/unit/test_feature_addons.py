@@ -80,3 +80,42 @@ def test_trust_scoreboard_endpoint() -> None:
     assert body["citation_precision_pct"] == 100.0
     assert body["tokens_on_refusal"] == 0
     assert len(body["benchmark_cases"]) == 5
+
+
+def test_repository_cypher_summary_endpoint() -> None:
+    tc = _client()
+    r = tc.get(f"/api/v1/repositories/{REPOSITORY_ID}/summary")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["repository_id"] == REPOSITORY_ID
+    assert "MATCH (r:Repository" in body["cypher_query"]
+    assert body["stats"]["total_decisions"] >= 1
+    assert isinstance(body["hotspot_entities"], list)
+
+
+def test_feature_impact_advisor_add_and_remove_modes() -> None:
+    tc = _client()
+    # Point 2: Add-on check for an existing feature ('retry')
+    r_add = tc.post(
+        f"/api/v1/repositories/{REPOSITORY_ID}/impact",
+        json={"mode": "add", "feature": "retry"},
+    )
+    assert r_add.status_code == 200
+    b_add = r_add.json()
+    assert b_add["already_exists"] is True
+    assert len(b_add["existing_history"]) >= 1
+    assert len(b_add["affected_if_added"]) >= 1
+    assert "MATCH" in b_add["cypher_query"]
+
+    # Point 3: Remove/change check ('retry')
+    r_rem = tc.post(
+        f"/api/v1/repositories/{REPOSITORY_ID}/impact",
+        json={"mode": "remove", "feature": "retry"},
+    )
+    assert r_rem.status_code == 200
+    b_rem = r_rem.json()
+    assert b_rem["mode"] == "remove"
+    assert len(b_rem["related_pull_requests"]) >= 1
+    assert len(b_rem["required_co_changes"]) >= 1
+    assert len(b_rem["what_could_go_wrong"]) >= 1
+    assert len(b_rem["supporting_evidence"]) >= 1

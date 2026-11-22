@@ -2,12 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import type { DecisionListItem, Entity, Repository } from '../types';
 import {
   fetchLineBlame,
+  fetchRepositoryCypherSummary,
   fetchRepositoryDecisionHistory,
+  runFeatureImpactAdvisor,
   runPreflightCheck,
   searchRepositoryEntities,
   type BlameLineItem,
+  type FeatureImpactAdvisorResponse,
   type LineBlameResponse,
   type PreflightResponse,
+  type RepositoryCypherSummaryResponse,
 } from '../services/api';
 import {
   AlertTriangle,
@@ -185,6 +189,12 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
   const [blameData, setBlameData] = useState<LineBlameResponse | null>(null);
   const [selectedBlameLine, setSelectedBlameLine] = useState<BlameLineItem | null>(null);
   const [isLoadingBlame, setIsLoadingBlame] = useState(false);
+  const [repoSummary, setRepoSummary] = useState<RepositoryCypherSummaryResponse | null>(null);
+  const [impactMode, setImpactMode] = useState<'add' | 'remove'>('add');
+  const [impactFeature, setImpactFeature] = useState('');
+  const [impactResult, setImpactResult] = useState<FeatureImpactAdvisorResponse | null>(null);
+  const [isRunningImpact, setIsRunningImpact] = useState(false);
+  const [showCypherQuery, setShowCypherQuery] = useState(false);
   // Monotonic token so a slow, older search can never overwrite a newer one.
   const searchSeqRef = useRef(0);
 
@@ -192,6 +202,8 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
     setPreflightData(null);
     setBlameData(null);
     setSelectedBlameLine(null);
+    setRepoSummary(null);
+    setImpactResult(null);
     if (!repoId) return;
     let cancelled = false;
     runPreflightCheck(repoId)
@@ -201,10 +213,36 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
       .catch(() => {
         // ignore if endpoint unavailable in mock unit test
       });
+    fetchRepositoryCypherSummary(repoId)
+      .then((res) => {
+        if (!cancelled) setRepoSummary(res);
+      })
+      .catch(() => {
+        // ignore if endpoint unavailable in mock unit test
+      });
     return () => {
       cancelled = true;
     };
   }, [repoId]);
+
+  const handleRunImpactAdvisor = async (customMode?: 'add' | 'remove', customFeature?: string) => {
+    if (!repoId || isRunningImpact) return;
+    const m = customMode ?? impactMode;
+    const feat = (customFeature ?? impactFeature).trim()
+      || preflightData?.hotspots[0]?.file
+      || 'retry';
+    setImpactMode(m);
+    setImpactFeature(feat);
+    setIsRunningImpact(true);
+    try {
+      const res = await runFeatureImpactAdvisor(repoId, m, feat);
+      setImpactResult(res);
+    } catch {
+      // ignore
+    } finally {
+      setIsRunningImpact(false);
+    }
+  };
 
   useEffect(() => {
     const targetPath = selectedEntity?.path || selectedEntity?.label || '';
@@ -836,6 +874,224 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </section>
+
+            {/* N1: GitHub Repo Architectural Summary via Neo4j Cypher */}
+            {repoSummary && (
+              <section className="rounded-xl border border-[#292A23] bg-[#12130F] p-4 space-y-3 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#292A23] pb-2.5">
+                  <div>
+                    <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-[#B9915E]">
+                      1. Neo4j Cypher Repository Architectural Summary — {repoSummary.full_name}
+                    </h3>
+                    <p className="text-xs text-[#F5F3ED] mt-1 leading-relaxed">{repoSummary.overview}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCypherQuery((prev) => !prev)}
+                    className="px-2.5 py-1 rounded bg-[#080907] hover:bg-[#181914] border border-[#292A23] text-[11px] font-mono text-[#A5A69D] hover:text-[#F5F3ED] cursor-pointer"
+                  >
+                    {showCypherQuery ? 'Hide Cypher Query' : 'Show Neo4j Cypher'}
+                  </button>
+                </div>
+                {showCypherQuery && (
+                  <pre className="p-3 rounded-lg bg-[#080907] border border-[#292A23] text-[11px] font-mono text-[#B9915E] overflow-x-auto">
+                    {repoSummary.cypher_query}
+                  </pre>
+                )}
+                {repoSummary.top_maintainers.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
+                    <span className="text-[#757F6C]">Top Maintainers (AUTHORED / REVIEWED):</span>
+                    {repoSummary.top_maintainers.map((m) => (
+                      <span
+                        key={m.login}
+                        className="px-2 py-0.5 rounded bg-[#080907] border border-[#292A23] text-[#F5F3ED]"
+                      >
+                        @{m.login}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* N2 & N3: Neo4j Add-On vs. Feature Removal Impact Advisor */}
+            <section className="rounded-xl border border-[#B9915E]/40 bg-[#12130F] p-4 space-y-3.5 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-[#B9915E]">
+                    2 &amp; 3. Neo4j Feature Add-On &amp; Removal Impact Advisor (Cypher Multi-Hop)
+                  </h3>
+                  <p className="text-[11px] text-[#A5A69D]">
+                    Check if an add-on already exists (when &amp; how it was added + blast radius) or what breaks if you remove/change a feature (all related PRs, required co-changes, what could go wrong &amp; verbatim evidence).
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleRunImpactAdvisor('add')}
+                    className={`px-2.5 py-1 rounded text-xs font-mono font-semibold border cursor-pointer ${
+                      impactMode === 'add'
+                        ? 'bg-[#2ea043]/20 text-[#3fb950] border-[#2ea043]/50'
+                        : 'bg-[#080907] text-[#A5A69D] border-[#292A23]'
+                    }`}
+                  >
+                    + Add Extra Add-On
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRunImpactAdvisor('remove')}
+                    className={`px-2.5 py-1 rounded text-xs font-mono font-semibold border cursor-pointer ${
+                      impactMode === 'remove'
+                        ? 'bg-[#f85149]/20 text-[#f85149] border-[#f85149]/50'
+                        : 'bg-[#080907] text-[#A5A69D] border-[#292A23]'
+                    }`}
+                  >
+                    - Remove / Modify Feature
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  value={impactFeature}
+                  onChange={(e) => setImpactFeature(e.target.value)}
+                  placeholder="Enter feature, add-on, constant, or file (e.g. retry, ALPN_PROTOCOLS, timeout)..."
+                  className="flex-1 min-w-[220px] rounded-lg bg-[#080907] border border-[#292A23] px-3 py-1.5 font-mono text-xs text-[#F5F3ED] placeholder:text-[#757F6C]"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleRunImpactAdvisor()}
+                  disabled={isRunningImpact}
+                  className="px-3.5 py-1.5 rounded-lg bg-[#B9915E]/20 hover:bg-[#B9915E]/30 border border-[#B9915E]/50 text-xs font-mono font-semibold text-[#B9915E] cursor-pointer"
+                >
+                  {isRunningImpact ? 'Querying Neo4j…' : 'Analyze in Neo4j'}
+                </button>
+              </div>
+
+              {impactResult && (
+                <div className="space-y-3 pt-1">
+                  <div className="p-3 rounded-lg bg-[#080907] border border-[#292A23] space-y-2 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-mono font-semibold text-[#F5F3ED]">
+                        {impactResult.mode === 'add'
+                          ? impactResult.already_exists
+                            ? '✓ Already Added / Attempted in History'
+                            : '✦ New Add-On — Not Yet Added in History'
+                          : `⚠ Removal & Change Impact Report for "${impactResult.feature}"`}
+                      </span>
+                      {impactResult.who_to_ask.length > 0 && (
+                        <span className="font-mono text-[11px] text-[#B9915E]">
+                          Consult: {impactResult.who_to_ask.map((u) => `@${u}`).join(', ')}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[#D4CBBF] leading-relaxed">{impactResult.recommendation}</p>
+                    <pre className="p-2 rounded bg-[#12130F] border border-[#292A23] text-[10px] font-mono text-[#757F6C] overflow-x-auto">
+                      {impactResult.cypher_query}
+                    </pre>
+                  </div>
+
+                  {/* Mode = ADD: When & How it was added + What else gets affected */}
+                  {impactResult.mode === 'add' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      <div className="p-3 rounded-lg bg-[#080907] border border-[#292A23] space-y-2">
+                        <h4 className="font-mono font-semibold text-[#3fb950] uppercase text-[11px]">
+                          When &amp; How It Was Added Before
+                        </h4>
+                        {impactResult.existing_history.length === 0 ? (
+                          <p className="text-[#A5A69D]">
+                            No prior implementation found in the graph—this is a net-new feature/add-on.
+                          </p>
+                        ) : (
+                          impactResult.existing_history.map((h) => (
+                            <div key={h.decision_id} className="p-2.5 rounded bg-[#12130F] border border-[#292A23] space-y-1">
+                              <div className="flex items-center justify-between font-mono text-[11px]">
+                                <span className="text-[#B9915E]">{h.date} · @{h.author}</span>
+                                <span className="px-1.5 py-0.5 rounded bg-[#080907] text-[#3fb950]">{h.state}</span>
+                              </div>
+                              <p className="font-semibold text-[#F5F3ED]">{h.summary}</p>
+                              <p className="text-[#A5A69D] text-[11px]">How: {h.how_added}</p>
+                              {h.quote && (
+                                <p className="text-[11px] italic text-[#D4CBBF]">"{h.quote}" ({h.source_id})</p>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-[#080907] border border-[#292A23] space-y-2">
+                        <h4 className="font-mono font-semibold text-[#B9915E] uppercase text-[11px]">
+                          What Else Will Be Affected (Blast Radius)
+                        </h4>
+                        {impactResult.affected_if_added.map((af) => (
+                          <div key={af.path} className="p-2.5 rounded bg-[#12130F] border border-[#292A23] space-y-1">
+                            <div className="flex items-center justify-between font-mono text-[11px]">
+                              <span className="text-[#F5F3ED] font-semibold">{af.path}</span>
+                              <span className="text-[#B9915E]">{af.risk_badge}</span>
+                            </div>
+                            <p className="text-[#A5A69D] text-[11px]">{af.reason}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mode = REMOVE: All Related PRs + Required Co-Changes + What Could Go Wrong & Evidence */}
+                  {impactResult.mode === 'remove' && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                      <div className="p-3 rounded-lg bg-[#080907] border border-[#292A23] space-y-2">
+                        <h4 className="font-mono font-semibold text-[#AFD2FA] uppercase text-[11px]">
+                          All Related Pull Requests ({impactResult.related_pull_requests.length})
+                        </h4>
+                        {impactResult.related_pull_requests.map((pr, idx) => (
+                          <div key={idx} className="p-2.5 rounded bg-[#12130F] border border-[#292A23] space-y-1">
+                            <div className="flex items-center justify-between font-mono text-[10px] text-[#A5A69D]">
+                              <span>{pr.source_id}</span>
+                              <span>{pr.date} · @{pr.author}</span>
+                            </div>
+                            <p className="text-[#F5F3ED] font-medium">{pr.summary}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-[#080907] border border-[#292A23] space-y-2">
+                        <h4 className="font-mono font-semibold text-[#B9915E] uppercase text-[11px]">
+                          What Else You Must Change (Co-Changes)
+                        </h4>
+                        {impactResult.required_co_changes.map((co) => (
+                          <div key={co.path} className="p-2.5 rounded bg-[#12130F] border border-[#292A23] space-y-1">
+                            <p className="font-mono font-semibold text-[#F5F3ED]">{co.path}</p>
+                            <p className="text-[11px] text-[#A5A69D]">{co.reason}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-[#080907] border border-[#f85149]/40 space-y-2">
+                        <h4 className="font-mono font-semibold text-[#f85149] uppercase text-[11px]">
+                          What Could Go Wrong &amp; Verbatim Evidence
+                        </h4>
+                        {impactResult.what_could_go_wrong.map((w, idx) => (
+                          <div key={idx} className="p-2.5 rounded bg-[#12130F] border border-[#f85149]/30 space-y-1">
+                            <span className="text-[10px] font-mono text-[#f85149] font-bold">[{w.severity}]</span>
+                            <p className="font-semibold text-[#F5F3ED]">{w.risk_title}</p>
+                            <p className="text-[11px] text-[#D4CBBF]">{w.explanation}</p>
+                          </div>
+                        ))}
+                        {impactResult.supporting_evidence.map((ev, idx) => (
+                          <blockquote
+                            key={idx}
+                            className="p-2 rounded bg-[#12130F] border-l-2 border-[#3fb950] text-[11px] italic text-[#A5A69D]"
+                          >
+                            "{ev.quote}" — <span className="not-italic font-mono text-[#3fb950]">{ev.source_id}</span>
+                          </blockquote>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </section>

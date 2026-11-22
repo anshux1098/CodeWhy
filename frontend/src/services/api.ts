@@ -626,3 +626,97 @@ export async function previewLiveExtraction(
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+export interface RepositoryCypherSummaryResponse {
+  repository_id: string;
+  full_name: string;
+  overview: string;
+  cypher_query: string;
+  stats: {
+    total_decisions: number;
+    active_decisions: number;
+    superseded_or_reverted: number;
+    tracked_entities: number;
+    pull_requests: number;
+    commits: number;
+  };
+  key_active_decisions: Array<{ id: string; summary: string; rule?: string | null; date?: string | null; entities: string[] }>;
+  historical_reverts_and_pitfalls: Array<{ id: string; summary: string; state: string; date?: string | null; entities: string[] }>;
+  hotspot_entities: Array<{ path: string; decision_count: number }>;
+  top_maintainers: Array<{ login: string; role: string }>;
+}
+
+export async function fetchRepositoryCypherSummary(
+  repositoryId: string,
+): Promise<RepositoryCypherSummaryResponse> {
+  const res = await fetch(
+    `/api/v1/repositories/${encodeURIComponent(repositoryId)}/summary`,
+    { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) },
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export interface FeatureImpactAdvisorResponse {
+  repository_id: string;
+  mode: 'add' | 'remove';
+  feature: string;
+  already_exists: boolean;
+  recommendation: string;
+  cypher_query: string;
+  existing_history: Array<{
+    decision_id: string;
+    summary: string;
+    state: string;
+    date: string;
+    how_added: string;
+    source_id: string;
+    source_url: string;
+    author: string;
+    quote: string;
+  }>;
+  affected_if_added: Array<{ path: string; risk_badge: string; reason: string }>;
+  related_pull_requests: Array<{
+    source_id: string;
+    url: string;
+    author: string;
+    date: string;
+    summary: string;
+    state: string;
+  }>;
+  required_co_changes: Array<{ path: string; reason: string }>;
+  what_could_go_wrong: Array<{
+    decision_id: string;
+    state: string;
+    severity: string;
+    risk_title: string;
+    explanation: string;
+  }>;
+  supporting_evidence: Array<{
+    source_id: string;
+    source_url: string;
+    author: string;
+    date: string;
+    quote: string;
+    claim: string;
+  }>;
+  who_to_ask: string[];
+}
+
+export async function runFeatureImpactAdvisor(
+  repositoryId: string,
+  mode: 'add' | 'remove',
+  feature: string,
+): Promise<FeatureImpactAdvisorResponse> {
+  const res = await fetch(
+    `/api/v1/repositories/${encodeURIComponent(repositoryId)}/impact`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ mode, feature }),
+      signal: AbortSignal.timeout(8000),
+    },
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}

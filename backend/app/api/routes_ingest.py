@@ -180,6 +180,19 @@ def _run_ingest_background(
         logger.info("Rebuilding Neo4j graph: %s", " ".join(rebuild_cmd))
         subprocess.run(rebuild_cmd, check=True)
 
+        # Also hydrate the running process's InMemoryGraphStore when Neo4j is in fallback mode
+        try:
+            from app.api.deps import get_source
+            from app.stores.graph_store import InMemoryGraphStore
+            from scripts.rebuild_graph import rebuild_graph as _rebuild_in_process
+
+            live_source = get_source(_settings)
+            live_store = getattr(live_source, "store", None)
+            if isinstance(live_store, InMemoryGraphStore):
+                _rebuild_in_process(repo, cache_path, live_store, cfg=_settings)
+        except Exception as sync_exc:  # noqa: BLE001
+            logger.warning("In-process graph sync skipped for %s: %s", repo, sync_exc)
+
         # ── Phase 7: done ───────────────────────────────────────────────
         result_repo_id = repo.replace("/", "-")
         job_store.update_job(

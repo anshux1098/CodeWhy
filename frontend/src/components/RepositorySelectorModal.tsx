@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Repository } from '../types';
-import { startIngest, fetchIngestStatus } from '../services/api';
+import { startIngest, fetchIngestStatus, fetchRepository } from '../services/api';
 import type { IngestJobStatus } from '../services/api';
 import { 
   GitBranch, 
@@ -327,18 +327,32 @@ export const RepositorySelectorModal: React.FC<RepositorySelectorModalProps> = (
         setIngestStatus(status);
         if (status.status === 'done') {
           clearPolling();
-          if (onAddNewRepo) {
-            onAddNewRepo({
-              id: status.result_repo_id ?? ingestRepo.replace('/', '-'),
-              name: ingestRepo,
-              url: `https://github.com/${ingestRepo}`,
-              counts: { decisions: 0, entities: 0, pull_requests: 0, commits: 0 },
-              fixture: false,
-            });
+          const canonicalSlug = status.repo || ingestRepo.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/i, '').replace(/^\/+|\/+$/g, '');
+          const resultId = status.result_repo_id ?? canonicalSlug.replace('/', '-');
+          let resolvedRepo: Repository = {
+            id: resultId,
+            name: canonicalSlug.split('/').pop() || canonicalSlug,
+            full_name: canonicalSlug,
+            url: `https://github.com/${canonicalSlug}`,
+            counts: { decisions: 0, entities: 0, pull_requests: 0, commits: 0 },
+            fixture: false,
+          };
+          try {
+            const fetched = await fetchRepository(resultId);
+            if (fetched) resolvedRepo = fetched;
+          } catch {
+            // Use fallback resolvedRepo if backend detail endpoint is still settling
           }
+          if (onAddNewRepo) {
+            onAddNewRepo(resolvedRepo);
+          }
+          onSelectRepo(resolvedRepo);
+          setIngestJobId(null);
+          setIngestStatus(null);
           onClose();
         } else if (status.status === 'failed') {
           clearPolling();
+          setIngestJobId(null);
           setIngestError(status.error ?? 'Ingestion failed');
         }
       } catch (e) {
