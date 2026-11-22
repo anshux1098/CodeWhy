@@ -287,15 +287,17 @@ export function App() {
           ? ' cw-status-page'
           : currentTab === 'graph'
           ? ' cw-graph-page'
+          : currentTab === 'mcp'
+          ? ' cw-investigate-page'
           : ''
       }`}
       style={{
-        backgroundColor: currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' || currentTab === 'graph' ? 'var(--cw-bg)' : 'var(--canvas)',
-        color: currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' || currentTab === 'graph' ? 'var(--cw-text)' : 'var(--text)',
+        backgroundColor: 'var(--cw-bg)',
+        color: 'var(--cw-text)',
       }}
     >
       <Navbar
-        variant={currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' || currentTab === 'graph' ? 'landing' : 'default'}
+        variant="landing"
         onSelectTab={(tab) => navigateToTab(tab)}
         selectedRepo={selectedRepo}
         onOpenRepoSelector={() => setIsSelectorOpen(true)}
