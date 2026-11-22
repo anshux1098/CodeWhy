@@ -88,7 +88,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="w-full px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div onClick={() => onSelectTab('home')} className="cursor-pointer">
-            <Logo size="md" />
+            <Logo size="md" variant="landing" />
           </div>
         </div>
 

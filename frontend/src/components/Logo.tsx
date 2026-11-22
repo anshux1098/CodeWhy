@@ -13,7 +13,7 @@ export const Logo: React.FC<LogoProps> = ({
   showText = true,
   showTagline = true,
   className = '',
-  variant = 'default',
+  variant = 'landing',
 }) => {
   const sizeMap = {
     sm: { icon: 28, text: 16, sub: 8, rx: 7 },
