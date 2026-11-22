@@ -28,10 +28,6 @@ function entityDisplayName(ent: string): string {
   return ent;
 }
 
-function isVisibleEntity(ent: string): boolean {
-  return Boolean(entityDisplayName(ent).trim());
-}
-
 interface DecisionHistoryViewProps {
   selectedRepo: Repository | null;
   questionContext: QuestionContext | null;
