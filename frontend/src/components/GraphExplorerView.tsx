@@ -467,17 +467,28 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
     return () => clearTimeout(timer);
   }, [searchQuery, repoId]);
 
-  // Filter nodes based on node-type checkboxes
+  // Filter nodes based on node-type checkboxes and Time-Travel year scrubber (2018 -> 2026)
+  const [timeTravelYear, setTimeTravelYear] = useState<number>(2026);
+
   const visibleNodesList = useMemo(() => {
     if (!graphData?.nodes) return [];
     return graphData.nodes.filter((node) => {
       const typeKey = node.type as keyof typeof filters;
-      if (filters[typeKey] !== undefined) {
-        return filters[typeKey];
+      if (filters[typeKey] !== undefined && !filters[typeKey]) {
+        return false;
+      }
+      if (timeTravelYear < 2026) {
+        const rawDate = (node as unknown as { date?: string; created_at?: string }).date
+          || (node as unknown as { date?: string; created_at?: string }).created_at
+          || '';
+        const match = /^(\d{4})/.exec(String(rawDate));
+        if (match && Number(match[1]) > timeTravelYear) {
+          return false;
+        }
       }
       return true;
     });
-  }, [graphData, filters]);
+  }, [graphData, filters, timeTravelYear]);
 
   const visibleNodeIds = useMemo(() => {
     return new Set(visibleNodesList.map((n) => n.id));
@@ -927,6 +938,34 @@ export const GraphExplorerView: React.FC<GraphExplorerViewProps> = ({
               <span className="w-4 border-t-2 border-[#E06C75]" />
               DECIDED_IN
             </span>
+          </div>
+
+          {/* F5: Time-Travel Graph Scrubber (2018 -> 2026) */}
+          <div className="flex items-center gap-3 pt-2 border-t border-[#292A23]/60 text-xs font-mono">
+            <span className="text-[#B9915E] font-semibold">⏳ Time-Travel Scrubber:</span>
+            <span className="text-[#A5A69D]">2018</span>
+            <input
+              type="range"
+              min={2018}
+              max={2026}
+              step={1}
+              value={timeTravelYear}
+              onChange={(e) => setTimeTravelYear(Number(e.target.value))}
+              aria-label="Time-Travel Year Scrubber"
+              className="w-44 accent-[#B9915E] cursor-pointer"
+            />
+            <span className="px-2 py-0.5 rounded bg-[#12130F] border border-[#B9915E]/40 text-[#F5F3ED] font-bold">
+              ≤ {timeTravelYear}
+            </span>
+            {timeTravelYear < 2026 && (
+              <button
+                type="button"
+                onClick={() => setTimeTravelYear(2026)}
+                className="text-[11px] text-[#A5A69D] hover:text-[#F5F3ED] underline cursor-pointer"
+              >
+                Reset to 2026
+              </button>
+            )}
           </div>
         </div>
       )}

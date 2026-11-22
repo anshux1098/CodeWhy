@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DecisionListItem, Entity, Repository } from '../types';
 import {
+  fetchLineBlame,
   fetchRepositoryDecisionHistory,
+  runPreflightCheck,
   searchRepositoryEntities,
+  type BlameLineItem,
+  type LineBlameResponse,
+  type PreflightResponse,
 } from '../services/api';
 import {
   AlertTriangle,
@@ -174,8 +179,74 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
   const [historyReload, setHistoryReload] = useState(0);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [preflightData, setPreflightData] = useState<PreflightResponse | null>(null);
+  const [diffText, setDiffText] = useState('');
+  const [isRunningPreflight, setIsRunningPreflight] = useState(false);
+  const [blameData, setBlameData] = useState<LineBlameResponse | null>(null);
+  const [selectedBlameLine, setSelectedBlameLine] = useState<BlameLineItem | null>(null);
+  const [isLoadingBlame, setIsLoadingBlame] = useState(false);
   // Monotonic token so a slow, older search can never overwrite a newer one.
   const searchSeqRef = useRef(0);
+
+  useEffect(() => {
+    setPreflightData(null);
+    setBlameData(null);
+    setSelectedBlameLine(null);
+    if (!repoId) return;
+    let cancelled = false;
+    runPreflightCheck(repoId)
+      .then((res) => {
+        if (!cancelled) setPreflightData(res);
+      })
+      .catch(() => {
+        // ignore if endpoint unavailable in mock unit test
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [repoId]);
+
+  useEffect(() => {
+    const targetPath = selectedEntity?.path || selectedEntity?.label || '';
+    if (!repoId || !targetPath) {
+      setBlameData(null);
+      setSelectedBlameLine(null);
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingBlame(true);
+    fetchLineBlame(repoId, targetPath)
+      .then((res) => {
+        if (!cancelled) {
+          setBlameData(res);
+          setSelectedBlameLine(res.selected_line ?? res.lines[0] ?? null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setBlameData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingBlame(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [repoId, selectedEntity?.id, selectedEntity?.path, selectedEntity?.label]);
+
+  const handleRunDiffPreflight = async (customDiff?: string) => {
+    if (!repoId) return;
+    const d = customDiff ?? diffText;
+    setIsRunningPreflight(true);
+    try {
+      const targetFiles = selectedEntity?.path ? [selectedEntity.path] : [];
+      const res = await runPreflightCheck(repoId, d, targetFiles);
+      setPreflightData(res);
+    } catch {
+      // ignore
+    } finally {
+      setIsRunningPreflight(false);
+    }
+  };
 
   useEffect(() => {
     const searchTerm = query.trim();
@@ -421,6 +492,104 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
               <p className="mt-1 break-all text-[11px] font-mono text-[#757F6C]">{selectedEntity.id}</p>
             </section>
 
+            {/* F2: Line-Level "Why Blame" Code Viewer */}
+            {blameData && blameData.lines.length > 0 && (
+              <section className="rounded-xl border border-[#292A23] bg-[#12130F] p-4 space-y-3 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#292A23] pb-2.5">
+                  <div>
+                    <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-[#B9915E]">
+                      Line-Level "Why Blame" Inspector — {blameData.path}
+                    </h3>
+                    <p className="text-[11px] text-[#A5A69D]">
+                      Click any decision-governed line to inspect its commit → PR → Decision &amp; revert lineage.
+                    </p>
+                  </div>
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#080907] border border-[#292A23] text-[#757F6C]">
+                    {blameData.governed_decisions_count} governing decision(s)
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+                  <div className="lg:col-span-7 max-h-64 overflow-y-auto rounded-lg bg-[#080907] border border-[#292A23] font-mono text-xs divide-y divide-[#181914]">
+                    {blameData.lines.map((ln) => {
+                      const isSel = selectedBlameLine?.line_number === ln.line_number;
+                      const state = ln.decision?.state || '';
+                      return (
+                        <button
+                          key={ln.line_number}
+                          type="button"
+                          onClick={() => setSelectedBlameLine(ln)}
+                          className={`w-full text-left px-3 py-1.5 flex items-center gap-2.5 transition-colors cursor-pointer ${
+                            isSel
+                              ? 'bg-[#B9915E]/20 text-[#F5F3ED]'
+                              : ln.governed
+                              ? 'hover:bg-[#181914] text-[#D4CBBF]'
+                              : 'text-[#757F6C] hover:bg-[#12130F]'
+                          }`}
+                        >
+                          <span className="w-7 shrink-0 text-right text-[10px] text-[#757F6C]">
+                            {ln.line_number}
+                          </span>
+                          <span
+                            className={`w-2 h-2 rounded-full shrink-0 ${
+                              !ln.governed
+                                ? 'bg-transparent'
+                                : state === 'ACTIVE'
+                                ? 'bg-[#3fb950]'
+                                : 'bg-[#B9915E]'
+                            }`}
+                          />
+                          <span className="w-16 shrink-0 text-[10px] text-[#A5A69D] truncate">
+                            {ln.sha || 'HEAD'}
+                          </span>
+                          <span className="truncate flex-1">{ln.code || ' '}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="lg:col-span-5 rounded-lg bg-[#080907] border border-[#292A23] p-3.5 space-y-2.5 text-xs">
+                    {isLoadingBlame ? (
+                      <p className="text-[#A5A69D] font-mono">Loading line blame…</p>
+                    ) : selectedBlameLine?.decision ? (
+                      <>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-[11px] text-[#B9915E]">
+                            Line {selectedBlameLine.line_number} · @{selectedBlameLine.author}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#12130F] border border-[#292A23] text-[#3fb950]">
+                            {selectedBlameLine.decision.state}
+                          </span>
+                        </div>
+                        <p className="font-semibold text-[#F5F3ED]">{selectedBlameLine.decision.summary}</p>
+                        {selectedBlameLine.decision.rule && (
+                          <p className="text-[11px] font-mono text-[#D4CBBF] bg-[#12130F] p-2 rounded border border-[#292A23]">
+                            Rule: {selectedBlameLine.decision.rule}
+                          </p>
+                        )}
+                        {selectedBlameLine.decision.quote && (
+                          <blockquote className="text-[11px] italic text-[#A5A69D] border-l-2 border-[#B9915E] pl-2.5">
+                            "{selectedBlameLine.decision.quote}"
+                          </blockquote>
+                        )}
+                        <div className="text-[10px] font-mono text-[#757F6C] flex flex-wrap gap-2 pt-1">
+                          <span>ID: {selectedBlameLine.decision.id}</span>
+                          {selectedBlameLine.decision.supersedes && (
+                            <span>· Supersedes: {selectedBlameLine.decision.supersedes}</span>
+                          )}
+                          {selectedBlameLine.decision.superseded_by && (
+                            <span className="text-[#f85149]">· Superseded by: {selectedBlameLine.decision.superseded_by}</span>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-[#A5A69D] font-mono">
+                        Select a highlighted line to inspect its governing decision and verbatim PR quote.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
+
             <div className="flex items-start gap-2.5 rounded-xl border border-[#B9915E]/30 bg-[#12130F] p-3.5 text-xs leading-relaxed text-[#A5A69D] shadow-sm">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#B9915E]" />
               <p>
@@ -507,6 +676,169 @@ export function FileDecisionBriefView({ selectedRepo }: FileDecisionBriefViewPro
           <div className="rounded-xl border border-[#292A23] bg-[#12130F] p-8 text-center space-y-2 shadow-sm">
             <Search className="mx-auto h-5 w-5 text-[#B9915E]" />
             <p className="text-xs font-mono text-[#A5A69D]">Search and select a file to build its brief.</p>
+          </div>
+        )}
+
+        {/* F6: Modification Risk Badge & Hotspot Map + F7: Constant Timeline + B7: Pre-Flight Diff Check */}
+        {preflightData && (
+          <div className="space-y-4 pt-2">
+            {/* Hotspot Grid */}
+            {preflightData.hotspots.length > 0 && (
+              <section className="rounded-xl border border-[#292A23] bg-[#12130F] p-4 space-y-3 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-[#F5F3ED]">
+                      Regression Hotspot Map &amp; Modification Risk Badges
+                    </h3>
+                    <p className="text-[11px] text-[#A5A69D]">
+                      Click any tracked file to open its decision brief and line-level Why Blame inspector.
+                    </p>
+                  </div>
+                  <span
+                    className={`px-2.5 py-0.5 rounded text-xs font-mono font-semibold border ${
+                      preflightData.risk_level === 'HIGH'
+                        ? 'bg-[#f85149]/15 text-[#f85149] border-[#f85149]/40'
+                        : preflightData.risk_level === 'MEDIUM'
+                        ? 'bg-[#B9915E]/15 text-[#B9915E] border-[#B9915E]/40'
+                        : 'bg-[#2ea043]/15 text-[#3fb950] border-[#2ea043]/40'
+                    }`}
+                  >
+                    Repo Posture: {preflightData.risk_badge}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {preflightData.hotspots.map((h) => (
+                    <button
+                      key={h.file}
+                      type="button"
+                      onClick={() =>
+                        setSelectedEntity({
+                          id: `file:${h.file}`,
+                          type: 'File',
+                          label: h.file,
+                          path: h.file,
+                          decision_count: h.active_count + h.reverted_or_superseded_count,
+                        })
+                      }
+                      className="text-left p-3 rounded-lg bg-[#080907] hover:bg-[#181914] border border-[#292A23] hover:border-[#B9915E]/50 transition-colors space-y-1.5 cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs font-semibold text-[#F5F3ED] truncate">{h.file}</span>
+                        <span
+                          className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold ${
+                            h.risk_level === 'HIGH'
+                              ? 'bg-[#f85149]/20 text-[#f85149]'
+                              : h.risk_level === 'MEDIUM'
+                              ? 'bg-[#B9915E]/20 text-[#B9915E]'
+                              : 'bg-[#2ea043]/20 text-[#3fb950]'
+                          }`}
+                        >
+                          {h.risk_badge}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#A5A69D] line-clamp-1">{h.top_decision}</p>
+                      <p className="text-[10px] font-mono text-[#757F6C]">
+                        {h.active_count} active · {h.reverted_or_superseded_count} reverted/superseded
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* F7: Visual Constant/Config Value Evolution Timeline */}
+            {preflightData.constant_timeline.length > 0 && (
+              <section className="rounded-xl border border-[#292A23] bg-[#12130F] p-4 space-y-3 shadow-sm">
+                <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-[#F5F3ED]">
+                  AST Constant &amp; Config Value Evolution Timeline
+                </h3>
+                <div className="space-y-2">
+                  {preflightData.constant_timeline.map((ct) => (
+                    <div
+                      key={`${ct.file}:${ct.name}`}
+                      className="p-3 rounded-lg bg-[#080907] border border-[#292A23] flex flex-wrap items-center justify-between gap-2 text-xs font-mono"
+                    >
+                      <div>
+                        <span className="text-[#B9915E] font-semibold">{ct.name}</span>
+                        <span className="text-[#757F6C] ml-2">({ct.file})</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {ct.transitions.map((tr, i) => (
+                          <span
+                            key={i}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#12130F] border border-[#292A23] text-[#F5F3ED]"
+                          >
+                            <span className="text-[#A5A69D]">{tr.old_value ?? 'init'}</span>
+                            <span className="text-[#B9915E]">→</span>
+                            <span className="text-[#3fb950] font-semibold">{tr.new_value}</span>
+                            <span className="text-[10px] text-[#757F6C]">({tr.source_id})</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* B7: Pre-Flight Diff Check Analyzer */}
+            <section className="rounded-xl border border-[#292A23] bg-[#12130F] p-4 space-y-3 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-[#F5F3ED]">
+                    Pre-Flight Impact &amp; Diff Analyzer
+                  </h3>
+                  <p className="text-[11px] text-[#A5A69D]">
+                    Paste a unified <code className="font-mono text-[#B9915E]">git diff</code> to check modified files and constants against ACTIVE decisions and past reverts.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sampleFile = preflightData.hotspots[0]?.file || 'src/retry.py';
+                      const sample = `diff --git a/${sampleFile} b/${sampleFile}\n--- a/${sampleFile}\n+++ b/${sampleFile}\n@@ -12,3 +12,3 @@\n-ALPN_PROTOCOLS = ['http/1.1']\n+ALPN_PROTOCOLS = ['h2', 'http/1.1']`;
+                      setDiffText(sample);
+                      handleRunDiffPreflight(sample);
+                    }}
+                    className="px-2.5 py-1 rounded bg-[#080907] hover:bg-[#181914] border border-[#292A23] text-xs font-mono text-[#A5A69D] hover:text-[#F5F3ED] cursor-pointer"
+                  >
+                    Load Sample Diff
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRunDiffPreflight()}
+                    disabled={isRunningPreflight}
+                    className="px-3 py-1 rounded bg-[#B9915E]/20 hover:bg-[#B9915E]/30 border border-[#B9915E]/40 text-xs font-mono font-semibold text-[#B9915E] cursor-pointer"
+                  >
+                    {isRunningPreflight ? 'Checking…' : 'Run Pre-Flight Check'}
+                  </button>
+                </div>
+              </div>
+              <textarea
+                value={diffText}
+                onChange={(e) => setDiffText(e.target.value)}
+                rows={3}
+                placeholder="Paste git diff here (e.g. +++ b/src/urllib3/util/ssl_.py)..."
+                className="w-full rounded-lg bg-[#080907] border border-[#292A23] p-2.5 font-mono text-xs text-[#F5F3ED] placeholder:text-[#757F6C]"
+              />
+              {preflightData.warnings.length > 0 && (
+                <div className="space-y-1.5">
+                  {preflightData.warnings.map((w, idx) => (
+                    <div
+                      key={idx}
+                      className="p-2.5 rounded-lg bg-[#080907] border border-[#B9915E]/40 flex items-start gap-2 text-xs"
+                    >
+                      <AlertTriangle className="h-4 w-4 text-[#B9915E] shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-mono font-semibold text-[#B9915E]">[{w.severity}] </span>
+                        <span className="text-[#F5F3ED]">{w.message}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         )}
       </main>

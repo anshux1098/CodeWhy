@@ -406,3 +406,223 @@ export async function auditRepositoryFiles(
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+export interface DuelClaim {
+  id: string;
+  text: string;
+  verified: boolean;
+  flag: string;
+}
+
+export interface HallucinationDuelResponse {
+  repository_id: string;
+  question: string;
+  plain_llm: {
+    model_label: string;
+    answer: string;
+    claims: DuelClaim[];
+    unverified_claims_count: number;
+    latency_ms: number;
+    tokens_used: number;
+  };
+  codewhy: {
+    model_label: string;
+    outcome: string;
+    reason_code?: string | null;
+    answer?: string | null;
+    confidence?: string | null;
+    citations: Array<{ id: string; quote: string; url?: string | null; author?: string | null }>;
+    verified_quotes_count: number;
+    latency_ms: number;
+    tokens_used: number;
+    gate_summary: string;
+  };
+  verdict: string;
+}
+
+export async function runHallucinationDuel(
+  repositoryId: string,
+  question: string,
+  entityId?: string,
+): Promise<HallucinationDuelResponse> {
+  const res = await fetch(
+    `/api/v1/repositories/${encodeURIComponent(repositoryId)}/duel`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ question, ...(entityId ? { entity_id: entityId } : {}) }),
+      signal: AbortSignal.timeout(15000),
+    },
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export interface BlameLineDecision {
+  id: string;
+  summary: string;
+  state: string;
+  date?: string | null;
+  rule?: string | null;
+  supersedes?: string | null;
+  superseded_by?: string | null;
+  quote: string;
+  source_id: string;
+  source_url: string;
+  author: string;
+}
+
+export interface BlameLineItem {
+  line_number: number;
+  code: string;
+  sha: string;
+  author: string;
+  summary: string;
+  governed: boolean;
+  decision?: BlameLineDecision | null;
+}
+
+export interface LineBlameResponse {
+  repository_id: string;
+  path: string;
+  total_lines: number;
+  governed_decisions_count: number;
+  selected_line?: BlameLineItem | null;
+  lines: BlameLineItem[];
+}
+
+export async function fetchLineBlame(
+  repositoryId: string,
+  path: string,
+  line?: number,
+): Promise<LineBlameResponse> {
+  const qs = new URLSearchParams({ path, ...(line !== undefined ? { line: String(line) } : {}) });
+  const res = await fetch(
+    `/api/v1/repositories/${encodeURIComponent(repositoryId)}/blame?${qs.toString()}`,
+    { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) },
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export interface PreflightResponse {
+  repository_id: string;
+  risk_level: 'HIGH' | 'MEDIUM' | 'LOW';
+  risk_badge: 'HIGH RISK' | 'CAUTION' | 'LOW RISK';
+  files_checked: string[];
+  constants_touched: string[];
+  active_constraints_count: number;
+  superseded_or_reverted_count: number;
+  warnings: Array<{ file: string; severity: string; message: string }>;
+  hotspots: Array<{
+    file: string;
+    risk_level: 'HIGH' | 'MEDIUM' | 'LOW';
+    risk_badge: string;
+    active_count: number;
+    reverted_or_superseded_count: number;
+    top_decision: string;
+  }>;
+  constant_timeline: Array<{
+    name: string;
+    file: string;
+    transitions: Array<{
+      old_value?: string | null;
+      new_value: string;
+      source_id: string;
+      date: string;
+      author: string;
+      summary?: string;
+    }>;
+  }>;
+}
+
+export async function runPreflightCheck(
+  repositoryId: string,
+  diff = '',
+  files: string[] = [],
+): Promise<PreflightResponse> {
+  const res = await fetch(
+    `/api/v1/repositories/${encodeURIComponent(repositoryId)}/preflight`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ diff, files }),
+      signal: AbortSignal.timeout(8000),
+    },
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export interface AdrExportResponse {
+  repository_id: string;
+  full_name: string;
+  total_adrs: number;
+  files: Array<{ path: string; title: string; state: string; date: string; content: string }>;
+  combined_markdown: string;
+}
+
+export async function exportRepositoryAdrs(repositoryId: string): Promise<AdrExportResponse> {
+  const res = await fetch(
+    `/api/v1/repositories/${encodeURIComponent(repositoryId)}/adrs/export`,
+    { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) },
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export interface TrustScoreboardResponse {
+  citation_precision_pct: number;
+  refusal_accuracy_pct: number;
+  hallucinations_blocked: number;
+  rejected_quotes_count: number;
+  unverified_decisions_blocked: number;
+  verified_decisions_total: number;
+  noisy_prs_filtered: number;
+  p50_latency_ms: number;
+  p95_latency_ms: number;
+  avg_tokens_per_answer: number;
+  tokens_on_refusal: number;
+  benchmark_cases: Array<{
+    question: string;
+    expected_outcome: string;
+    actual_outcome: string;
+    reason_code?: string | null;
+    verified_citations: number;
+    tokens_used: number;
+    latency_ms: number;
+    passed: boolean;
+  }>;
+}
+
+export async function fetchTrustScoreboard(): Promise<TrustScoreboardResponse> {
+  const res = await fetch('/api/v1/eval/scoreboard', {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export interface LiveExtractionPreviewResponse {
+  status: string;
+  injection_flagged: boolean;
+  injection_reasons: string[];
+  decision?: { summary: string; rationale: string; constraint_rule?: string | null } | null;
+  verified_quotes: Array<{ quote: string; verified: boolean; classification?: string }>;
+  rejected_quotes: Array<{ quote: string; reason: string }>;
+}
+
+export async function previewLiveExtraction(
+  text: string,
+  title = 'PR #42: Enforce strict timeout boundary',
+): Promise<LiveExtractionPreviewResponse> {
+  const res = await fetch('/api/v1/extract/preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ text, title, source_type: 'pr' }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
