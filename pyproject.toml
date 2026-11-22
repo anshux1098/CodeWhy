@@ -26,6 +26,9 @@ embeddings = [
     "sentence-transformers>=3.0",
 ]
 
+[project.scripts]
+codewhy-mcp = "app.mcp_server:main"
+
 [tool.setuptools.packages.find]
 where = ["backend"]
 include = ["app*"]
