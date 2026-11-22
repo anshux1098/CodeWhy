@@ -89,10 +89,14 @@ MATCH (d:Decision {repo: $repo})
 OPTIONAL MATCH (d)-[:GOVERNS]->(e:CodeEntity)
 OPTIONAL MATCH (d)-[:DECIDED_IN]->(src)
 OPTIONAL MATCH (d)-[:SUPPORTED_BY]->(ev:Evidence)
+OPTIONAL MATCH (p:Person)-[:AUTHORED|REVIEWED]->(src)
+OPTIONAL MATCH (src)-[:TRIGGERED_BY]->(inc:Incident)
 WITH collect(DISTINCT d) AS decisions, collect(DISTINCT e) AS entities,
-     collect(DISTINCT src) AS sources, collect(DISTINCT ev) AS evidence
-UNWIND (decisions + entities + sources + evidence) AS node
+     collect(DISTINCT src) AS sources, collect(DISTINCT ev) AS evidence,
+     collect(DISTINCT p) AS people, collect(DISTINCT inc) AS incidents
+UNWIND (decisions + entities + sources + evidence + people + incidents) AS node
 WITH DISTINCT node
+WHERE node IS NOT NULL
 LIMIT $node_cap
 RETURN node, labels(node) AS labels
 """

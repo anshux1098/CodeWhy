@@ -10,6 +10,8 @@ SOURCE_LABELS: dict[str, str] = {
     "issue": "Issue",
     "doc": "Document",
     "commit": "Commit",
+    "discussion": "Discussion",
+    "disc": "Discussion",
 }
 
 #: The enum spelling stored on the node, matching schemas.common.SourceType values.
@@ -18,9 +20,11 @@ SOURCE_TYPE_NAMES: dict[str, str] = {
     "issue": "Issue",
     "doc": "Document",
     "commit": "Commit",
+    "discussion": "Discussion",
+    "disc": "Discussion",
 }
 
-_NUMBERED = re.compile(r"^(?P<kind>pr|issue):[^#]*#(?P<number>\d+)$")
+_NUMBERED = re.compile(r"^(?P<kind>pr|issue|discussion|disc):[^#]*#(?P<number>\d+)$")
 
 
 def to_api_id(repo: str) -> str:
@@ -85,6 +89,10 @@ def source_url(source_id: Any, repo: str) -> str:
         number = source_number(text)
         if number is not None:
             return f"https://github.com/{repo}/issues/{number}"
+    if kind in ("discussion", "disc"):
+        number = source_number(text)
+        if number is not None:
+            return f"https://github.com/{repo}/discussions/{number}"
     if kind == "commit":
         sha = text.split(":", 1)[1] if ":" in text else ""
         if sha:

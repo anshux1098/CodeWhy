@@ -674,7 +674,11 @@ class Neo4jGraphStore(BaseGraphStore):
                     os.environ.setdefault("SSL_CERT_FILE", certifi.where())
                 except ImportError:
                     pass
-            driver = neo4j.GraphDatabase.driver(uri, auth=(user, password))
+            driver = neo4j.GraphDatabase.driver(
+                uri,
+                auth=(user, password),
+                connection_timeout=5.0,
+            )
         self.driver = driver
         self.database = database
 
@@ -1064,7 +1068,7 @@ class Neo4jGraphStore(BaseGraphStore):
         cql = (
             "MATCH (s)-[r]->(t) "
             "WHERE (s.repo = $repo OR t.repo = $repo) "
-            "AND type(r) IN ['REVERTS', 'SUPERSEDES', 'PART_OF', 'REFERENCES', 'CONTAINS'] "
+            "AND type(r) IN ['REVERTS', 'SUPERSEDES', 'PART_OF', 'REFERENCES', 'CONTAINS', 'IMPORTS', 'TRIGGERED_BY', 'AUTHORED', 'REVIEWED'] "
             "RETURN s.id AS source_id, type(r) AS rel_type, t.id AS target_id, properties(r) AS props"
         )
         with self.driver.session(database=self.database) as session:

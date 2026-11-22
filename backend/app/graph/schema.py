@@ -30,6 +30,7 @@ NODE_INDEXES: Final[tuple[str, ...]] = (
     "CREATE INDEX decision_repo_state IF NOT EXISTS FOR (d:Decision) ON (d.repo, d.state);",
     "CREATE INDEX commit_sha_lookup IF NOT EXISTS FOR (c:Commit) ON (c.sha);",
     "CREATE INDEX pr_number_lookup IF NOT EXISTS FOR (p:PullRequest) ON (p.repo, p.number);",
+    "CREATE INDEX person_id_lookup IF NOT EXISTS FOR (p:Person) ON (p.id);",
 )
 
 # ---------------------------------------------------------------------------

@@ -69,3 +69,109 @@ def test_rebuild_graph_creates_person_nodes_authored_reviewed_and_pre_stored_cou
         ent_node = store.get_node("file:acme/net:src/net/retry.py")
         assert ent_node is not None
         assert ent_node["decision_count"] == 1
+
+
+def test_full_11_label_graph_and_pre_stored_embeddings():
+    with TemporaryDirectory() as tmpdir:
+        db = Path(tmpdir) / "full11.sqlite3"
+        with SqliteCache(db) as cache:
+            cache.put_raw(
+                "pr",
+                "acme/net",
+                "42",
+                {
+                    "number": 42,
+                    "title": "Pin retry budget",
+                    "body": "Mobile clients kept timing out under INC-101.",
+                    "state": "MERGED",
+                    "merged": True,
+                    "mergedAt": "2025-03-01T00:00:00Z",
+                    "author": "alice",
+                    "reviews": [{"author": {"login": "bob"}, "state": "APPROVED", "body": "LGTM"}],
+                    "files": ["src/net/retry.py"],
+                },
+            )
+            cache.put_raw(
+                "issue",
+                "acme/net",
+                "10",
+                {"number": 10, "title": "Retry storm", "body": "Issue body", "author": "carol"},
+            )
+            cache.put_raw(
+                "discussion",
+                "acme/net",
+                "99",
+                {"number": 99, "title": "RFC: Retry policy", "body": "Discussion body", "author": "dave"},
+            )
+            cache.put_raw(
+                "doc",
+                "acme/net",
+                "docs/adr/0001-retry.md",
+                {"path": "docs/adr/0001-retry.md", "content": "ADR content"},
+            )
+            cache.put_commits_and_files_batch(
+                "acme/net",
+                [{"sha": "sha1", "subject": "Pin retry (#42)", "message": "Pin retry (#42)", "author_name": "alice"}],
+                [("sha1", {"path": "src/net/retry.py", "status": "M", "diff": "+RETRY = 5"})],
+            )
+            cache.put_decision({
+                "id": "dec_42",
+                "source_id": "pr:acme/net#42",
+                "repo": "acme/net",
+                "summary": "Pin retry budget to 5",
+                "decision_type": "Reliability",
+                "rationale": "Mobile clients kept timing out under INC-101.",
+                "state": "ACTIVE",
+                "affected_entities": ["src/net/retry.py"],
+                "quote_verified": True,
+                "extraction_version": "v1",
+                "content_hash": "h42",
+            })
+            cache.put_evidence({
+                "id": "ev_42",
+                "decision_id": "dec_42",
+                "source_id": "pr:acme/net#42",
+                "source_type": "PullRequest",
+                "source_url": "https://github.com/acme/net/pull/42",
+                "quote": "Mobile clients kept timing out under INC-101.",
+                "author": "alice",
+                "timestamp": "2025-03-01T00:00:00Z",
+                "classification": "rationale",
+                "claim": "Pin retry budget to 5",
+                "quote_verified": True,
+            })
+            cache.put_link({
+                "id": "lnk_inc",
+                "repo": "acme/net",
+                "source_id": "pr:acme/net#42",
+                "source_type": "PullRequest",
+                "rel_type": "TRIGGERED_BY",
+                "target_id": "incident:acme/net:INC-101",
+                "target_type": "Incident",
+                "confidence": 1.0,
+                "derivation_method": "regex",
+            })
+
+        store = InMemoryGraphStore()
+        rebuild_graph("acme/net", db, store)
+
+        label_counts = store.label_counts()
+        expected_11_labels = {
+            "Repository",
+            "CodeEntity",
+            "Decision",
+            "Evidence",
+            "PullRequest",
+            "Commit",
+            "Issue",
+            "Discussion",
+            "Document",
+            "Incident",
+            "Person",
+        }
+        assert expected_11_labels.issubset(set(label_counts.keys()))
+
+        dec_node = store.get_node("dec_42")
+        assert dec_node is not None
+        assert isinstance(dec_node.get("embedding"), list)
+        assert len(dec_node["embedding"]) == 384
