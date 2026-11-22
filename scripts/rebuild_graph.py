@@ -390,6 +390,11 @@ def _rebuild_graph_with_cache(
             "state": payload.get("state") or payload.get("status") or "",
             "mergedAt": payload.get("mergedAt") or payload.get("merged_at") or "",
             "createdAt": payload.get("createdAt") or payload.get("created_at") or "",
+            "files": [
+                str(f.get("path") if isinstance(f, dict) else f)
+                for f in (payload.get("files") or [])
+                if f
+            ],
         }
         _queue_node(label, properties)
 
@@ -468,6 +473,7 @@ def _rebuild_graph_with_cache(
             "decision_count": f_cov.get("verified_decisions", 0),
             **f_cov,
         })
+        _queue_rel("CONTAINS", slug, fid)
         module = get_module_for_path(path)
         if module:
             module_names.add(module)
@@ -486,6 +492,7 @@ def _rebuild_graph_with_cache(
             "decision_count": m_cov.get("verified_decisions", 0),
             **m_cov,
         })
+        _queue_rel("CONTAINS", slug, mid)
 
     # 4. Links & Supersession Analysis (Phase 4)
     for d in verified:
@@ -521,6 +528,12 @@ def _rebuild_graph_with_cache(
     parsed_entities_by_dec: list[list[str]] = []
     for d in verified:
         ents = json.loads(d["affected_entities"] or "[]")
+        if not ents:
+            sid = str(d.get("source_id") or "")
+            raw_files = (source_metadata.get(sid) or {}).get("files") or []
+            ents = [str(f) for f in raw_files if f][:3]
+        if not ents and ordered_paths:
+            ents = [ordered_paths[0]]
         parsed_entities_by_dec.append(ents)
         ents_str = " ".join(str(e) for e in ents)
         embed_inputs.append(f"{ents_str} {d['summary']} {d.get('rationale') or ''}".strip())
@@ -585,6 +598,7 @@ def _rebuild_graph_with_cache(
                     "decision_count": e_cov.get("verified_decisions", 0),
                     **e_cov,
                 })
+                _queue_rel("CONTAINS", slug, ent_id)
             _queue_rel("GOVERNS", dec_id, ent_id)
 
         for ev in cache.evidence_for_decision(dec_id):

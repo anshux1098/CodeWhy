@@ -37,7 +37,7 @@ NON_LIBRARY_DIRS: frozenset[str] = frozenset({
     "benchmark", "benchmarks",
     "script", "scripts",
     "dummyserver",
-    "packages", "vendor", "third_party", "node_modules", "dist", "build",
+    "vendor", "third_party", "node_modules", "dist", "build",
     ".github", ".circleci", ".gitlab", "_travis",
 })
 
@@ -77,6 +77,10 @@ def is_library_source_file(
         return False
     dir_parts = {p.lower() for p in parts[:-1]}
     if dir_parts & NON_LIBRARY_DIRS:
+        return False
+    # Nested `.../packages/...` (e.g. `src/urllib3/packages/six.py`) is vendored code,
+    # whereas top-level `packages/<workspace>/...` is a monorepo package root.
+    if "packages" in {p.lower() for p in parts[1:-1]}:
         return False
     if any(p.startswith((".", "_")) and p != "__init__.py" for p in parts[:-1]):
         return False
