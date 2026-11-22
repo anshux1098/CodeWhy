@@ -344,25 +344,25 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
 
           {/* F1: Hallucination Duel Split-Screen (works standalone or alongside an answer) */}
           {duelResult && (
-            <div className="rounded-xl bg-[#12130F] border border-[#B9915E]/40 p-5 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#292A23] pb-3">
+            <div className="rounded-xl bg-[#242038] border border-[#9067C6]/50 p-5 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#CAC4CE]/20 pb-3">
                 <div>
-                  <span className="text-xs font-mono uppercase tracking-wider text-[#B9915E] font-semibold">
+                  <span className="text-xs font-mono uppercase tracking-wider text-[#C5B0E6] font-semibold">
                     ⚔️ Hallucination Duel — Side-by-Side Comparison
                   </span>
-                  <p className="text-xs text-[#A5A69D] mt-0.5">{duelResult.verdict}</p>
+                  <p className="text-xs text-[#CAC4CE] mt-0.5">{duelResult.verdict}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setDuelResult(null)}
-                  className="text-xs font-mono text-[#A5A69D] hover:text-[#F5F3ED] px-2 py-0.5 rounded border border-[#292A23] cursor-pointer"
+                  className="text-xs font-mono text-[#CAC4CE] hover:text-[#F7ECE1] px-2 py-0.5 rounded border border-[#CAC4CE]/20 cursor-pointer"
                 >
                   Close Duel
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Left: Plain Ungrounded LLM */}
-                <div className="rounded-lg bg-[#080907] border border-[#f85149]/40 p-4 space-y-3">
+                <div className="rounded-lg bg-[#161324] border border-[#f85149]/40 p-4 space-y-3">
                   <div className="flex items-center justify-between text-xs font-mono">
                     <span className="text-[#f85149] font-semibold">{duelResult.plain_llm.model_label}</span>
                     <span className="px-2 py-0.5 rounded bg-[#f85149]/15 text-[#f85149] border border-[#f85149]/30">
@@ -371,8 +371,8 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
                   </div>
                   <div className="space-y-2">
                     {duelResult.plain_llm.claims.map((c) => (
-                      <div key={c.id} className="p-2.5 rounded bg-[#12130F] border border-[#f85149]/30 text-xs space-y-1">
-                        <p className="text-[#F5F3ED] leading-relaxed">{c.text}</p>
+                      <div key={c.id} className="p-2.5 rounded bg-[#242038] border border-[#f85149]/30 text-xs space-y-1">
+                        <p className="text-[#F7ECE1] leading-relaxed">{c.text}</p>
                         <span className="inline-block text-[10px] font-mono text-[#f85149]">
                           ⚠ {c.flag}
                         </span>
@@ -382,22 +382,22 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
                 </div>
 
                 {/* Right: CodeWhy 4-Gate Engine */}
-                <div className="rounded-lg bg-[#080907] border border-[#2ea043]/40 p-4 space-y-3">
+                <div className="rounded-lg bg-[#161324] border border-[#3fb950]/40 p-4 space-y-3">
                   <div className="flex items-center justify-between text-xs font-mono">
                     <span className="text-[#3fb950] font-semibold">{duelResult.codewhy.model_label}</span>
-                    <span className="px-2 py-0.5 rounded bg-[#2ea043]/15 text-[#3fb950] border border-[#2ea043]/30">
+                    <span className="px-2 py-0.5 rounded bg-[#3fb950]/15 text-[#3fb950] border border-[#3fb950]/30">
                       {duelResult.codewhy.gate_summary}
                     </span>
                   </div>
                   {duelResult.codewhy.answer && (
-                    <p className="text-xs text-[#F5F3ED] leading-relaxed bg-[#12130F] p-3 rounded border border-[#292A23]">
+                    <p className="text-xs text-[#F7ECE1] leading-relaxed bg-[#242038] p-3 rounded border border-[#CAC4CE]/20">
                       {duelResult.codewhy.answer}
                     </p>
                   )}
                   {duelResult.codewhy.citations.map((cit) => (
-                    <div key={cit.id} className="p-2.5 rounded bg-[#12130F] border border-[#2ea043]/30 text-xs space-y-1">
+                    <div key={cit.id} className="p-2.5 rounded bg-[#242038] border border-[#3fb950]/30 text-xs space-y-1">
                       <p className="font-mono text-[#3fb950] text-[11px]">✓ Character-Verified Quote ({cit.id})</p>
-                      <p className="text-[#D4CBBF] italic">"{cit.quote}"</p>
+                      <p className="text-[#CAC4CE] italic">"{cit.quote}"</p>
                     </div>
                   ))}
                 </div>
@@ -408,9 +408,9 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
           {!isLoading && response && (
             <div className="space-y-4">
               {/* F3: Per-Answer Engineering Telemetry Chip + F9: Shareable Permalink */}
-              <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-lg bg-[#0B0C09] border border-[#292A23] text-xs font-mono">
-                <div className="flex flex-wrap items-center gap-2 text-[#A5A69D]">
-                  <span className="text-[#B9915E] font-semibold">⚡ Telemetry:</span>
+              <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-lg bg-[#242038] border border-[#CAC4CE]/20 text-xs font-mono">
+                <div className="flex flex-wrap items-center gap-2 text-[#CAC4CE]">
+                  <span className="text-[#C5B0E6] font-semibold">⚡ Telemetry:</span>
                   <span>{answerLatencyMs !== null ? `${answerLatencyMs}ms` : '42ms'}</span>
                   <span>·</span>
                   <span>
@@ -419,7 +419,7 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
                       : `${Math.max(240, (response.answer?.length || 100) * 2 + activeCitations.length * 95)} tokens`}
                   </span>
                   <span>·</span>
-                  <span className={response.outcome === 'refusal' ? 'text-[#D4CBBF]' : 'text-[#3fb950]'}>
+                  <span className={response.outcome === 'refusal' ? 'text-[#CAC4CE]' : 'text-[#3fb950]'}>
                     {response.outcome === 'refusal'
                       ? `Gate Refusal (${response.reason_code || 'no_decision_path'})`
                       : `${activeCitations.length} verbatim quote(s) verified`}
@@ -429,7 +429,7 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
                   <button
                     type="button"
                     onClick={handleCopyPermalink}
-                    className="px-2.5 py-1 rounded bg-[#12130F] hover:bg-[#181914] border border-[#292A23] text-[#F5F3ED] transition-colors cursor-pointer"
+                    className="px-2.5 py-1 rounded bg-[#161324] hover:bg-[#322D4D] border border-[#CAC4CE]/20 text-[#F7ECE1] transition-colors cursor-pointer"
                   >
                     {copiedPermalink ? '✓ Permalink Copied' : 'Share Receipt Link'}
                   </button>
@@ -437,7 +437,7 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
                     type="button"
                     onClick={handleRunDuel}
                     disabled={isDuelLoading}
-                    className="px-2.5 py-1 rounded bg-[#B9915E]/15 hover:bg-[#B9915E]/25 border border-[#B9915E]/40 text-[#B9915E] font-semibold transition-colors cursor-pointer"
+                    className="px-2.5 py-1 rounded bg-[#9067C6]/25 hover:bg-[#9067C6]/35 border border-[#9067C6]/50 text-[#C5B0E6] font-semibold transition-colors cursor-pointer"
                   >
                     {isDuelLoading ? 'Running Duel…' : '⚔️ Run Hallucination Duel'}
                   </button>
@@ -750,7 +750,7 @@ export const IntelligenceWorkspace: React.FC<IntelligenceWorkspaceProps> = ({
               type="button"
               onClick={handleRunDuel}
               disabled={isLoading || isDuelLoading || !repoId}
-              className="px-3 py-1.5 rounded-lg bg-[#12130F] hover:bg-[#181914] text-[#B9915E] border border-[#B9915E]/40 font-mono text-xs font-semibold transition-colors disabled:opacity-40 cursor-pointer shrink-0"
+              className="px-3 py-1.5 rounded-lg bg-[#9067C6]/20 hover:bg-[#9067C6]/30 text-[#C5B0E6] border border-[#9067C6]/50 font-mono text-xs font-semibold transition-colors disabled:opacity-40 cursor-pointer shrink-0"
               title="Run side-by-side Hallucination Duel (Plain LLM vs CodeWhy)"
             >
               {isDuelLoading ? 'Duel…' : '⚔️ Duel'}

@@ -9,6 +9,7 @@ import { DecisionHistoryView } from './components/DecisionHistoryView';
 import { RepositoryStatusView } from './components/RepositoryStatusView';
 import { GraphExplorerView } from './components/GraphExplorerView';
 import { FileDecisionBriefView } from './components/FileDecisionBriefView';
+import { McpServerView } from './components/McpServerView';
 import type { Repository, QuestionContext, AskResponse } from './types';
 import { fetchRepositories, fetchHealth } from './services/api';
 
@@ -68,6 +69,12 @@ export function App() {
           return { tab: 'file' as const, repoId: idFromUrl };
         }
       }
+      if (sub.endsWith('/mcp')) {
+        const idFromUrl = decodeURIComponent(sub.replace(/\/mcp\/?$/, '')).replace(/\/$/, '');
+        if (idFromUrl) {
+          return { tab: 'mcp' as const, repoId: idFromUrl };
+        }
+      }
       const idFromUrl = decodeURIComponent(sub).replace(/\/$/, '');
       if (idFromUrl) {
         return { tab: 'workspace' as const, repoId: idFromUrl };
@@ -103,6 +110,11 @@ export function App() {
         }
       } else if (tab === 'file' && targetRepo) {
         const newUrl = `/r/${encodeURIComponent(targetRepo.id)}/file`;
+        if (window.location.pathname !== newUrl) {
+          window.history.pushState(null, '', newUrl);
+        }
+      } else if (tab === 'mcp' && targetRepo) {
+        const newUrl = `/r/${encodeURIComponent(targetRepo.id)}/mcp`;
         if (window.location.pathname !== newUrl) {
           window.history.pushState(null, '', newUrl);
         }
@@ -310,7 +322,7 @@ export function App() {
 
       <div className="flex flex-1 z-10 min-h-0">
         <Sidebar
-          variant={currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' || currentTab === 'graph' ? 'landing' : 'default'}
+          variant="landing"
           currentTab={currentTab}
           onSelectTab={(tab) => navigateToTab(tab)}
           isOpen={sidebarOpen}
@@ -320,7 +332,7 @@ export function App() {
         {/* Main Content Area */}
         <main
           className="flex-1 flex flex-col min-w-0"
-          style={{ backgroundColor: currentTab === 'home' || currentTab === 'workspace' || currentTab === 'decisions' || currentTab === 'file' || currentTab === 'status' || currentTab === 'graph' ? 'var(--cw-bg)' : 'var(--canvas)' }}
+          style={{ backgroundColor: 'var(--cw-bg)' }}
         >
           {currentTab === 'home' ? (
             <Hero
@@ -353,6 +365,10 @@ export function App() {
           ) : currentTab === 'file' ? (
             <FileDecisionBriefView
               key={selectedRepo?.id}
+              selectedRepo={selectedRepo}
+            />
+          ) : currentTab === 'mcp' ? (
+            <McpServerView
               selectedRepo={selectedRepo}
             />
           ) : (

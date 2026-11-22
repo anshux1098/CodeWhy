@@ -8,9 +8,10 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   FileCode2,
+  Cpu,
 } from 'lucide-react';
 
-export type AppTab = 'home' | 'workspace' | 'decisions' | 'status' | 'graph' | 'file';
+export type AppTab = 'home' | 'workspace' | 'decisions' | 'status' | 'graph' | 'file' | 'mcp';
 
 interface SidebarProps {
   variant?: 'default' | 'landing';
@@ -34,6 +35,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'file', label: 'Before You Change', icon: FileCode2, accent: 'var(--tab-file)' },
   { id: 'graph', label: 'Knowledge Graph', icon: GitFork, accent: 'var(--tab-graph)' },
   { id: 'status', label: 'Repo Status', icon: Activity, accent: 'var(--tab-status)' },
+  { id: 'mcp', label: 'MCP Server', icon: Cpu, accent: 'var(--tab-investigate)' },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({

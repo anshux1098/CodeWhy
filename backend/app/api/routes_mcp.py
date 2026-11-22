@@ -57,14 +57,31 @@ def verify_mcp_token(token: str) -> bool:
 
 def _is_valid_localhost_redirect(redirect_uri: str) -> bool:
     parsed = urlsplit(redirect_uri)
-    return (
+    if (
         parsed.scheme == "http"
         and parsed.hostname in {"127.0.0.1", "localhost"}
         and parsed.port is not None
         and parsed.path == "/callback"
         and not parsed.query
         and not parsed.fragment
-    )
+    ):
+        return True
+    # Allow UI "Preview Browser Auth" redirect back to the CodeWhy MCP tab
+    if (
+        parsed.scheme in {"http", "https"}
+        and parsed.hostname is not None
+        and parsed.path.endswith("/mcp")
+        and parsed.path.startswith("/r/")
+        and not parsed.query
+        and not parsed.fragment
+        and (
+            parsed.hostname in {"127.0.0.1", "localhost"}
+            or parsed.hostname.endswith(".onrender.com")
+            or parsed.hostname.endswith(".vercel.app")
+        )
+    ):
+        return True
+    return False
 
 
 def _check_mcp_token(authorization: str | None) -> None:
@@ -94,14 +111,14 @@ async def mcp_authorize_page(
   <meta charset="utf-8" />
   <title>Authorize CodeWhy MCP</title>
   <style>
-    body {{ font-family: system-ui, -apple-system, sans-serif; background: #0b1020; color: #e5e7eb; display: grid; place-items: center; min-height: 100vh; margin: 0; }}
-    .card {{ background: #131a2e; border: 1px solid #26314d; border-radius: 12px; padding: 28px; max-width: 440px; width: 90%; box-shadow: 0 12px 32px rgba(0,0,0,.4); }}
+    body {{ font-family: system-ui, -apple-system, sans-serif; background: #191628; color: #F7ECE1; display: grid; place-items: center; min-height: 100vh; margin: 0; }}
+    .card {{ background: #242038; border: 1px solid rgba(202, 196, 206, 0.22); border-radius: 12px; padding: 28px; max-width: 440px; width: 90%; box-shadow: 0 12px 32px rgba(0,0,0,.4); }}
     h1 {{ margin: 0 0 8px; font-size: 20px; }}
-    p {{ color: #9ca3af; font-size: 14px; line-height: 1.5; }}
-    ul {{ color: #cbd5e1; font-size: 13px; padding-left: 18px; margin: 14px 0 20px; }}
-    button {{ width: 100%; background: #3b82f6; color: #fff; border: 0; border-radius: 8px; padding: 11px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }}
-    button:hover {{ background: #2563eb; }}
-    .target {{ font-family: ui-monospace, monospace; font-size: 12px; color: #93c5fd; word-break: break-all; }}
+    p {{ color: #CAC4CE; font-size: 14px; line-height: 1.5; }}
+    ul {{ color: #CAC4CE; font-size: 13px; padding-left: 18px; margin: 14px 0 20px; }}
+    button {{ width: 100%; background: #9067C6; color: #fff; border: 0; border-radius: 8px; padding: 11px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }}
+    button:hover {{ background: #7B52B3; }}
+    .target {{ font-family: ui-monospace, monospace; font-size: 12px; color: #8D86C9; word-break: break-all; }}
   </style>
 </head>
 <body>
